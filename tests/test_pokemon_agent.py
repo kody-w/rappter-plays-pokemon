@@ -33,6 +33,7 @@ from openrappter.agents.pokemon_agent import (
     runner_main,
     runtime_command,
     runtime_status,
+    seed_legacy_ram_provenance,
     supervisor_main,
     wait_for_supervised_child,
 )
@@ -304,18 +305,33 @@ def test_paused_runner_pumps_window_events_without_applying_input():
 
 
 def test_resume_skips_corrupt_newest_checkpoint(tmp_path):
-    older = tmp_path / "state-0001.state"
+    older = tmp_path / "state-20260711-120000-000001.state"
     older.write_bytes(b"older-valid")
     older.with_suffix(".json").write_text(
-        json.dumps({"rom_sha256": "rom-hash", "sha256": file_sha256(older)})
+        json.dumps(
+            {
+                "schema_version": 1,
+                "rom_sha256": "rom-hash",
+                "sha256": file_sha256(older),
+                "created_at": "2026-07-11T12:00:00+00:00",
+            }
+        )
     )
-    newer = tmp_path / "state-0002.state"
+    newer = tmp_path / "state-20260711-120001-000001.state"
     newer.write_bytes(b"corrupt")
     newer.with_suffix(".json").write_text(
-        json.dumps({"rom_sha256": "rom-hash", "sha256": "wrong"})
+        json.dumps(
+            {
+                "schema_version": 1,
+                "rom_sha256": "rom-hash",
+                "sha256": "wrong",
+                "created_at": "2026-07-11T12:01:00+00:00",
+            }
+        )
     )
     runner = PokemonRunner.__new__(PokemonRunner)
     runner.args = SimpleNamespace(resume=True)
+    runner.runtime_dir = tmp_path
     runner.states_dir = tmp_path
     runner.pyboy = FakeStateEmulator()
     runner.player = ActionPlayer()
@@ -326,6 +342,264 @@ def test_resume_skips_corrupt_newest_checkpoint(tmp_path):
     assert selected == older
     assert runner.pyboy.loaded[-1] == b"older-valid"
     assert runner.pyboy.ticks == 1
+
+
+def test_interrupted_checkpoint_requires_matching_pending_provenance(tmp_path):
+    state = tmp_path / "state-20260711-120000-000001.state"
+    state.write_bytes(b"recoverable")
+    state.with_suffix(".pending.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "state_name": state.name,
+                "created_at": "2026-07-11T12:00:00+00:00",
+                "reason": "interrupted",
+                "rom_sha256": "rom-hash",
+            }
+        )
+    )
+    runner = PokemonRunner.__new__(PokemonRunner)
+    runner.runtime_dir = tmp_path
+    runner.states_dir = tmp_path
+    runner.status = {"rom_sha256": "rom-hash"}
+
+    runner._recover_orphaned_states()
+
+    manifest = json.loads(state.with_suffix(".json").read_text())
+    assert manifest["recovered"] is True
+    assert manifest["rom_sha256"] == "rom-hash"
+    assert manifest["sha256"] == file_sha256(state)
+
+
+def test_ambiguous_orphaned_checkpoint_is_quarantined(tmp_path):
+    state = tmp_path / "state-20260711-120000-000001.state"
+    state.write_bytes(b"unknown")
+    runner = PokemonRunner.__new__(PokemonRunner)
+    runner.runtime_dir = tmp_path
+    runner.states_dir = tmp_path
+    runner.status = {"rom_sha256": "rom-hash"}
+
+    runner._recover_orphaned_states()
+
+    assert not state.exists()
+    assert list((tmp_path / "quarantine").glob("*.orphan"))
+
+
+def test_cartridge_ram_is_rom_scoped_and_manifested(tmp_path):
+    class RamEmulator:
+        def stop(self, save, ram_file):
+            assert save is True
+            ram_file.write(b"battery-ram")
+
+    runner = PokemonRunner.__new__(PokemonRunner)
+    runner.runtime_dir = tmp_path
+    runner.rom_sha256 = "a" * 64
+    runner.ram_path = tmp_path / f"pokemon-red-{runner.rom_sha256[:16]}.ram"
+    runner.pyboy = RamEmulator()
+    runner.status = {}
+
+    runner._save_ram_and_stop()
+
+    manifest = json.loads(runner.ram_path.with_suffix(".json").read_text())
+    assert manifest["rom_sha256"] == runner.rom_sha256
+    assert manifest["sha256"] == file_sha256(runner.ram_path)
+    assert runner._validated_ram_path() == runner.ram_path
+
+
+def test_invalid_utf8_ram_manifest_is_quarantined(tmp_path):
+    scoped = tmp_path / f"pokemon-red-{'b' * 16}.ram"
+    scoped.write_bytes(b"ram")
+    scoped.with_suffix(".json").write_bytes(b"\xff\xfeinvalid")
+    runner = PokemonRunner.__new__(PokemonRunner)
+    runner.runtime_dir = tmp_path
+    runner.rom_sha256 = "b" * 64
+    runner.ram_path = scoped
+    runner.status = {}
+
+    assert runner._validated_ram_path() is None
+    assert not scoped.exists()
+    assert list((tmp_path / "quarantine").glob("*.invalid"))
+
+
+def test_ram_manifest_failure_restores_previous_verified_pair(monkeypatch, tmp_path):
+    class NewRamEmulator:
+        def stop(self, save, ram_file):
+            assert save is True
+            ram_file.write(b"new-ram")
+
+    runner = PokemonRunner.__new__(PokemonRunner)
+    runner.runtime_dir = tmp_path
+    runner.rom_sha256 = "d" * 64
+    runner.ram_path = tmp_path / f"pokemon-red-{runner.rom_sha256[:16]}.ram"
+    runner.ram_path.write_bytes(b"old-ram")
+    old_manifest = {
+        "schema_version": 1,
+        "rom_sha256": runner.rom_sha256,
+        "sha256": file_sha256(runner.ram_path),
+    }
+    runner.ram_path.with_suffix(".json").write_text(json.dumps(old_manifest))
+    runner.pyboy = NewRamEmulator()
+    runner.status = {}
+    real_atomic_write = pokemon_module.atomic_write_json
+
+    def fail_new_manifest(path, value):
+        if path == runner.ram_path.with_suffix(".json") and value.get("bytes") == 7:
+            raise OSError("disk full")
+        real_atomic_write(path, value)
+
+    monkeypatch.setattr(pokemon_module, "atomic_write_json", fail_new_manifest)
+
+    with pytest.raises(OSError, match="disk full"):
+        runner._save_ram_and_stop()
+
+    assert runner.ram_path.read_bytes() == b"old-ram"
+    restored = json.loads(runner.ram_path.with_suffix(".json").read_text())
+    assert restored["sha256"] == old_manifest["sha256"]
+
+
+def test_legacy_ram_is_migrated_only_when_rom_context_matches(tmp_path):
+    legacy = tmp_path / "pokemon-red.ram"
+    legacy.write_bytes(b"\x00" * 32768)
+    rom_sha = "e" * 64
+    (tmp_path / "legacy-ram-provenance.json").write_text(
+        json.dumps({"rom_sha256": rom_sha})
+    )
+    runner = PokemonRunner.__new__(PokemonRunner)
+    runner.runtime_dir = tmp_path
+    runner.rom_sha256 = rom_sha
+    runner.ram_path = tmp_path / f"pokemon-red-{rom_sha[:16]}.ram"
+    runner.status = {"rom_title": "POKEMON RED"}
+
+    assert runner._validated_ram_path() == runner.ram_path
+    assert not legacy.exists()
+    assert runner.ram_path.stat().st_size == 32768
+    manifest = json.loads(runner.ram_path.with_suffix(".json").read_text())
+    assert manifest["migrated_from"] == "pokemon-red.ram"
+
+
+def test_ram_recovery_handles_split_backup_pair(tmp_path):
+    rom_sha = "f" * 64
+    runner = PokemonRunner.__new__(PokemonRunner)
+    runner.runtime_dir = tmp_path
+    runner.rom_sha256 = rom_sha
+    runner.ram_path = tmp_path / f"pokemon-red-{rom_sha[:16]}.ram"
+    runner.status = {}
+    backup_ram, _ = runner._ram_backup_paths()
+    backup_ram.write_bytes(b"verified-old")
+    runner.ram_path.with_suffix(".json").write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "rom_sha256": rom_sha,
+                "sha256": file_sha256(backup_ram),
+            }
+        )
+    )
+
+    assert runner._validated_ram_path() == runner.ram_path
+    assert runner.ram_path.read_bytes() == b"verified-old"
+
+
+def test_contradictory_legacy_manifest_is_never_overridden_by_size_heuristic(tmp_path):
+    legacy = tmp_path / "pokemon-red.ram"
+    legacy.write_bytes(b"\x00" * 32768)
+    legacy.with_suffix(".json").write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "rom_sha256": "other-rom",
+                "sha256": file_sha256(legacy),
+            }
+        )
+    )
+    rom_sha = "1" * 64
+    (tmp_path / "legacy-ram-provenance.json").write_text(
+        json.dumps({"rom_sha256": rom_sha})
+    )
+    runner = PokemonRunner.__new__(PokemonRunner)
+    runner.runtime_dir = tmp_path
+    runner.rom = tmp_path / "Pokemon Red.gb"
+    runner.rom_sha256 = rom_sha
+    runner.ram_path = tmp_path / f"pokemon-red-{rom_sha[:16]}.ram"
+    runner.status = {"rom_title": "POKEMON RED"}
+
+    assert runner._validated_ram_path() is None
+    assert legacy.exists()
+    assert not runner.ram_path.exists()
+
+
+def test_immutable_legacy_provenance_survives_rewritten_current_config(tmp_path):
+    legacy = tmp_path / "pokemon-red.ram"
+    legacy.write_bytes(b"\x00" * 32768)
+    (tmp_path / "legacy-ram-provenance.json").write_text(
+        json.dumps({"rom_sha256": "original-rom"})
+    )
+    (tmp_path / "config.json").write_text(
+        json.dumps({"rom_sha256": "new-rom", "rom_path": "/new/rom.gb"})
+    )
+    runner = PokemonRunner.__new__(PokemonRunner)
+    runner.runtime_dir = tmp_path
+    runner.rom = tmp_path / "new-rom.gb"
+    runner.rom_sha256 = "new-rom"
+    runner.ram_path = tmp_path / "pokemon-red-new-rom.ram"
+    runner.status = {"rom_title": "POKEMON RED"}
+
+    assert runner._validated_ram_path() is None
+    assert legacy.exists()
+    assert not runner.ram_path.exists()
+
+
+def test_released_layout_seeds_legacy_provenance_from_prior_status(tmp_path):
+    legacy = tmp_path / "pokemon-red.ram"
+    legacy.write_bytes(b"\x00" * 32768)
+    rom_sha = "2" * 64
+    (tmp_path / "config.json").write_text(
+        json.dumps({"rom_path": "/owned/Pokemon Red.gb"})
+    )
+    (tmp_path / "status.json").write_text(
+        json.dumps({"rom_sha256": rom_sha})
+    )
+
+    seed_legacy_ram_provenance(tmp_path)
+
+    provenance = json.loads(
+        (tmp_path / "legacy-ram-provenance.json").read_text()
+    )
+    assert provenance["rom_sha256"] == rom_sha
+    assert provenance["rom_path"] == "/owned/Pokemon Red.gb"
+
+
+def test_controller_normalization_failure_does_not_quarantine_valid_state(tmp_path):
+    state = tmp_path / "state-20260711-120000-000001.state"
+    state.write_bytes(b"valid")
+    state.with_suffix(".json").write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "created_at": "2026-07-11T12:00:00+00:00",
+                "rom_sha256": "rom-hash",
+                "sha256": file_sha256(state),
+            }
+        )
+    )
+
+    class StopsDuringNormalization(FakeStateEmulator):
+        def tick(self):
+            return False
+
+    runner = PokemonRunner.__new__(PokemonRunner)
+    runner.args = SimpleNamespace(resume=True)
+    runner.runtime_dir = tmp_path
+    runner.states_dir = tmp_path
+    runner.pyboy = StopsDuringNormalization()
+    runner.player = ActionPlayer()
+    runner.status = {"rom_sha256": "rom-hash"}
+
+    with pytest.raises(RuntimeError, match="normalizing controller"):
+        runner._load_latest_state()
+
+    assert state.exists()
+    assert state.with_suffix(".json").exists()
 
 
 def test_stale_ai_decision_is_discarded_after_manual_takeover():
@@ -888,7 +1162,7 @@ def test_retention_removes_only_old_generated_artifacts(tmp_path):
             json.dumps(
                 {
                     "schema_version": 1,
-                    "sha256": "state-hash",
+                    "sha256": file_sha256(state),
                     "rom_sha256": "rom-hash",
                     "reason": "routine",
                 }
