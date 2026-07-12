@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+      - name: Install test dependencies only
+        run: python -m pip install -e ".[dev]"
+      - name: Lint
+        run: ruff check .
+      - name: Compile
+        run: python -m compileall -q pokemon_agent.py src tests
+      - name: Shell syntax
+        run: bash -n bootstrap.sh launch.sh uninstall.sh
+      - name: ROM-free mocked smoke test and unit suite
+        run: pytest
+      - name: Reject prohibited artifacts
+        run: |
+          if find . -type f \( \
+            -iname '*.gb' -o -iname '*.gbc' -o -iname '*.rom' -o \
+            -iname '*.sav' -o -iname '*.ram' -o -iname '*.state' -o \
+            -iname '*.mp4' -o -iname '*.mov' -o -iname '*.mkv' -o \
+            -iname '*.png' -o -iname '*.jpg' -o -iname '*.jpeg' \
+          \) -not -path './.git/*' -print -quit | grep -q .; then
+            echo "Prohibited game/runtime artifact found" >&2
+            exit 1
+          fi
