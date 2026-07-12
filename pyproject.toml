@@ -1,0 +1,72 @@
+[build-system]
+requires = ["setuptools>=75,<81"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "rappter-plays-pokemon"
+version = "1.0.0"
+description = "A ROM-free OpenRappter agent for locally attempting Pokemon Red with GitHub Copilot and PyBoy"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+authors = [{ name = "Kody W" }]
+keywords = ["openrappter", "github-copilot", "pyboy", "agent"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Operating System :: MacOS",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+]
+dependencies = []
+
+[project.optional-dependencies]
+runtime = [
+  "github-copilot-sdk>=1.0.6,<2",
+  "Pillow>=10,<13",
+  "PyBoy>=2.6.1,<3",
+]
+dev = [
+  "pytest>=8.3,<9",
+  "pytest-cov>=6,<8",
+  "ruff>=0.9,<1",
+]
+
+[project.scripts]
+rappter-plays-pokemon = "rappter_plays_pokemon.cli:main"
+rappter-register-pokemon = "rappter_plays_pokemon.install_agent:main"
+
+[project.urls]
+Homepage = "https://github.com/kody-w/rappter-plays-pokemon"
+Issues = "https://github.com/kody-w/rappter-plays-pokemon/issues"
+Source = "https://github.com/kody-w/rappter-plays-pokemon"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+addopts = "-ra"
+testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 88
+extend-exclude = [".venv", ".venv-dev", ".work-tmp"]
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I", "B", "S"]
+ignore = [
+  "S101",
+  "S104",
+  "S110",
+  "S311",
+  "S603",
+  "S607",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S"]

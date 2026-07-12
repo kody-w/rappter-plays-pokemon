@@ -1,0 +1,47 @@
+# Python and local environment
+.venv/
+.venv-dev/
+.work-tmp/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+dist/
+build/
+
+# Local configuration and secrets
+config.json
+.env
+.env.*
+!.env.example
+
+# Never commit game or runtime artifacts
+*.gb
+*.gbc
+*.rom
+*.sav
+*.ram
+*.state
+*.rtc
+*.mp4
+*.mov
+*.mkv
+*.png
+*.jpg
+*.jpeg
+*.webp
+*.log
+control.jsonl
+status.json
+desired.json
+supervisor.json
+viewer-auth.json
+runtime-owner.json
+brain.json
+clips/
+states/
+screens/
+runtime/
