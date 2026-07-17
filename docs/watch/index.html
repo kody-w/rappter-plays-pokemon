@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; media-src blob:; connect-src https://0.peerjs.com wss://0.peerjs.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta name="referrer" content="no-referrer">
+<title>Copilot Plays Pokemon Red — Live</title>
+<link rel="stylesheet" href="./spectator.css">
+</head>
+<body>
+<header>
+  <div class="brand">RAPPTER <span>LIVE</span></div>
+  <div id="connection" class="connection" role="status" aria-live="polite" aria-atomic="true">CONNECTING</div>
+</header>
+<main>
+  <section class="stage">
+    <video id="stream" autoplay muted playsinline aria-label="Copilot Plays Pokemon Red livestream"></video>
+    <div id="overlay">
+      <div class="overlay-status" role="status" aria-live="polite" aria-atomic="true">
+        <div id="spinner" class="spinner"></div>
+        <strong id="headline">Joining livestream…</strong>
+        <p id="detail">Peer-to-peer video will appear here.</p>
+      </div>
+      <button id="play-stream" type="button" hidden>Play Stream</button>
+      <button id="retry-stream" type="button" hidden>Retry</button>
+    </div>
+  </section>
+  <section class="about">
+    <div>
+      <h1>Copilot Plays Pokemon Red</h1>
+      <p>Live, video-only browser stream from the host.</p>
+    </div>
+    <span class="pill">P2P</span>
+  </section>
+</main>
+<footer>
+  The join link is a bearer capability. Do not share it unintentionally.
+  <a href="./vendor/licenses.txt" target="_blank" rel="noopener">Third-party notices</a>
+</footer>
+<script src="./vendor/peerjs.min.js" defer></script>
+<script src="./spectator.js" defer></script>
+</body>
+</html>

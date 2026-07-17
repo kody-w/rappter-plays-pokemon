@@ -3,7 +3,8 @@
 Run a real, single-file OpenRappter agent that lets GitHub Copilot autonomously
 attempt a full playthrough of Pokémon Red in a local PyBoy emulator. It can
 persist progress for long-running sessions, record segmented MP4 clips, expose
-an authenticated local viewer, and hand control to you at any time.
+an authenticated local viewer, optionally broadcast browser-to-browser with
+PeerJS, and hand control to you at any time.
 
 > [!IMPORTANT]
 > This repository is **ROM-free**. You must supply your own legally obtained
@@ -28,6 +29,9 @@ Fame, but **it is not guaranteed to beat the game**.
 - **Local viewer and takeover:** authenticated browser session on
   `127.0.0.1`, strict same-origin controls, pause/resume, manual buttons, and
   return-to-autonomy.
+- **Optional P2P livestream:** the authenticated viewer becomes the video-only
+  host, renders the game through a nearest-neighbor canvas, and shares a QRious
+  QR code and bearer join link with up to five spectators by default.
 - **Bounded recording:** local, rotating H.264 MP4 clips with manifests,
   retention limits, a disk budget, and a free-space reserve.
 - **Local-only state:** ROM path, screenshots, saves, logs, and videos stay in a
@@ -91,6 +95,7 @@ All commands operate on the default private runtime directory,
 ./launch.sh press a                                        # a/b/start/select
 ./launch.sh autonomy                                       # return control to Copilot
 ./launch.sh checkpoint                                     # save + rotate clip
+./launch.sh share                                          # private spectator link/state
 ./launch.sh stop                                           # checkpoint and stop cleanly
 ```
 
@@ -111,6 +116,74 @@ Useful start options:
 without it. `--no-open-viewer` prevents automatic browser launch.
 `--no-resume` deliberately starts without loading a checkpoint; it does not
 delete existing saves.
+
+### Browser livestream
+
+Livestreaming is opt-in. Use the repository's canonical HTTPS spectator page
+and ephemeral local ports with:
+
+```bash
+./launch.sh start \
+  --rom "/absolute/path/to/your/Pokemon Red.gb" \
+  --livestream \
+  --join-base https://kody-w.github.io/rappter-plays-pokemon/watch/ \
+  --port 0 \
+  --spectator-port 0
+./launch.sh share
+```
+
+The checked-in page at
+<https://kody-w.github.io/rappter-plays-pokemon/watch/> is only static
+spectator HTML, CSS, JavaScript, the pinned PeerJS 1.5.5 bundle, and license
+notices. It contains no invitation, host identity, capability, game frame,
+status, control, token, or ROM API. The private host ID and watch capability
+are added after `#` in the link produced by the host. Browsers do not send that
+fragment in HTTP requests, so it does not reach GitHub Pages or its HTTP access
+logs. Keep the complete link private.
+
+Keep the dedicated authenticated game viewer open and visible: that browser is
+the streamer. It automatically goes live, targets 10 canvas captures per
+second while visible, and shows **Go Live**, **End**, and **Retry** controls,
+LIVE/reconnecting state, viewer count, the exact join link, and a locally
+rendered QRious QR code. Browsers may throttle minimized or background tabs, so
+10 fps is not guaranteed. No click is required for initial broadcast. Because
+the browser is the host, enabling livestreaming opens the viewer even if
+`--no-open-viewer` is also configured; that option applies to local-only
+sessions.
+
+Before creating PeerJS, the page acquires a generation-scoped browser lease
+from the local runtime. Only one fresh viewer tab can own it. Heartbeats keep
+the lease and reported LIVE state current; runtime restart, lease loss, repeated
+backend failures, End/Stop, capture end, or closing the page tears down PeerJS,
+all peer connections, and canvas tracks. Stale browser reports become offline.
+
+The local spectator asset server still starts separately on the LAN, even when
+`--join-base` selects GitHub Pages for shared links. It remains an immediate
+fallback and compatible static source, serving only a fixed read-only page,
+CSS, JavaScript, and the pinned PeerJS library. It never serves frames, status,
+controls, clips, paths, tokens, or ROM data. GitHub Pages has the same static
+spectator files. PeerJS Cloud performs signaling only; actual game video
+travels browser-to-browser over WebRTC where direct connectivity succeeds.
+
+Useful livestream options:
+
+```text
+--spectator-port PORT      LAN page port; 0 selects an available port
+--advertised-host HOST     hostname/IP placed in the LAN join link
+--join-base HTTPS_URL      canonical Pages or compatible HTTPS spectator page
+--max-viewers N            mesh fanout (default 5, hard limit 8)
+--no-livestream            override a config file that enables streaming
+```
+
+Without `--advertised-host`, the agent advertises its best detected LAN IPv4
+address. If that is not reachable from the other device, pass the Mac's LAN
+hostname or address explicitly. `--join-base` must be HTTPS; use
+`https://kody-w.github.io/rappter-plays-pokemon/watch/` for the canonical
+published page. Its trailing slash is retained so the private fragment reaches
+the page without a directory redirect. The local asset server still starts for
+immediate LAN use. Ports `0` are replaced by their actual bound ports in viewer
+URLs, status, and share links. A fixed-port conflict fails with a clear bind
+error.
 
 To use a config file, copy the safe template outside version control, fill in
 your local ROM path, and pass it explicitly:
@@ -136,6 +209,9 @@ files containing local state are mode `0600`.
 | `brain.json` | Recent decisions and progress context |
 | `player.log` | Local supervisor/player diagnostics |
 | `runtime-owner.json` | Safety marker required for explicit purge |
+| `viewer-auth.json` | Short-lived authenticated viewer bootstrap secret |
+| `livestream-auth.json` | Ephemeral private join capability; removed on clean shutdown |
+| `livestream-status.json` | Browser-published LIVE state and bounded viewer count |
 
 The original ROM remains at the path you supplied. It is not copied into the
 runtime directory. On resume, the runner verifies checkpoint hashes and the ROM
@@ -158,6 +234,10 @@ flowchart LR
     R --> P[PyBoy]
     R --> F[ffmpeg segment recorder]
     R --> V[127.0.0.1 authenticated viewer]
+    V -->|canvas capture target: 10 fps while visible| H[PeerJS host in same browser]
+    R -->|fixed GET/HEAD assets only| W[LAN spectator page]
+    H -->|WebRTC video, one connection each| W
+    H -.->|signaling only| PJS[PeerJS Cloud]
     R --> B[CopilotBrain]
     B -->|PNG screenshot only| C[GitHub Copilot SDK<br/>gpt-5.6-sol / max]
     C -->|JSON buttons, zero tools| R
@@ -186,14 +266,45 @@ after repeated crashes.
   API, frame, script, stylesheet, and clip requests require that cookie.
   Mutating requests additionally require an exact loopback Origin and JSON
   content type. Host checks mitigate DNS rebinding.
+- **Spectator isolation:** an independent server binds on the LAN only when
+  livestreaming is enabled. It accepts GET/HEAD for fixed spectator assets and
+  has no APIs. The checked-in GitHub Pages surface serves the same static
+  spectator assets and nothing from the runtime. The spectator page contains
+  no emulator control code. Host and watch IDs are independent high-entropy
+  values in the URL fragment, so normal LAN and GitHub Pages HTTP requests and
+  access logs do not contain them.
+- **P2P boundary:** PeerJS Cloud performs signaling. Game media is a WebRTC
+  video track protected in transit with DTLS-SRTP and sent directly between
+  browsers where connectivity permits. The watch link is a bearer capability;
+  anyone who receives it can attempt to watch until the host session ends.
+  Both host and spectator pass the same explicit ICE configuration: Google
+  `stun:stun.l.google.com:19302` only, with no TURN relay.
 - **Local secrets:** the short-lived viewer bootstrap token is written only to
-  a mode-`0600` runtime file and removed on clean shutdown. Never paste a viewer
-  URL into chat, logs, or bug reports.
-- **No inbound network exposure:** do not reverse-proxy, port-forward, or change
-  the loopback bind.
+  a mode-`0600` runtime file. Livestream credentials use a separate mode-`0600`
+  file. Both are removed on clean shutdown. Never paste either private URL into
+  chat, logs, or bug reports.
+- **Pinned browser code:** PeerJS 1.5.5 and QRious 4.0.2 are served from
+  hash-checked embedded copies, not runtime CDNs. CSP permits only the exact
+  PeerJS Cloud HTTPS/WSS signaling origin required by the enabled stream.
 
 The model still sees screenshots of gameplay and structured RAM-derived game
 state. GitHub's Copilot service terms and privacy policy apply to that inference.
+
+### Livestream scope and limitations
+
+- v1 is video-only; emulator audio is not captured.
+- WebRTC can reveal network metadata/IP candidates to peers. Use the link only
+  with people you trust.
+- Symmetric NATs and restrictive firewalls may prevent a direct connection.
+  The explicit Google STUN server discovers candidates but is not a relay; this
+  release intentionally configures no TURN URLs.
+- Direct WebRTC peers may learn network metadata and IP candidates. The STUN
+  server also observes connection metadata needed for candidate discovery.
+- The canonical GitHub Pages surface provides HTTPS static assets. The local
+  HTTP page remains available as a LAN fallback.
+- Each spectator receives a separate outgoing track. Host upload and browser
+  work grow linearly with viewers (`O(viewers)`).
+- This bounded browser mesh is intentionally not Twitch-scale infrastructure.
 
 ## Troubleshooting
 
@@ -227,6 +338,19 @@ project cannot obtain or validate the legality of your copy.
 
 Open it with `./launch.sh view`; the bare port intentionally cannot mint an
 authenticated session. Do not reuse an old viewer URL after a restart.
+
+### Spectators cannot open the join page
+
+Start with `--spectator-port 0`, run `./launch.sh share`, and confirm the
+advertised host is reachable from the spectator's LAN. If automatic detection
+selected the wrong interface, restart with `--advertised-host` set to the
+host's LAN address. Do not expose or proxy the authenticated loopback viewer.
+
+### Join page opens but video never arrives
+
+Leave the host viewer open and use its Retry button. Ad blockers, restrictive
+firewalls, NAT behavior, or blocked access to `0.peerjs.com` can prevent
+signaling or a direct WebRTC path. v1 does not provision a TURN relay.
 
 ### A stale process keeps restarting
 
@@ -266,6 +390,9 @@ python3.11 -m venv .venv-dev
 .venv-dev/bin/ruff check .
 .venv-dev/bin/python -m compileall -q pokemon_agent.py src tests
 .venv-dev/bin/pytest
+.venv-dev/bin/python scripts/update_browser_assets.py --check
+.venv-dev/bin/python scripts/build_pages_site.py --check
+.venv-dev/bin/python scripts/check_browser_js.py
 bash -n bootstrap.sh launch.sh uninstall.sh
 ```
 
@@ -276,6 +403,13 @@ ffmpeg. See [CONTRIBUTING.md](CONTRIBUTING.md) and
 ## License and trademarks
 
 Code in this repository is available under the [MIT License](LICENSE).
+Vendored PeerJS is MIT licensed; notices for eventemitter3,
+peerjs-js-binarypack, webrtc-adapter, and sdp bundled into its browser build are
+also retained. QRious 4.0.2 is GPL-3.0-or-later according to its release
+metadata and distribution header; its notice, complete terms, package metadata,
+and unminified distribution are retained under
+[`vendor/browser/`](vendor/browser/). The installed single-file agent embeds
+and serves those notices and the QRious unminified distribution.
 Pokémon and related names are trademarks of their respective owners. This
 independent project is not affiliated with or endorsed by Nintendo, The Pokémon
 Company, Game Freak, GitHub, or PyBoy.

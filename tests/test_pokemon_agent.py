@@ -18,6 +18,7 @@ from openrappter.agents.pokemon_agent import (
     CopilotBrain,
     PokemonAgent,
     PokemonRunner,
+    StartupConfigurationError,
     ViewerServer,
     acquire_runtime_lock,
     build_parser,
@@ -37,6 +38,7 @@ from openrappter.agents.pokemon_agent import (
     runtime_status,
     seed_legacy_ram_provenance,
     supervisor_main,
+    terminate_isolated_process_group,
     wait_for_supervised_child,
 )
 
@@ -1168,6 +1170,144 @@ def test_supervisor_restarts_failed_child_then_stops_cleanly(monkeypatch, tmp_pa
     assert json.loads((tmp_path / "supervisor.json").read_text())["running"] is False
 
 
+def test_supervisor_does_not_retry_nonretryable_startup_failure(
+    monkeypatch,
+    tmp_path,
+):
+    children = []
+
+    class ConfigFailure:
+        def __init__(self, command, **kwargs):
+            del command, kwargs
+            self.pid = 4040
+            self.returncode = None
+            children.append(self)
+            (tmp_path / "status.json").write_text(
+                json.dumps(
+                    {
+                        "pid": self.pid,
+                        "instance_id": "config-failure",
+                        "lifecycle": "failed",
+                        "restartable": False,
+                        "failure_kind": "configuration",
+                        "last_error": (
+                            "Cannot bind authenticated viewer to "
+                            "127.0.0.1:8765: address in use"
+                        ),
+                    }
+                )
+            )
+
+        def wait(self, timeout=None):
+            del timeout
+            self.returncode = 1
+            return self.returncode
+
+        def poll(self):
+            return self.returncode
+
+        def terminate(self):
+            self.returncode = 1
+
+        def kill(self):
+            self.returncode = -9
+
+    monkeypatch.setattr(pokemon_module.subprocess, "Popen", ConfigFailure)
+    monkeypatch.setattr(pokemon_module.signal, "signal", lambda *args: None)
+    args = build_parser().parse_args(
+        [
+            "supervise",
+            "--rom",
+            str(tmp_path / "Pokemon Red.gb"),
+            "--runtime-dir",
+            str(tmp_path),
+            "--instance-id",
+            "config-failure",
+        ]
+    )
+
+    assert supervisor_main(args) == 1
+    assert len(children) == 1
+    status = json.loads((tmp_path / "status.json").read_text())
+    assert "address in use" in status["last_error"]
+    assert status["restartable"] is False
+
+
+def test_runner_classifies_configuration_startup_failure(
+    monkeypatch,
+    tmp_path,
+):
+    class FailedRunner:
+        stream_generation = None
+
+        def __init__(self, args):
+            del args
+            self.stop_event = threading.Event()
+            self.brain_ready = threading.Event()
+            self.brain = None
+
+        def run(self):
+            raise StartupConfigurationError("fixed viewer port is unavailable")
+
+    monkeypatch.setattr(pokemon_module, "PokemonRunner", FailedRunner)
+    monkeypatch.setattr(pokemon_module.signal, "signal", lambda *args: None)
+
+    assert runner_main(
+        [
+            "run",
+            "--rom",
+            str(tmp_path / "Pokemon Red.gb"),
+            "--runtime-dir",
+            str(tmp_path),
+            "--instance-id",
+            "configuration-runner",
+        ]
+    ) == 1
+    status = json.loads((tmp_path / "status.json").read_text())
+    assert status["restartable"] is False
+    assert status["failure_kind"] == "configuration"
+    assert status["last_error"] == "fixed viewer port is unavailable"
+
+
+def test_outer_timeout_terminates_entire_isolated_process_group(monkeypatch):
+    signals = []
+    waits = []
+
+    class HungGroupLeader:
+        pid = 9001
+        returncode = None
+
+        def poll(self):
+            return self.returncode
+
+        def wait(self, timeout):
+            waits.append(timeout)
+            if len(waits) == 1:
+                raise pokemon_module.subprocess.TimeoutExpired("supervisor", timeout)
+            self.returncode = -9
+            return self.returncode
+
+        def terminate(self):
+            raise AssertionError("must signal the isolated process group")
+
+        def kill(self):
+            raise AssertionError("must kill the isolated process group")
+
+    monkeypatch.setattr(
+        pokemon_module.os,
+        "killpg",
+        lambda pid, requested_signal: signals.append((pid, requested_signal)),
+    )
+
+    assert terminate_isolated_process_group(HungGroupLeader()) == -9
+    assert signals == [
+        (9001, pokemon_module.signal.SIGTERM),
+        (9001, pokemon_module.signal.SIGKILL),
+    ]
+    assert waits[0] > pokemon_module.SUPERVISOR_SHUTDOWN_TIMEOUT_SECONDS
+    assert waits[1] == 10
+
+
 def test_retention_removes_only_old_generated_artifacts(tmp_path):
     clips_dir = tmp_path / "clips"
     states_dir = tmp_path / "states"
@@ -1341,6 +1481,7 @@ def test_failure_lifecycle_returns_nonzero_to_supervisor(monkeypatch, tmp_path):
         def __init__(self, args):
             del args
             self.status = {"lifecycle": "failed"}
+            self.stream_generation = None
             self.stop_event = threading.Event()
             self.brain_ready = threading.Event()
             self.brain = None

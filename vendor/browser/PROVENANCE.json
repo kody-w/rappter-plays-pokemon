@@ -1,0 +1,70 @@
+{
+  "schema_version": 1,
+  "assets": [
+    {
+      "package": "peerjs",
+      "version": "1.5.5",
+      "source": "https://registry.npmjs.org/peerjs/-/peerjs-1.5.5.tgz",
+      "npm_integrity": "sha512-viMUCPDL6CSfOu0ZqVcFqbWRXNHIbv2lPqNbrBIjbFYrflebOjItJ4hPfhjnuUCstqciHVu9vVJ7jFqqKi/EuQ==",
+      "metadata_file": "peerjs-1.5.5.package.json",
+      "metadata_sha256": "971f9e0e66fea49c8d495ae3b614b1209d22662861ab02de572f960362506635",
+      "file": "peerjs-1.5.5.min.js",
+      "sha256": "7604d8c31bec4f134b0d15c2d80b1d095ea18af005354f439f14291fcd7b4168",
+      "license": "MIT",
+      "license_file": "peerjs-1.5.5.LICENSE",
+      "license_sha256": "9407807dba7f47a79bfb3ac55759d63d77c9371ebd0616d5a093e97d3e810397"
+    },
+    {
+      "package": "qrious",
+      "version": "4.0.2",
+      "source": "https://registry.npmjs.org/qrious/-/qrious-4.0.2.tgz",
+      "npm_integrity": "sha512-xWPJIrK1zu5Ypn898fBp8RHkT/9ibquV2Kv24S/JY9VYEhMBMKur1gHVsOiNUh7PHP9uCgejjpZUHUIXXKoU/g==",
+      "metadata_file": "qrious-4.0.2.package.json",
+      "metadata_sha256": "cb5c535446f79a9b9e234736a2c588e38041973069cdacf81bafce6a22806267",
+      "file": "qrious-4.0.2.min.js",
+      "sha256": "db99dcaf40a926181bce4522477c2efc5924f6c4b29111b6a97faea477c9528b",
+      "source_file": "qrious-4.0.2.js",
+      "source_sha256": "d1e65c661e659f51c226de9be64feff66052549ed881959aa7ebb960adfb8158",
+      "license": "GPL-3.0-or-later",
+      "license_file": "qrious-4.0.2.LICENSE.md",
+      "license_sha256": "573aa60568eb0d6829453b85a9bcae84763de76638bc16e6a198a9535871191a",
+      "license_terms_file": "GPL-3.0.txt",
+      "license_terms_sha256": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986"
+    }
+  ],
+  "peerjs_bundle_lock": "https://raw.githubusercontent.com/peers/peerjs/v1.5.5/package-lock.json",
+  "peerjs_bundled_dependencies": [
+    {
+      "package": "eventemitter3",
+      "version": "4.0.7",
+      "npm_integrity": "sha512-8guHBZCwKnFhYdHr2ysuRWErTwhoN2X8XELRlrRwpmfeY2jjuUN4taQMsULKUVo1K4DvZl+0pgfyoysHxvmvEw==",
+      "license": "MIT",
+      "license_file": "eventemitter3-4.0.7.LICENSE",
+      "license_sha256": "3aecc12b1cb28832b5f65ab64291de96568c3f236a74d646281b4491f7bcadbf"
+    },
+    {
+      "package": "peerjs-js-binarypack",
+      "version": "2.1.0",
+      "npm_integrity": "sha512-YIwCC+pTzp3Bi8jPI9UFKO0t0SLo6xALnHkiNt/iUFmUUZG0fEEmEyFKvjsDKweiFitzHRyhuh6NvyJZ4nNxMg==",
+      "license": "MIT",
+      "license_file": "peerjs-js-binarypack-2.1.0.LICENSE",
+      "license_sha256": "9517e6f46b30231a62407f94a8c7adf8b4d14038c01807cd769f1d4de5911ba4"
+    },
+    {
+      "package": "webrtc-adapter",
+      "version": "9.0.1",
+      "npm_integrity": "sha512-1AQO+d4ElfVSXyzNVTOewgGT/tAomwwztX/6e3totvyyzXPvXIIuUUjAmyZGbKBKbZOXauuJooZm3g6IuFuiNQ==",
+      "license": "BSD-3-Clause",
+      "license_file": "webrtc-adapter-9.0.1.LICENSE.md",
+      "license_sha256": "00a46c6cfc219593b97586398b477e188391556e70487225d3ff9d60ccda6dce"
+    },
+    {
+      "package": "sdp",
+      "version": "3.2.0",
+      "npm_integrity": "sha512-d7wDPgDV3DDiqulJjKiV2865wKsJ34YI+NDREbm+FySq6WuKOikwyNQcm+doLAZ1O6ltdO0SeKle2xMpN3Brgw==",
+      "license": "MIT",
+      "license_file": "sdp-3.2.0.LICENSE",
+      "license_sha256": "798e82590af6a84bfbde3d6bb0fb9162c519edf16122404fea00acefdc55cbd9"
+    }
+  ]
+}

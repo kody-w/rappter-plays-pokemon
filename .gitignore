@@ -39,6 +39,8 @@ status.json
 desired.json
 supervisor.json
 viewer-auth.json
+livestream-auth.json
+livestream-status.json
 runtime-owner.json
 brain.json
 clips/

@@ -20,6 +20,9 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
           cache: pip
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
       - name: Install test dependencies only
         run: python -m pip install -e ".[dev]"
       - name: Lint
@@ -28,6 +31,12 @@ jobs:
         run: python -m compileall -q pokemon_agent.py src tests
       - name: Shell syntax
         run: bash -n bootstrap.sh launch.sh uninstall.sh
+      - name: Verify embedded browser assets
+        run: python scripts/update_browser_assets.py --check
+      - name: Verify GitHub Pages spectator site
+        run: python scripts/build_pages_site.py --check
+      - name: Parse browser JavaScript
+        run: python scripts/check_browser_js.py --require-node
       - name: ROM-free mocked smoke test and unit suite
         run: pytest
       - name: Reject prohibited artifacts

@@ -248,7 +248,7 @@ def test_installer_atomically_copies_single_file_agent(tmp_path):
 
 
 def test_cli_config_and_agent_dispatch(monkeypatch, tmp_path):
-    rom = tmp_path / "owned.gb"
+    rom = tmp_path / "Pokemon - Red Version (UE)[!].gb"
     config = tmp_path / "config.json"
     config.write_text(
         json.dumps(
@@ -257,6 +257,10 @@ def test_cli_config_and_agent_dispatch(monkeypatch, tmp_path):
                 "runtime_dir": str(tmp_path / "runtime"),
                 "max_clips": 12,
                 "open_viewer": False,
+                "livestream": True,
+                "spectator_port": 0,
+                "advertised_host": "pokemon.local",
+                "max_viewers": 4,
             }
         ),
         encoding="utf-8",
@@ -276,7 +280,19 @@ def test_cli_config_and_agent_dispatch(monkeypatch, tmp_path):
     assert captured["rom_path"] == str(rom)
     assert captured["max_clips"] == 12
     assert captured["open_viewer"] is False
+    assert captured["livestream"] is True
+    assert captured["spectator_port"] == 0
+    assert captured["advertised_host"] == "pokemon.local"
+    assert captured["max_viewers"] == 4
     assert captured["model"] == "gpt-5.6-sol"
+
+
+def test_launchers_preserve_rom_paths_as_single_arguments():
+    launch = (ROOT / "launch.sh").read_text()
+    bootstrap = (ROOT / "bootstrap.sh").read_text()
+
+    assert 'rappter_plays_pokemon.cli "$@"' in launch
+    assert '"${LAUNCH_ARGS[@]}"' in bootstrap
 
 
 def test_rom_free_runner_smoke_uses_mock_runtime(monkeypatch, tmp_path):
@@ -284,6 +300,7 @@ def test_rom_free_runner_smoke_uses_mock_runtime(monkeypatch, tmp_path):
         def __init__(self, args):
             del args
             self.status = {"lifecycle": "stopped"}
+            self.stream_generation = None
             self.stop_event = threading.Event()
             self.brain_ready = threading.Event()
             self.brain = None

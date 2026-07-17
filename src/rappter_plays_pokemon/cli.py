@@ -18,6 +18,7 @@ ACTIONS = (
     "checkpoint",
     "press",
     "view",
+    "share",
     "stop",
 )
 BUTTONS = ("a", "b", "start", "select", "up", "down", "left", "right")
@@ -49,7 +50,42 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         help="Local private state directory (default: ~/.openrappter/pokemon-red)",
     )
-    parser.add_argument("--port", type=int)
+    parser.add_argument(
+        "--port",
+        type=int,
+        help="Authenticated loopback viewer port; 0 selects an available port",
+    )
+    livestream_group = parser.add_mutually_exclusive_group()
+    livestream_group.add_argument(
+        "--livestream",
+        action="store_true",
+        dest="livestream",
+        help="Enable browser-hosted PeerJS video broadcasting",
+    )
+    livestream_group.add_argument(
+        "--no-livestream",
+        action="store_false",
+        dest="livestream",
+        help="Disable livestreaming configured in JSON",
+    )
+    parser.add_argument(
+        "--spectator-port",
+        type=int,
+        help="Read-only LAN spectator page port; 0 selects an available port",
+    )
+    parser.add_argument(
+        "--advertised-host",
+        help="LAN hostname or IP placed in the spectator join link",
+    )
+    parser.add_argument(
+        "--join-base",
+        help="Compatible externally hosted HTTPS spectator page base",
+    )
+    parser.add_argument(
+        "--max-viewers",
+        type=int,
+        help="P2P viewer fanout (default 5, hard limit 8)",
+    )
     parser.add_argument("--clip-minutes", type=float)
     parser.add_argument("--model")
     parser.add_argument("--decision-timeout", type=int)
@@ -61,7 +97,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--visible", action="store_true", default=None)
     parser.add_argument("--no-open-viewer", action="store_false", dest="open_viewer")
     parser.add_argument("--no-resume", action="store_false", dest="resume")
-    parser.set_defaults(open_viewer=None, resume=None)
+    parser.set_defaults(open_viewer=None, resume=None, livestream=None)
     return parser
 
 
@@ -98,6 +134,11 @@ def agent_kwargs(args: argparse.Namespace, config: dict[str, Any]) -> dict[str, 
             os.environ.get("OPENRAPPTER_POKEMON_ROM"),
         ),
         "port": _configured(args, config, "port", 8765),
+        "livestream": _configured(args, config, "livestream", False),
+        "spectator_port": _configured(args, config, "spectator_port", 8766),
+        "advertised_host": _configured(args, config, "advertised_host"),
+        "join_base": _configured(args, config, "join_base"),
+        "max_viewers": _configured(args, config, "max_viewers", 5),
         "clip_minutes": _configured(args, config, "clip_minutes", 10),
         "model": _configured(args, config, "model", "gpt-5.6-sol"),
         "decision_timeout": _configured(args, config, "decision_timeout", 180),
