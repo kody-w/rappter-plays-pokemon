@@ -11,15 +11,7 @@ const QR_CAPACITY_BYTES = 2200;
 const ANSWER_PREFIX = 'rpp-answer-v2.';
 const RTC_CONFIG = Object.freeze({
   iceServers: Object.freeze([
-    Object.freeze({urls: 'stun:stun.l.google.com:19302'}),
-    Object.freeze({
-      urls: Object.freeze([
-        'turn:us-0.turn.peerjs.com:3478',
-        'turn:eu-0.turn.peerjs.com:3478'
-      ]),
-      username: 'peerjs',
-      credential: 'peerjsp'
-    })
+    Object.freeze({urls: 'stun:stun.l.google.com:19302'})
   ])
 });
 const encoder = new TextEncoder();

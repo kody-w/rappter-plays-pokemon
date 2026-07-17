@@ -428,19 +428,32 @@ function validDashboardSnapshot(value) {
 }
 
 function validIceServers(servers) {
-  if (!Array.isArray(servers) || servers.length !== 2) return false;
+  if (
+    !Array.isArray(servers) ||
+    servers.length < 1 ||
+    servers.length > 2
+  ) return false;
   const stun = servers[0];
+  if (
+    !exactKeys(stun, ['urls']) ||
+    stun.urls !== 'stun:stun.l.google.com:19302'
+  ) return false;
+  if (servers.length === 1) return true;
   const turn = servers[1];
   return Boolean(
-    exactKeys(stun, ['urls']) &&
-    stun.urls === 'stun:stun.l.google.com:19302' &&
     exactKeys(turn, ['credential', 'urls', 'username']) &&
     Array.isArray(turn.urls) &&
-    turn.urls.length === 2 &&
-    turn.urls[0] === 'turn:us-0.turn.peerjs.com:3478' &&
-    turn.urls[1] === 'turn:eu-0.turn.peerjs.com:3478' &&
-    turn.username === 'peerjs' &&
-    turn.credential === 'peerjsp'
+    turn.urls.length >= 1 &&
+    turn.urls.length <= 4 &&
+    turn.urls.every(
+      url => typeof url === 'string' &&
+        url.length <= 256 &&
+        /^turns?:/.test(url)
+    ) &&
+    typeof turn.username === 'string' &&
+    turn.username.length <= 256 &&
+    typeof turn.credential === 'string' &&
+    turn.credential.length <= 256
   );
 }
 

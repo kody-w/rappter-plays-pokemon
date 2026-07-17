@@ -35,17 +35,7 @@ class FakeChannel {
 class FakePeerConnection {
   constructor(config) {
     assert.deepEqual(config, {
-      iceServers: [
-        {urls: 'stun:stun.l.google.com:19302'},
-        {
-          urls: [
-            'turn:us-0.turn.peerjs.com:3478',
-            'turn:eu-0.turn.peerjs.com:3478'
-          ],
-          username: 'peerjs',
-          credential: 'peerjsp'
-        }
-      ]
+      iceServers: [{urls: 'stun:stun.l.google.com:19302'}]
     });
     this.iceGatheringState = 'complete';
     this.connectionState = 'new';
@@ -206,20 +196,9 @@ async function run() {
   const api = global.RppPairing;
   assert(api);
   assert.deepEqual(api.cloneRtcConfig(), {
-    iceServers: [
-      {urls: 'stun:stun.l.google.com:19302'},
-      {
-        urls: [
-          'turn:us-0.turn.peerjs.com:3478',
-          'turn:eu-0.turn.peerjs.com:3478'
-        ],
-        username: 'peerjs',
-        credential: 'peerjsp'
-      }
-    ]
+    iceServers: [{urls: 'stun:stun.l.google.com:19302'}]
   });
-  assert(source.includes('turn:us-0.turn.peerjs.com:3478'));
-  assert(source.includes('turn:eu-0.turn.peerjs.com:3478'));
+  assert(!source.includes('turn:'));
   assert(!source.includes('turns:'));
   assert(!source.includes('WebSocket'));
   assert(!source.includes('fetch('));

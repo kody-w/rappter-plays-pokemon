@@ -115,17 +115,7 @@ assert.equal(pageConfig.peer_id, peerId);
 assert.equal(pageConfig.watch_capability, capability);
 assert.deepEqual(
   pageConfig.peer_options.config.iceServers,
-  [
-    {urls: 'stun:stun.l.google.com:19302'},
-    {
-      urls: [
-        'turn:us-0.turn.peerjs.com:3478',
-        'turn:eu-0.turn.peerjs.com:3478'
-      ],
-      username: 'peerjs',
-      credential: 'peerjsp'
-    }
-  ]
+  [{urls: 'stun:stun.l.google.com:19302'}]
 );
 
 const roomId = Buffer.alloc(16, 1).toString('base64url');
@@ -205,22 +195,9 @@ assert.equal(nostrPage.room_key, roomKey);
 assert.deepEqual(nostrPage.relay_urls, relayUrls);
 assert.deepEqual(
   nostrPage.rtc_config,
-  {
-    iceServers: [
-      {urls: 'stun:stun.l.google.com:19302'},
-      {
-        urls: [
-          'turn:us-0.turn.peerjs.com:3478',
-          'turn:eu-0.turn.peerjs.com:3478'
-        ],
-        username: 'peerjs',
-        credential: 'peerjsp'
-      }
-    ]
-  }
+  {iceServers: [{urls: 'stun:stun.l.google.com:19302'}]}
 );
-assert(JSON.stringify(nostrPage).includes('turn:us-0.turn.peerjs.com:3478'));
-assert(!JSON.stringify(nostrPage).includes('turns:'));
+assert(!JSON.stringify(nostrPage).includes('turn:'));
 assert.throws(
   () => validateBootstrap({
     ...nostrBootstrap,

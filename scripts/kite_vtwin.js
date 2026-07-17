@@ -1940,17 +1940,7 @@ function pageBootstrap(config, broadcastState = {
       manual_return_page: config.manual_return_page,
       relay_urls: [...config.relay_urls],
       rtc_config: {
-        iceServers: [
-          {urls: 'stun:stun.l.google.com:19302'},
-          {
-            urls: [
-              'turn:us-0.turn.peerjs.com:3478',
-              'turn:eu-0.turn.peerjs.com:3478'
-            ],
-            username: 'peerjs',
-            credential: 'peerjsp'
-          }
-        ]
+        iceServers: [{urls: 'stun:stun.l.google.com:19302'}]
       },
       max_hello_bytes: 2048,
       protocol_version: 2
@@ -1967,17 +1957,7 @@ function pageBootstrap(config, broadcastState = {
       secure: true,
       debug: 0,
       config: {
-        iceServers: [
-          {urls: 'stun:stun.l.google.com:19302'},
-          {
-            urls: [
-              'turn:us-0.turn.peerjs.com:3478',
-              'turn:eu-0.turn.peerjs.com:3478'
-            ],
-            username: 'peerjs',
-            credential: 'peerjsp'
-          }
-        ]
+        iceServers: [{urls: 'stun:stun.l.google.com:19302'}]
       }
     },
     protocol_version: 1,

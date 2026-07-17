@@ -23,15 +23,7 @@ const REVIEWED_RELAYS = Object.freeze([
 ]);
 const RTC_CONFIG = Object.freeze({
   iceServers: Object.freeze([
-    Object.freeze({urls: 'stun:stun.l.google.com:19302'}),
-    Object.freeze({
-      urls: Object.freeze([
-        'turn:us-0.turn.peerjs.com:3478',
-        'turn:eu-0.turn.peerjs.com:3478'
-      ]),
-      username: 'peerjs',
-      credential: 'peerjsp'
-    })
+    Object.freeze({urls: 'stun:stun.l.google.com:19302'})
   ])
 });
 const MAX_TELEMETRY_BYTES = 4096;
@@ -325,7 +317,7 @@ async function scheduleRetryAsync(message) {
       'offline',
       'Stream unavailable',
       capability.version === 2
-        ? 'Host authentication or media timed out even with the TURN relay fallback. Ask for a fresh link or try Manual Share.'
+        ? 'Host authentication or media timed out. Restrictive NAT can block the direct path; ask for a fresh link or try Manual Share.'
         : 'Automatic retries ended. Ask the host for a fresh link.',
       {showRetry: true, loading: false}
     );
@@ -1273,7 +1265,7 @@ async function connectNostr(epoch) {
       transportTimer = setTimeout(() => {
         if (epoch !== attemptEpoch || acceptedHost !== peerId) return;
         scheduleRetry(
-          'Host authenticated, but the WebRTC transport timed out even with the TURN relay fallback. Try a fresh link or Manual Share.'
+          'Host authenticated, but the WebRTC transport timed out. Restrictive NAT can block the direct path; try a fresh link or Manual Share.'
         );
       }, TRANSPORT_DEADLINE_MILLISECONDS);
       mediaTimer = setTimeout(() => {

@@ -569,8 +569,7 @@ def test_browser_contract_has_explicit_ice_bounded_admission_and_teardown():
     security = (ROOT / "SECURITY.md").read_text()
     serialized_ice = json.dumps(PEERJS_ICE_CONFIG).lower()
     assert "stun:stun.l.google.com:19302" in serialized_ice
-    assert "turn:us-0.turn.peerjs.com:3478" in serialized_ice
-    assert "turn:eu-0.turn.peerjs.com:3478" in serialized_ice
+    assert "turn:" not in serialized_ice
     assert "turns:" not in serialized_ice
     spectator_constructor = SPECTATOR_JS[
         SPECTATOR_JS.index("const activePeer = new Peer(") : SPECTATOR_JS.index(
@@ -581,10 +580,11 @@ def test_browser_contract_has_explicit_ice_bounded_admission_and_teardown():
     assert "new peer({" not in spectator_constructor
     assert "config:" in spectator_constructor
     assert "rtc_config.iceservers" in spectator_constructor
+    assert "turn:" not in spectator_constructor
     assert "turns:" not in spectator_constructor
     for documentation in (readme, security):
         assert "stun:stun.l.google.com:19302" in documentation
-        assert "turn:us-0.turn.peerjs.com:3478" in documentation
+        assert "no TURN" in documentation
     assert "background tabs" in readme
     assert "10 fps is not guaranteed" in readme
 
