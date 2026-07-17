@@ -135,6 +135,7 @@ async function run() {
   let joinConfig = null;
   let joinCallbacks = null;
   let joinCount = 0;
+  let qualificationCount = 0;
   let leaveResolve = null;
   const room = {
     isPassive: () => true,
@@ -160,6 +161,9 @@ async function run() {
     selfId: 'viewer-self-identifier',
     getRelaySockets: () => sockets,
     getRelayHealth: () => health,
+    async qualifyRelays() {
+      qualificationCount += 1;
+    },
     joinRoom(config, joinedRoom, callbacks) {
       joinCount += 1;
       assert.equal(joinedRoom, roomId);
@@ -252,6 +256,7 @@ async function run() {
 
   assert.equal(clearedAddress, '/watch/v2/');
   assert.equal(joinCount, 1);
+  assert.equal(qualificationCount, 1);
   assert.equal(joinConfig.passive, true);
   assert.equal(joinConfig.password, roomKey);
   assert.equal(joinConfig.trickleIce, true);

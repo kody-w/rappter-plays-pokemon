@@ -105,8 +105,12 @@ content/SDP; it is not sent as plaintext application
 data. Once connected, video uses direct WebRTC/DTLS-SRTP and telemetry uses
 direct SCTP/DTLS. Relay loss alone does not close established media.
 An open relay socket is diagnostic, not healthy signaling. The vendored
-adapter records NIP-01 `OK true` acceptance plus subscribed EVENT delivery;
-automatic sharing becomes ready only after that round trip. A bounded
+adapter sends one bounded random self-probe per socket generation and requires
+NIP-01 `OK true` plus delivery of that exact event through its exact
+subscription. Probe content has only a protocol marker and random nonsecret
+bytes, never room/key/SDP. This operational check is separate from the
+two-client release qualification. Automatic sharing becomes ready only after
+that round trip. A bounded
 zero-qualified-relay interval announces Manual Share without closing existing
 direct peers. Host authentication, transport, and media/playback have separate
 deadlines. A targeted `media-ready` action is sent only after a live remote

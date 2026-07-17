@@ -102,6 +102,7 @@ const state = {
   streamState: 'untethered',
   peerOpen: false,
   relayOpenCount: 0,
+  relayQualifyingCount: 0,
   relayQualifiedCount: 0,
   relayTotal: 0,
   relayTimer: null,
@@ -237,7 +238,15 @@ function updateHealth() {
     state.runtimeState === 'ready'
   );
   const peerLabel = state.signaling === 'nostr'
-    ? `${state.relayQualifiedCount} QUALIFIED · ${state.relayOpenCount} OPEN`
+    ? (
+      state.relayQualifiedCount
+        ? `${state.relayQualifiedCount} QUALIFIED · ${state.relayOpenCount} OPEN`
+        : (
+          state.relayQualifyingCount
+            ? `${state.relayQualifyingCount} QUALIFYING · ${state.relayOpenCount} OPEN`
+            : `${state.relayOpenCount} OPEN`
+        )
+    )
     : (
       state.peerOpen
         ? 'OPEN'
@@ -248,7 +257,11 @@ function updateHealth() {
   if (automatic) {
     automatic.textContent = automaticShareReady()
       ? 'LIVE'
-      : (state.room ? 'WAITING FOR RELAY ROUND-TRIP' : 'OFFLINE');
+      : (
+        state.relayQualifyingCount
+          ? 'QUALIFYING RELAY ROUND-TRIP'
+          : (state.room ? 'WAITING FOR RELAY ROUND-TRIP' : 'OFFLINE')
+      );
     automatic.classList.toggle('lost', !automaticShareReady());
   }
   const manual = document.getElementById('manual-health');
@@ -1408,6 +1421,9 @@ function updateRelayHealth(epoch = state.attemptEpoch, joinedRoom = state.room) 
   state.relayOpenCount = configured.filter(
     url => sockets[url] && sockets[url].readyState === 1
   ).length;
+  state.relayQualifyingCount = configured.filter(
+    url => relayHealth[url] && relayHealth[url].qualifying === true
+  ).length;
   state.relayQualifiedCount = configured.filter(
     url => relayHealth[url] && relayHealth[url].qualified === true
   ).length;
@@ -1456,6 +1472,7 @@ function startNostrRoom(epoch) {
   if (
     !RppTrysteroNostr ||
     typeof RppTrysteroNostr.joinRoom !== 'function' ||
+    typeof RppTrysteroNostr.qualifyRelays !== 'function' ||
     typeof RppPairing !== 'object'
   ) throw new Error('nostr-runtime-unavailable');
   state.telemetryAction = null;
@@ -1501,6 +1518,15 @@ function startNostrRoom(epoch) {
     if (entry) entry.leaving = true;
     closeViewer(peerId);
   };
+  const qualification = RppTrysteroNostr.qualifyRelays();
+  if (qualification && typeof qualification.catch === 'function') {
+    void qualification.catch(() => {
+      if (epoch === state.attemptEpoch && state.room === joinedRoom) {
+        state.error = 'relay-qualification';
+        updateRelayHealth(epoch, joinedRoom);
+      }
+    });
+  }
   state.relayTotal = state.config.relay_urls.length;
   state.relayFailureStartedAt = monotonicNow();
   state.relayTimer = setInterval(
@@ -1851,6 +1877,7 @@ function teardownBroadcast(
   state.peer = null;
   state.peerOpen = false;
   state.relayOpenCount = 0;
+  state.relayQualifyingCount = 0;
   state.relayQualifiedCount = 0;
   state.relayFailureStartedAt = null;
   state.relayAnnouncement = false;
@@ -2165,10 +2192,15 @@ function publicStatus() {
       ? (
         state.relayQualifiedCount
           ? 'qualified'
-          : (state.relayOpenCount ? 'unqualified' : 'blocked')
+          : (
+            state.relayQualifyingCount
+              ? 'qualifying'
+              : (state.relayOpenCount ? 'open' : 'blocked')
+          )
       )
       : (state.peerOpen ? 'open' : 'offline'),
     relay_open_count: state.relayOpenCount,
+    relay_qualifying_count: state.relayQualifyingCount,
     relay_qualified_count: state.relayQualifiedCount,
     relay_total: state.relayTotal,
     direct_health: directCount

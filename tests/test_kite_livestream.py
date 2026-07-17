@@ -199,7 +199,9 @@ def test_share_waits_for_kite_peer_and_first_frame(tmp_path):
         "runtime_health": "ready",
         "peer_health": "offline",
         "signaling": "nostr",
-        "relay_health": "blocked",
+        "relay_health": "qualifying",
+        "relay_open_count": 5,
+        "relay_qualifying_count": 5,
         "relay_qualified_count": 0,
         "first_frame": True,
         "updated_at": pokemon_module.utc_now(),
@@ -210,6 +212,8 @@ def test_share_waits_for_kite_peer_and_first_frame(tmp_path):
     assert unavailable["available"] is False
     assert unavailable["automatic_available"] is False
     assert unavailable["manual_available"] is True
+    assert unavailable["relay_health"] == "qualifying"
+    assert unavailable["relay_qualifying_count"] == 5
     assert "join_url" not in unavailable
 
     base_status.update(
@@ -218,6 +222,7 @@ def test_share_waits_for_kite_peer_and_first_frame(tmp_path):
             "automatic_share_ready": True,
             "peer_health": "open",
             "relay_health": "qualified",
+            "relay_qualifying_count": 4,
             "relay_qualified_count": 1,
             "updated_at": pokemon_module.utc_now(),
         }
@@ -225,6 +230,7 @@ def test_share_waits_for_kite_peer_and_first_frame(tmp_path):
     (tmp_path / "kite-host-status.json").write_text(json.dumps(base_status))
     available = livestream_share_info(tmp_path)
     assert available["available"] is True
+    assert available["relay_qualifying_count"] == 4
     assert available["join_url"] == join_url
 
     base_status.update(

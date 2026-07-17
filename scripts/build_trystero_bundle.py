@@ -41,7 +41,9 @@ def verify_inputs(
         if not path.is_file() or sha256(path) != expected:
             raise RuntimeError(f"Pinned bundle input failed verification: {path}")
     entry = VENDOR / str(record.get("entry", ""))
-    if not entry.is_file() or sha256(entry) != record.get("entry_sha256"):
+    if not entry.is_file():
+        raise RuntimeError("Pinned Trystero bundle entry is missing")
+    if verify_derivatives and sha256(entry) != record.get("entry_sha256"):
         raise RuntimeError("Pinned Trystero bundle entry failed verification")
     if verify_derivatives:
         derivatives = record.get("derivatives")
@@ -64,6 +66,8 @@ def rebuild(*, check: bool) -> bool:
     if not isinstance(derivatives, list):
         raise RuntimeError("Trystero derivative provenance is invalid")
     if not check:
+        entry = VENDOR / str(record.get("entry", ""))
+        record["entry_sha256"] = sha256(entry)
         for item in derivatives:
             if not isinstance(item, dict):
                 raise RuntimeError("Trystero derivative provenance item is invalid")

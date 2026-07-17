@@ -1155,6 +1155,7 @@ function monitorNostrPeer(epoch, joinedRoom, peerId) {
 async function connectNostr(epoch) {
   if (
     typeof RppTrysteroNostr !== 'object' ||
+    typeof RppTrysteroNostr.qualifyRelays !== 'function' ||
     typeof RppPairing !== 'object'
   ) {
     showState(
@@ -1298,6 +1299,7 @@ async function connectNostr(epoch) {
       ) return;
       attachDirectStream(stream, peerId);
     };
+    void RppTrysteroNostr.qualifyRelays().catch(() => {});
     hostAuthTimer = setTimeout(() => {
       if (epoch !== attemptEpoch || acceptedHost) return;
       pendingHost = null;

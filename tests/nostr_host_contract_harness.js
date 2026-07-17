@@ -195,7 +195,12 @@ async function run() {
     relays.map(url => [url, {readyState: 1}])
   );
   const health = Object.fromEntries(
-    relays.map(url => [url, {qualified: true}])
+    relays.map(url => [url, {
+      accepted: false,
+      delivered: false,
+      qualified: false,
+      qualifying: false
+    }])
   );
   let clock = 1000;
   const intervals = [];
@@ -208,6 +213,8 @@ async function run() {
   let cachedRoom = null;
   let pendingLeave = null;
   let joinCount = 0;
+  let qualificationCalls = 0;
+  let qualifyFirstRelay = null;
 
   function makeRoom() {
     const peers = {};
@@ -259,6 +266,20 @@ async function run() {
     selfId: 'host-self-identifier',
     getRelaySockets: () => sockets,
     getRelayHealth: () => health,
+    qualifyRelays() {
+      qualificationCalls += 1;
+      for (const relayHealth of Object.values(health)) {
+        relayHealth.qualifying = true;
+      }
+      const pending = new Promise(() => {});
+      qualifyFirstRelay = () => {
+        health[relays[0]].accepted = true;
+        health[relays[0]].delivered = true;
+        health[relays[0]].qualified = true;
+        health[relays[0]].qualifying = false;
+      };
+      return pending;
+    },
     joinRoom(config, id, callbacks) {
       joinCount += 1;
       assert.equal(id, roomId);
@@ -400,9 +421,19 @@ async function run() {
   assert.equal(joinConfig.trickleIce, true);
   assert.deepEqual(plain(joinConfig.relayConfig.urls), relays);
   assert.equal(typeof joinCallbacks.onPeerHandshake, 'function');
+  assert.equal(qualificationCalls, 1);
+  assert.equal(ingress.status().relay_health, 'qualifying');
+  assert.equal(ingress.status().relay_qualifying_count, relays.length);
+  assert.equal(ingress.status().automatic_share_ready, false);
+  assert.equal(ingress.status().manual_share_ready, true);
+  assert.equal(Object.keys(rooms[0].peers).length, 0);
+  qualifyFirstRelay();
+  intervals.at(-1)();
   assert.equal(ingress.status().relay_health, 'qualified');
+  assert.equal(ingress.status().relay_qualified_count, 1);
   assert.equal(ingress.status().automatic_share_ready, true);
   assert.equal(ingress.status().manual_share_ready, true);
+  assert.equal(Object.keys(rooms[0].peers).length, 0);
   await elements.get('manual-create').emit('click');
   await elements.get('manual-share-offer').emit('click');
   assert.deepEqual(JSON.parse(JSON.stringify(shareCalls)), [
@@ -469,6 +500,7 @@ async function run() {
   for (const url of relays) {
     sockets[url].readyState = 3;
     health[url].qualified = false;
+    health[url].qualifying = false;
   }
   clock += 13000;
   ingress.heartbeat({

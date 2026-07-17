@@ -35,6 +35,8 @@ const maxTopicsPerSubscription = 250
 const localDisposalGraceMs = 150
 const maxPublishedEventsPerRelay = 256
 const publishedEventTtlMs = 60_000
+const qualificationProbeTimeoutMs = 10_000
+const qualificationProbeMarker = 'rpp-relay-qualification-v1'
 
 type PublishedEventState = {
   accepted: boolean
@@ -42,49 +44,74 @@ type PublishedEventState = {
   expiresAt: number
 }
 
+type QualificationProbe = {
+  url: string
+  socket: WebSocket
+  generation: number
+  subId: string
+  topic: string
+  kind: number
+  content: string
+  eventId: string
+  accepted: boolean
+  delivered: boolean
+  subscribed: boolean
+  settled: boolean
+  timer: ReturnType<typeof setTimeout> | null
+  promise: Promise<boolean>
+  resolve: (qualified: boolean) => void
+}
+
 type RelayQualification = {
   accepted: boolean
   delivered: boolean
   qualified: boolean
+  qualifying: boolean
   socket: WebSocket | null
+  generation: number
+  attempted: boolean
+  probe: QualificationProbe | null
   publishedIds: Map<string, PublishedEventState>
 }
 
 const relayQualification: Record<string, RelayQualification> = {}
+const relayClients: Record<string, SocketClient | undefined> = {}
+const relayKeys = new WeakMap<SocketClient, string>()
+const qualificationRelayUrls = new Set<string>()
+let qualificationEnabled = false
+let socketQualificationGeneration = 0
+
+const relayKeyFor = (client: SocketClient): string =>
+  relayKeys.get(client) ?? client.url
 
 const emptyQualification = (
-  socket: WebSocket | null
+  socket: WebSocket | null,
+  generation = 0,
+  attempted = false
 ): RelayQualification => ({
   accepted: false,
   delivered: false,
   qualified: false,
+  qualifying: false,
   socket,
+  generation,
+  attempted,
+  probe: null,
   publishedIds: new Map()
 })
 
-const qualificationFor = (client: SocketClient): RelayQualification => {
-  const socket = client.socket
-  const current = relayQualification[client.url]
-
-  if (!current || current.socket !== socket) {
-    return (relayQualification[client.url] = emptyQualification(socket))
-  }
-
-  return current
-}
-
 const activeQualificationFor = (
   client: SocketClient
-): RelayQualification | null =>
-  client.socket.readyState === 1 ? qualificationFor(client) : null
+): RelayQualification | null => {
+  const health = relayQualification[relayKeyFor(client)]
 
-const resetSocketQualification = (
-  url: string,
-  socket: WebSocket
-): void => {
-  if (relayQualification[url]?.socket === socket) {
-    relayQualification[url] = emptyQualification(socket)
-  }
+  return (
+    health &&
+    health.socket === client.socket &&
+    client.socket.readyState === 1
+  )
+    ? health
+    : null
 }
 
 const prunePublishedEvents = (
@@ -152,43 +179,321 @@ const recordPublishedEventResult = (
   }
 
   published[result] = true
-  health[result] = true
 
   if (published.accepted && published.delivered) {
-    health.qualified = true
-    health.publishedIds.clear()
+    health.publishedIds.delete(id)
+  }
+}
+
+const randomHex = (size: number): string => {
+  const value = new Uint8Array(size)
+  globalThis.crypto.getRandomValues(value)
+  return toHex(value)
+}
+
+const probeIsCurrent = (probe: QualificationProbe): boolean => {
+  const health = relayQualification[probe.url]
+
+  return Boolean(
+    !probe.settled &&
+    health?.probe === probe &&
+    health.socket === probe.socket &&
+    health.generation === probe.generation &&
+    relayClients[probe.url]?.socket === probe.socket &&
+    probe.socket.readyState === 1
+  )
+}
+
+const settleQualificationProbe = (
+  probe: QualificationProbe,
+  qualified: boolean
+): void => {
+  if (probe.settled) {
+    return
+  }
+
+  const current = probeIsCurrent(probe)
+  probe.settled = true
+
+  if (probe.timer !== null) {
+    clearTimeout(probe.timer)
+    probe.timer = null
+  }
+
+  if (probe.subscribed && probe.socket.readyState === 1) {
+    try {
+      probe.socket.send(toJson(['CLOSE', probe.subId]))
+    } catch {
+      // A failed relay socket cannot retain a live subscription.
+    }
+  }
+
+  const health = relayQualification[probe.url]
+
+  if (health?.probe === probe) {
+    health.probe = null
+    health.qualifying = false
+    health.accepted = probe.accepted
+    health.delivered = probe.delivered
+    health.qualified = Boolean(
+      current &&
+      qualified &&
+      probe.accepted &&
+      probe.delivered
+    )
+    if (health.qualified) {
+      health.publishedIds.clear()
+    }
+  }
+
+  probe.resolve(Boolean(current && qualified))
+}
+
+const invalidateSocketQualification = (
+  url: string,
+  socket: WebSocket,
+  generation: number
+): void => {
+  const health = relayQualification[url]
+
+  if (
+    !health ||
+    health.socket !== socket ||
+    health.generation !== generation
+  ) {
+    return
+  }
+
+  if (health.probe) {
+    settleQualificationProbe(health.probe, false)
+  }
+
+  relayQualification[url] = emptyQualification(
+    socket,
+    generation,
+    true
+  )
+}
+
+const startQualificationProbe = (
+  client: SocketClient
+): Promise<boolean> => {
+  const socket = client.socket
+  const url = relayKeyFor(client)
+  const health = activeQualificationFor(client)
+
+  if (
+    !qualificationEnabled ||
+    !qualificationRelayUrls.has(url) ||
+    !health
+  ) {
+    return Promise.resolve(false)
+  }
+
+  if (health.probe) {
+    return health.probe.promise
+  }
+
+  if (health.attempted) {
+    return Promise.resolve(health.qualified)
+  }
+
+  health.attempted = true
+  health.qualifying = true
+
+  let resolveProbe: (qualified: boolean) => void = () => {}
+  const promise = new Promise<boolean>(resolve => {
+    resolveProbe = resolve
+  })
+  const topic = `${qualificationProbeMarker}:${randomHex(32)}`
+  const probe: QualificationProbe = {
+    url,
+    socket,
+    generation: health.generation,
+    subId: `${qualificationProbeMarker}:${randomHex(16)}`,
+    topic,
+    kind: strToNum(topic, 10_000) + 20_000,
+    content: `${qualificationProbeMarker}:${randomHex(32)}`,
+    eventId: '',
+    accepted: false,
+    delivered: false,
+    subscribed: false,
+    settled: false,
+    timer: null,
+    promise,
+    resolve: resolveProbe
+  }
+  health.probe = probe
+
+  void (async () => {
+    try {
+      const event = await createEventForKind(
+        probe.topic,
+        probe.content,
+        probe.kind
+      )
+      const parsed = fromJson<[string, {id?: unknown}]>(event)
+      const eventId = parsed[1]?.id
+
+      if (typeof eventId !== 'string' || !probeIsCurrent(probe)) {
+        settleQualificationProbe(probe, false)
+        return
+      }
+
+      probe.eventId = eventId
+      probe.timer = setTimeout(
+        () => settleQualificationProbe(probe, false),
+        qualificationProbeTimeoutMs
+      )
+      socket.send(
+        toJson([
+          'REQ',
+          probe.subId,
+          {
+            kinds: [probe.kind],
+            authors: [pubkey],
+            since: now(),
+            ['#' + tag]: [probe.topic]
+          }
+        ])
+      )
+      probe.subscribed = true
+      socket.send(event)
+    } catch {
+      settleQualificationProbe(probe, false)
+    }
+  })()
+
+  return promise
+}
+
+const recordQualificationAcceptance = (
+  client: SocketClient,
+  eventId: string,
+  accepted: boolean
+): void => {
+  const probe = activeQualificationFor(client)?.probe
+
+  if (!probe || !probeIsCurrent(probe) || eventId !== probe.eventId) {
+    return
+  }
+
+  if (!accepted) {
+    settleQualificationProbe(probe, false)
+    return
+  }
+
+  probe.accepted = true
+  const health = relayQualification[probe.url]
+
+  if (health?.probe === probe) {
+    health.accepted = true
+  }
+
+  if (probe.delivered) {
+    settleQualificationProbe(probe, true)
+  }
+}
+
+type DeliveredEvent = {
+  id?: unknown
+  content?: unknown
+  kind?: unknown
+  pubkey?: unknown
+  tags?: unknown
+}
+
+const recordQualificationDelivery = (
+  client: SocketClient,
+  subId: string,
+  event: DeliveredEvent
+): void => {
+  const probe = activeQualificationFor(client)?.probe
+
+  if (
+    !probe ||
+    !probeIsCurrent(probe) ||
+    subId !== probe.subId ||
+    event.id !== probe.eventId ||
+    event.content !== probe.content ||
+    event.kind !== probe.kind ||
+    event.pubkey !== pubkey ||
+    !Array.isArray(event.tags) ||
+    event.tags.length !== 1 ||
+    !Array.isArray(event.tags[0]) ||
+    event.tags[0].length !== 2 ||
+    event.tags[0][0] !== tag ||
+    event.tags[0][1] !== probe.topic
+  ) {
+    return
+  }
+
+  probe.delivered = true
+  const health = relayQualification[probe.url]
+
+  if (health?.probe === probe) {
+    health.delivered = true
+  }
+
+  if (probe.accepted) {
+    settleQualificationProbe(probe, true)
   }
 }
 
 const resetQualification = (urls: string[]): void => {
   urls.forEach(url => {
+    const health = relayQualification[url]
+
+    if (health?.probe) {
+      settleQualificationProbe(health.probe, false)
+    }
+
     relayQualification[url] = emptyQualification(null)
   })
 }
 
 type ObservedSocket = WebSocket & {
   __rppQualificationObserved?: boolean
+  __rppQualificationGeneration?: number
 }
 
 const observeRelaySocket = (client: SocketClient): void => {
   const socket = client.socket as ObservedSocket
+  const url = relayKeyFor(client)
 
   if (socket.__rppQualificationObserved) {
     return
   }
 
   socket.__rppQualificationObserved = true
-  relayQualification[client.url] = emptyQualification(socket)
+  const generation = ++socketQualificationGeneration
+  socket.__rppQualificationGeneration = generation
+  const previous = relayQualification[url]
+
+  if (previous?.probe) {
+    settleQualificationProbe(previous.probe, false)
+  }
+
+  relayQualification[url] = emptyQualification(socket, generation)
   const onClose = socket.onclose
   const onError = socket.onerror
   const onMessage = socket.onmessage
+  const onOpen = socket.onopen
+
+  socket.onopen = event => {
+    onOpen?.call(socket, event)
+
+    if (client.socket === socket) {
+      void startQualificationProbe(client)
+    }
+  }
 
   socket.onclose = event => {
-    resetSocketQualification(client.url, socket)
+    invalidateSocketQualification(url, socket, generation)
     onClose?.call(socket, event)
   }
   socket.onerror = event => {
-    resetSocketQualification(client.url, socket)
+    invalidateSocketQualification(url, socket, generation)
     onError?.call(socket, event)
   }
   socket.onmessage = event => {
@@ -205,12 +510,13 @@ const now = (): number => Math.floor(Date.now() / 1000)
 const topicToKind = (topic: string): number =>
   (kindCache[topic] ??= strToNum(topic, 10_000) + 20_000)
 
-export const createEvent = async (
+const createEventForKind = async (
   topic: string,
-  content: string
+  content: string,
+  kind: number
 ): Promise<string> => {
   const payload = {
-    kind: topicToKind(topic),
+    kind,
     tags: [[tag, topic]],
     created_at: now(),
     content,
@@ -238,6 +544,11 @@ export const createEvent = async (
     }
   ])
 }
+
+export const createEvent = async (
+  topic: string,
+  content: string
+): Promise<string> => createEventForKind(topic, content, topicToKind(topic))
 
 export const subscribe = (subId: string, topic: string): string => {
   subIdToTopic[subId] = topic
@@ -449,13 +760,18 @@ const upstreamJoinRoom: JoinRoom<NostrRoomConfig> = createTopicStrategy<
                 [
                   string,
                   string,
-                  {content: string; tags?: string[][]} | boolean,
+                  (DeliveredEvent & {content: string}) | boolean,
                   string
                 ]
               >(data)
 
             if (msgType !== eventMsgType) {
               if (msgType === 'OK') {
+                recordQualificationAcceptance(
+                  client,
+                  subId,
+                  payload === true
+                )
                 recordPublishedEventResult(
                   client,
                   subId,
@@ -480,13 +796,14 @@ const upstreamJoinRoom: JoinRoom<NostrRoomConfig> = createTopicStrategy<
               typeof payload === 'object' &&
               'content' in payload
             ) {
+              recordQualificationDelivery(client, subId, payload)
               if (
-                typeof (payload as {id?: unknown}).id === 'string' &&
+                typeof payload.id === 'string' &&
                 activeQualificationFor(client)
               ) {
                 recordPublishedEventResult(
                   client,
-                  (payload as {id: string}).id,
+                  payload.id,
                   'delivered'
                 )
               }
@@ -514,10 +831,13 @@ const upstreamJoinRoom: JoinRoom<NostrRoomConfig> = createTopicStrategy<
           () => {
             observeRelaySocket(client)
             resubscribeOnReconnect(client)
+            void startQualificationProbe(client)
           }
         )
       )
 
+      relayClients[url] = client
+      relayKeys.set(client, url)
       observeRelaySocket(client)
       return createRelayLease(client, activeSubscriptionGeneration).ready
     }),
@@ -581,7 +901,13 @@ export const getRelaySockets = relayManager.getSockets
 
 export const getRelayHealth = (): Record<
   string,
-  {accepted: boolean; delivered: boolean; qualified: boolean}
+  {
+    accepted: boolean
+    delivered: boolean
+    qualified: boolean
+    qualifying: boolean
+    pendingPublicationCount: number
+  }
 > => {
   const sockets = getRelaySockets()
 
@@ -600,14 +926,46 @@ export const getRelayHealth = (): Record<
       {
         accepted: Boolean(active && health.accepted),
         delivered: Boolean(active && health.delivered),
-        qualified: Boolean(active && health.qualified)
+        qualified: Boolean(active && health.qualified),
+        qualifying: Boolean(active && health.qualifying),
+        pendingPublicationCount: active ? health.publishedIds.size : 0
       }
       ]
     })
   )
 }
 
+export const qualifyRelays = async (): Promise<
+  Record<string, boolean>
+> => {
+  if (activeRoomCount === 0) {
+    return {}
+  }
+
+  qualificationEnabled = true
+  const probes: Promise<boolean>[] = []
+
+  qualificationRelayUrls.forEach(url => {
+    const client = relayClients[url]
+
+    if (client?.socket.readyState === 1) {
+      probes.push(startQualificationProbe(client))
+    }
+  })
+
+  await Promise.allSettled(probes)
+  const health = getRelayHealth()
+
+  return Object.fromEntries(
+    [...qualificationRelayUrls].map(url => [
+      url,
+      health[url]?.qualified === true
+    ])
+  )
+}
+
 export const disposeRelaySockets = (): void => {
+  qualificationEnabled = false
   pauseRelayReconnection()
   Object.values(getRelaySockets()).forEach(socket => {
     try {
@@ -623,6 +981,7 @@ export const disposeRelaySockets = (): void => {
     }
   })
   resetQualification(Object.keys(getRelaySockets()))
+  qualificationRelayUrls.clear()
 }
 
 const decoratedRooms = new WeakSet<object>()
@@ -636,6 +995,9 @@ export const joinRoom: JoinRoom<NostrRoomConfig> = (
   const urls = getRelays(config, defaultRelayUrls, defaultRedundancy, true)
 
   if (activeRoomCount === 0) {
+    qualificationEnabled = false
+    qualificationRelayUrls.clear()
+    urls.forEach(url => qualificationRelayUrls.add(url))
     activeSubscriptionGeneration = ++subscriptionGeneration
     resetQualification(urls)
     resumeRelayReconnection()
@@ -643,6 +1005,8 @@ export const joinRoom: JoinRoom<NostrRoomConfig> = (
       const managed = socket as WebSocket & {__rppResume?: () => void}
       managed.__rppResume?.()
     })
+  } else {
+    urls.forEach(url => qualificationRelayUrls.add(url))
   }
 
   const room = upstreamJoinRoom(config, roomId, callbacks)

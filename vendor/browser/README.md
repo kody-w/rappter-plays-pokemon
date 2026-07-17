@@ -5,7 +5,7 @@ they do not load scripts from a CDN at runtime.
 
 | Asset | Version | Upstream package file | SHA-256 | License |
 | --- | --- | --- | --- | --- |
-| Trystero Nostr browser IIFE | 0.25.3 + RPP derivative 1 | deterministic bundle of `@trystero-p2p/nostr`, core, and noble at commit `f76eb4f…a11e` with reviewed lifecycle/qualification hardening | `e77bfc06dffc27f310d43e09734d274993b80a98d0a9a10f5505efda5242d99d` | MIT |
+| Trystero Nostr browser IIFE | 0.25.3 + RPP derivative 1 | deterministic bundle of `@trystero-p2p/nostr`, core, and noble at commit `f76eb4f…a11e` with reviewed lifecycle/qualification hardening | `3a4f689e5cc156f92d118a1860bc0cd77a60db220b6521b9f60b3b6fb36b2b9d` | MIT |
 | PeerJS | 1.5.5 | `peerjs/dist/peerjs.min.js` | `7604d8c31bec4f134b0d15c2d80b1d095ea18af005354f439f14291fcd7b4168` | MIT |
 | PeerJS runtime | 1.5.5 | pinned minified file with its trailing `sourceMappingURL` removed and final newline normalized | `95f57b9e94e1b96c829145b3f3ef0d04b332c9bda0567e144bed70d13712e3d0` | MIT |
 | QRious | 4.0.2 | `qrious/dist/qrious.min.js` | `db99dcaf40a926181bce4522477c2efc5924f6c4b29111b6a97faea477c9528b` | GPL-3.0-or-later |
@@ -44,8 +44,11 @@ The exact Trystero Nostr/core/noble npm archives are retained under
 source, reviewed derivative, core patches, and bundle entry are adjacent.
 The derivative (1) makes `room.leave()` idempotent with cleanup in `finally`,
 (2) suspends sockets and cancels reconnect timers after the last room while
-recreating them on retry, and (3) exposes relay EVENT acceptance/subscribed
-delivery qualification. `TRYSTERO_BUILD.json` pins every input, patch, commit,
+recreating them on retry, and (3) exposes one bounded, socket-generation-bound
+operational probe per relay that requires `OK true` plus exact subscribed
+EVENT delivery. Probe payloads contain only a marker and random nonsecret
+bytes. This self-probe does not replace the independent two-client release
+qualification in `NOSTR_RELAYS.json`. `TRYSTERO_BUILD.json` pins every input, patch, commit,
 esbuild 0.25.6, build argument, and output hash. Patches apply with POSIX
 `patch --fuzz=0`; exact npm archives remain unchanged. The IIFE has no runtime
 external imports. To verify a deliberate asset update (not in CI):

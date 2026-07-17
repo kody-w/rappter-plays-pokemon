@@ -1,6 +1,7 @@
 'use strict';
 
 const assert = require('node:assert/strict');
+const crypto = require('node:crypto');
 const vm = require('node:vm');
 
 let source = '';
@@ -31,7 +32,7 @@ async function run() {
   };
   class FakeWebSocket {
     constructor(url) {
-      this.url = url;
+      this.url = new URL(url).href;
       this.readyState = 0;
       this.sent = [];
       sockets.push(this);
@@ -148,6 +149,7 @@ async function run() {
   assert(api);
   assert.equal(typeof api.disposeRelaySockets, 'function');
   assert.equal(typeof api.getRelayHealth, 'function');
+  assert.equal(typeof api.qualifyRelays, 'function');
 
   const relays = [
     'wss://communities.nos.social',
@@ -205,7 +207,10 @@ async function run() {
   assert(sockets.slice(5).every(socket => socket.readyState === 3));
 
   await testDelayedReadyRetry();
-  await testQualificationLifecycle();
+  await testEmptyRoomQualification();
+  await testPartialAndInvalidProofs();
+  await testRejectAndTimeoutCleanup();
+  await testQualificationReconnect();
   await testPublishedEventBound();
   process.stdout.write('trystero cleanup contracts passed\n');
 }
@@ -213,11 +218,13 @@ async function run() {
 function createRuntime({
   autoOpen = true,
   interceptAnnouncements = false,
+  interceptProbeTimeouts = false,
   initialNow = Date.now()
 } = {}) {
   const sockets = [];
   const reconnectTimers = new Set();
   const announceTimers = [];
+  const probeTimers = [];
   let captureReconnectTimer = false;
   let nowMs = initialNow;
 
@@ -227,8 +234,13 @@ function createRuntime({
       reconnectTimers.add(handle);
       return handle;
     }
+    if (interceptProbeTimeouts && delay === 10000) {
+      const handle = {callback, delay};
+      probeTimers.push(handle);
+      return handle;
+    }
     if (interceptAnnouncements && delay >= 200) {
-      const handle = {callback};
+      const handle = {callback, delay};
       announceTimers.push(handle);
       return handle;
     }
@@ -241,6 +253,11 @@ function createRuntime({
       announceTimers.splice(announceIndex, 1);
       return;
     }
+    const probeIndex = probeTimers.indexOf(handle);
+    if (probeIndex >= 0) {
+      probeTimers.splice(probeIndex, 1);
+      return;
+    }
     clearTimeout(handle);
   };
   class FakeDate extends Date {
@@ -250,7 +267,7 @@ function createRuntime({
   }
   class FakeWebSocket {
     constructor(url) {
-      this.url = url;
+      this.url = new URL(url).href;
       this.readyState = 0;
       this.sent = [];
       this.onerror = null;
@@ -379,6 +396,7 @@ function createRuntime({
     sockets,
     reconnectTimers,
     announceTimers,
+    probeTimers,
     advance(milliseconds) {
       nowMs += milliseconds;
     },
@@ -426,9 +444,41 @@ function publishedEvents(socket) {
   );
 }
 
-function qualify(socket, event) {
-  socket.message(['OK', event.id, true, '']);
-  socket.message(['EVENT', 'delivery-proof', event]);
+const probeMarker = 'rpp-relay-qualification-v1:';
+
+function qualificationEvents(socket) {
+  return publishedEvents(socket).filter(
+    value => value[1].content.startsWith(probeMarker)
+  );
+}
+
+function qualificationTraffic(socket) {
+  const event = qualificationEvents(socket).at(-1)?.[1];
+  assert(event, 'qualification EVENT is missing');
+  const topic = event.tags[0][1];
+  const request = socket.sent.map(value => JSON.parse(value)).find(value =>
+    value[0] === 'REQ' &&
+    value[2] &&
+    Array.isArray(value[2]['#x']) &&
+    value[2]['#x'][0] === topic
+  );
+  assert(request, 'qualification REQ is missing');
+  return {event, request, subId: request[1], topic};
+}
+
+function deliverQualification(socket, traffic, event = traffic.event) {
+  socket.message(['EVENT', traffic.subId, event]);
+}
+
+function qualify(socket, traffic = qualificationTraffic(socket)) {
+  socket.message(['OK', traffic.event.id, true, '']);
+  deliverQualification(socket, traffic);
+}
+
+function fireProbeTimeout(runtime, index = 0) {
+  const timer = runtime.probeTimers[index];
+  assert(timer, 'qualification timeout is missing');
+  timer.callback();
 }
 
 async function testDelayedReadyRetry() {
@@ -468,27 +518,203 @@ async function testDelayedReadyRetry() {
   await replacement.leave();
 }
 
-async function testQualificationLifecycle() {
+async function testEmptyRoomQualification() {
   const runtime = createRuntime();
-  const relay = 'wss://qualification.example';
+  const relay = 'wss://empty-room.example';
   const room = runtime.api.joinRoom(
     relayConfig([relay], false),
-    'qualification-room'
+    'empty-room'
   );
+  const qualification = runtime.api.qualifyRelays();
   await waitFor(
-    () => publishedEvents(runtime.sockets[0]).length > 0,
-    'initial qualification publication was not sent'
+    () => qualificationEvents(runtime.sockets[0]).length === 1,
+    'empty room did not send an explicit qualification probe'
+  );
+  const socket = runtime.sockets[0];
+  const traffic = qualificationTraffic(socket);
+  assert.match(traffic.event.id, /^[a-f0-9]{64}$/);
+  assert.match(traffic.event.sig, /^[a-f0-9]{128}$/);
+  assert.equal(
+    traffic.event.id,
+    crypto.createHash('sha256').update(JSON.stringify([
+      0,
+      traffic.event.pubkey,
+      traffic.event.created_at,
+      traffic.event.kind,
+      traffic.event.tags,
+      traffic.event.content
+    ])).digest('hex'),
+    'probe EVENT ID must commit to the exact Nostr payload'
+  );
+  assert.match(traffic.topic, /^rpp-relay-qualification-v1:[a-f0-9]{64}$/);
+  assert.match(
+    traffic.event.content,
+    /^rpp-relay-qualification-v1:[a-f0-9]{64}$/
+  );
+  assert.deepEqual(traffic.request[2].authors, [traffic.event.pubkey]);
+  assert.deepEqual(traffic.request[2].kinds, [traffic.event.kind]);
+  assert.equal(
+    runtime.api.getRelayHealth()[new URL(relay).href],
+    undefined,
+    'health must retain the configured relay key, not WebSocket URL normalization'
+  );
+  assert.equal(runtime.api.getRelayHealth()[relay].qualifying, true);
+  socket.message(['OK', traffic.event.id, true, '']);
+  assert.equal(
+    runtime.api.getRelayHealth()[relay].qualified,
+    false,
+    'OK without subscribed delivery must not qualify'
+  );
+  deliverQualification(socket, traffic);
+  await qualification;
+  assert.equal(runtime.api.getRelayHealth()[relay].qualified, true);
+  assert.equal(runtime.api.getRelayHealth()[relay].qualifying, false);
+  assert(socket.sent.some(value => {
+    const message = JSON.parse(value);
+    return message[0] === 'CLOSE' && message[1] === traffic.subId;
+  }));
+  await runtime.api.qualifyRelays();
+  assert.equal(
+    qualificationEvents(socket).length,
+    1,
+    'a socket generation gets at most one qualification probe'
+  );
+  await room.leave();
+}
+
+async function testPartialAndInvalidProofs() {
+  const runtime = createRuntime({interceptProbeTimeouts: true});
+  const relays = [
+    'wss://ok-only.example',
+    'wss://delivery-only.example',
+    'wss://invalid-proof.example'
+  ];
+  const room = runtime.api.joinRoom(
+    relayConfig(relays, false),
+    'partial-proof-room'
+  );
+  const qualification = runtime.api.qualifyRelays();
+  await waitFor(
+    () => runtime.sockets.every(
+      socket => qualificationEvents(socket).length === 1
+    ),
+    'partial-proof probes were not sent'
+  );
+  const [okSocket, deliverySocket, invalidSocket] = runtime.sockets;
+  const okTraffic = qualificationTraffic(okSocket);
+  const deliveryTraffic = qualificationTraffic(deliverySocket);
+  const invalidTraffic = qualificationTraffic(invalidSocket);
+
+  okSocket.message(['OK', okTraffic.event.id, true, '']);
+  deliverQualification(deliverySocket, deliveryTraffic);
+  invalidSocket.message(['OK', 'f'.repeat(64), true, '']);
+  invalidSocket.message([
+    'EVENT',
+    invalidTraffic.subId,
+    {...invalidTraffic.event, id: 'e'.repeat(64)}
+  ]);
+  invalidSocket.message([
+    'EVENT',
+    `${invalidTraffic.subId}-wrong`,
+    invalidTraffic.event
+  ]);
+  invalidSocket.message([
+    'EVENT',
+    invalidTraffic.subId,
+    {
+      ...invalidTraffic.event,
+      tags: [['x', `${invalidTraffic.topic}-wrong`]]
+    }
+  ]);
+  for (const relay of relays) {
+    assert.equal(runtime.api.getRelayHealth()[relay].qualified, false);
+  }
+  assert.equal(runtime.api.getRelayHealth()[relays[0]].accepted, true);
+  assert.equal(runtime.api.getRelayHealth()[relays[0]].delivered, false);
+  assert.equal(runtime.api.getRelayHealth()[relays[1]].accepted, false);
+  assert.equal(runtime.api.getRelayHealth()[relays[1]].delivered, true);
+  for (const timer of [...runtime.probeTimers]) timer.callback();
+  await qualification;
+  assert.equal(runtime.probeTimers.length, 0);
+  for (const [index, relay] of relays.entries()) {
+    const health = runtime.api.getRelayHealth()[relay];
+    assert.equal(health.qualified, false);
+    assert.equal(health.qualifying, false);
+    const traffic = [okTraffic, deliveryTraffic, invalidTraffic][index];
+    assert(runtime.sockets[index].sent.some(value => {
+      const message = JSON.parse(value);
+      return message[0] === 'CLOSE' && message[1] === traffic.subId;
+    }));
+  }
+  await room.leave();
+}
+
+async function testRejectAndTimeoutCleanup() {
+  const runtime = createRuntime({interceptProbeTimeouts: true});
+  const relays = [
+    'wss://reject.example',
+    'wss://timeout.example'
+  ];
+  const room = runtime.api.joinRoom(
+    relayConfig(relays, false),
+    'failed-proof-room'
+  );
+  const qualification = runtime.api.qualifyRelays();
+  await waitFor(
+    () => runtime.sockets.every(
+      socket => qualificationEvents(socket).length === 1
+    ),
+    'failure probes were not sent'
+  );
+  const rejected = qualificationTraffic(runtime.sockets[0]);
+  const timedOut = qualificationTraffic(runtime.sockets[1]);
+  runtime.sockets[0].message([
+    'OK',
+    rejected.event.id,
+    false,
+    'rejected'
+  ]);
+  assert.equal(runtime.probeTimers.length, 1);
+  fireProbeTimeout(runtime);
+  await qualification;
+  assert.equal(runtime.probeTimers.length, 0);
+  for (const [index, relay] of relays.entries()) {
+    const health = runtime.api.getRelayHealth()[relay];
+    assert.equal(health.qualified, false);
+    assert.equal(health.qualifying, false);
+    const traffic = [rejected, timedOut][index];
+    assert(runtime.sockets[index].sent.some(value => {
+      const message = JSON.parse(value);
+      return message[0] === 'CLOSE' && message[1] === traffic.subId;
+    }));
+  }
+  await runtime.api.qualifyRelays();
+  assert(runtime.sockets.every(
+    socket => qualificationEvents(socket).length === 1
+  ));
+  await room.leave();
+}
+
+async function testQualificationReconnect() {
+  const runtime = createRuntime();
+  const relay = 'wss://qualification-reconnect.example';
+  const room = runtime.api.joinRoom(
+    relayConfig([relay], false),
+    'qualification-reconnect-room'
+  );
+  const initialQualification = runtime.api.qualifyRelays();
+  await waitFor(
+    () => qualificationEvents(runtime.sockets[0]).length === 1,
+    'initial reconnect probe was not sent'
   );
   const firstSocket = runtime.sockets[0];
-  const firstEvent = publishedEvents(firstSocket).at(-1)[1];
-  qualify(firstSocket, firstEvent);
-  assert.equal(runtime.api.getRelayHealth()[relay].qualified, true);
+  const firstTraffic = qualificationTraffic(firstSocket);
+  void runtime.api.qualifyRelays();
+  assert.equal(qualificationEvents(firstSocket).length, 1);
 
   runtime.captureReconnect(() => firstSocket.close());
-  assert.deepEqual(
-    {...runtime.api.getRelayHealth()[relay]},
-    {accepted: false, delivered: false, qualified: false}
-  );
+  await initialQualification;
+  assert.equal(runtime.api.getRelayHealth()[relay].qualified, false);
   assert.equal(runtime.reconnectTimers.size, 1);
   const reconnect = [...runtime.reconnectTimers][0];
   runtime.reconnectTimers.delete(reconnect);
@@ -498,88 +724,99 @@ async function testQualificationLifecycle() {
     'relay did not reconnect'
   );
   const secondSocket = runtime.sockets[1];
-  assert.deepEqual(
-    {...runtime.api.getRelayHealth()[relay]},
-    {accepted: false, delivered: false, qualified: false}
+  await waitFor(
+    () => qualificationEvents(secondSocket).length === 1,
+    'replacement socket did not send a fresh probe'
   );
-  qualify(secondSocket, firstEvent);
+  const secondTraffic = qualificationTraffic(secondSocket);
+  assert.notEqual(secondTraffic.event.id, firstTraffic.event.id);
+  assert.notEqual(secondTraffic.topic, firstTraffic.topic);
+  qualify(firstSocket, firstTraffic);
+  secondSocket.message(['OK', firstTraffic.event.id, true, '']);
+  secondSocket.message([
+    'EVENT',
+    firstTraffic.subId,
+    firstTraffic.event
+  ]);
   assert.equal(
     runtime.api.getRelayHealth()[relay].qualified,
     false,
     'old-socket proofs must not qualify a replacement socket'
   );
-  await waitFor(
-    () => publishedEvents(secondSocket).length > 0,
-    'replacement socket did not publish a fresh qualification event'
-  );
-  const secondEvent = publishedEvents(secondSocket).at(-1)[1];
-  qualify(secondSocket, secondEvent);
+  void runtime.api.qualifyRelays();
+  assert.equal(qualificationEvents(secondSocket).length, 1);
+  qualify(secondSocket, secondTraffic);
   assert.equal(runtime.api.getRelayHealth()[relay].qualified, true);
   secondSocket.fail();
-  assert.deepEqual(
-    {...runtime.api.getRelayHealth()[relay]},
-    {accepted: false, delivered: false, qualified: false}
-  );
+  assert.equal(runtime.api.getRelayHealth()[relay].qualified, false);
   await room.leave();
 }
 
 async function testPublishedEventBound() {
   const runtime = createRuntime({
-    interceptAnnouncements: true,
+    interceptProbeTimeouts: true,
     initialNow: Date.parse('2026-07-17T00:00:00.000Z')
   });
   const relay = 'wss://bounded-publications.example';
-  const room = runtime.api.joinRoom(
-    relayConfig([relay], false),
-    'bounded-publications-room'
+  const config = relayConfig([relay], false);
+  const rooms = Array.from(
+    {length: 300},
+    (_, index) => runtime.api.joinRoom(
+      config,
+      `bounded-publications-room-${index}`
+    )
   );
   const socket = runtime.sockets[0];
   await waitFor(
-    () => publishedEvents(socket).length > 0,
-    'initial bounded-state publication was not sent'
+    () => socket.readyState === 1,
+    'bounded-state relay did not open'
   );
-  while (publishedEvents(socket).length < 300) {
-    await waitFor(
-      () => runtime.announceTimers.length > 0,
-      'next qualification publication was not scheduled'
-    );
-    const timer = runtime.announceTimers.shift();
-    const before = publishedEvents(socket).length;
-    runtime.advance(1001);
-    timer.callback();
-    await waitFor(
-      () => publishedEvents(socket).length > before,
-      'scheduled qualification publication was not sent'
-    );
-  }
-  const events = publishedEvents(socket);
-  qualify(socket, events[0][1]);
-  assert.deepEqual(
-    {...runtime.api.getRelayHealth()[relay]},
-    {accepted: false, delivered: false, qualified: false},
+  const qualification = runtime.api.qualifyRelays();
+  await waitFor(
+    () => qualificationEvents(socket).length === 1,
+    'bounded-state probe was not sent'
+  );
+  const ordinaryEvents = () => publishedEvents(socket).filter(
+    value => !value[1].content.startsWith(probeMarker)
+  );
+  await waitFor(
+    () => ordinaryEvents().length >= 300,
+    '300 distinct signaling publications were not sent'
+  );
+  assert.equal(
+    runtime.api.getRelayHealth()[relay].pendingPublicationCount,
+    256
+  );
+  const events = ordinaryEvents();
+  socket.message(['OK', events[0][1].id, true, '']);
+  socket.message(['EVENT', 'ordinary-delivery', events[0][1]]);
+  assert.equal(
+    runtime.api.getRelayHealth()[relay].pendingPublicationCount,
+    256,
     'the oldest of 300 publications must be outside the 256-entry window'
   );
-
   const newest = events.at(-1)[1];
-  runtime.advance(60_001);
-  runtime.api.getRelayHealth();
-  qualify(socket, newest);
+  socket.message(['OK', newest.id, true, '']);
+  socket.message(['EVENT', 'ordinary-delivery', newest]);
+  assert.equal(
+    runtime.api.getRelayHealth()[relay].pendingPublicationCount,
+    255
+  );
   assert.equal(
     runtime.api.getRelayHealth()[relay].qualified,
     false,
-    'expired publication IDs must not qualify a relay'
+    'signaling publications must not replace the explicit probe'
   );
-
-  const timer = runtime.announceTimers.shift();
-  assert(timer);
-  const before = publishedEvents(socket).length;
-  runtime.advance(1001);
-  timer.callback();
-  await waitFor(
-    () => publishedEvents(socket).length > before,
-    'fresh post-expiry publication was not sent'
+  runtime.advance(60_001);
+  assert.equal(
+    runtime.api.getRelayHealth()[relay].pendingPublicationCount,
+    0,
+    'published IDs must expire'
   );
-  qualify(socket, publishedEvents(socket).at(-1)[1]);
+  assert.equal(qualificationEvents(socket).length, 1);
+  qualify(socket);
+  await qualification;
   assert.equal(runtime.api.getRelayHealth()[relay].qualified, true);
-  await room.leave();
+  assert.equal(runtime.probeTimers.length, 0);
+  await Promise.all(rooms.map(room => room.leave()));
 }

@@ -3,7 +3,7 @@
   "reviewed_at": "2026-07-17T15:24:00Z",
   "policy": "Exactly these five origins are supplied to Trystero. Public invitation fragments cannot add or replace relays.",
   "upstream_source": "https://github.com/dmotz/trystero/blob/f76eb4fca528a3253e2bdfd6d41b54c8131ca11e/packages/nostr/src/index.ts",
-  "test_method": "Release qualification uses two independent bounded clients: client A subscribes to a fresh random topic, client B publishes a signed EVENT, the relay must return OK true to B and deliver the exact event ID/content to A, then both send CLOSE and disconnect. Open/EOSE alone does not qualify signaling. CI is offline and does not run this network test; runtime health separately requires observed EVENT acceptance and subscribed delivery.",
+  "test_method": "Release qualification uses two independent bounded clients: client A subscribes to a fresh random topic, client B publishes a signed EVENT, the relay must return OK true to B and deliver the exact event ID/content to A, then both send CLOSE and disconnect. Open/EOSE alone does not qualify signaling. CI is offline and does not run this network test. Runtime health separately uses a bounded same-socket operational self-probe; that check does not replace this two-client release qualification.",
   "service_level": "Best effort public infrastructure. The project has no ownership, contract, or SLA; there is no SLA.",
   "relays": [
     {
@@ -47,5 +47,5 @@
       "latency_ms": 838
     }
   ],
-  "privacy": "Relay operators can observe connecting IP addresses, relay URLs, timing, ephemeral Nostr public keys, event IDs/signatures, created_at, kind, and the plaintext x tag containing a deterministic topic hash. EVENT content carries Trystero-encrypted signaling. Invited peers can still cause pre-auth WebRTC candidate exchange and may learn candidate metadata. Media and application actions use direct WebRTC."
+  "privacy": "Relay operators can observe connecting IP addresses, relay URLs, timing, ephemeral Nostr public keys, event IDs/signatures, created_at, kind, and plaintext x tags. Signaling EVENT content is Trystero-encrypted. Operational probe EVENT content contains only a protocol marker and random nonsecret bytes, never a room ID, room key, or SDP. Invited peers can still cause pre-auth WebRTC candidate exchange and may learn candidate metadata. Media and application actions use direct WebRTC."
 }

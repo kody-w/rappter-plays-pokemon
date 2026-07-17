@@ -44,7 +44,7 @@ ASSETS = (
     (
         "TRYSTERO_NOSTR_RUNTIME_JS",
         ROOT / "vendor/browser/trystero-nostr-0.25.3.iife.min.js",
-        "e77bfc06dffc27f310d43e09734d274993b80a98d0a9a10f5505efda5242d99d",
+        "3a4f689e5cc156f92d118a1860bc0cd77a60db220b6521b9f60b3b6fb36b2b9d",
     ),
     (
         "PEERJS_LICENSE",
@@ -99,17 +99,17 @@ ASSETS = (
     (
         "TRYSTERO_BUILD_PROVENANCE",
         ROOT / "vendor/browser/TRYSTERO_BUILD.json",
-        "31634ee738170d3d00fffb17f708ebacc59fa49734b5f6478a0ac651526a1d6a",
+        "489ca4fad767ed268ff8eeaaa64f79f91c28e8d223f25694561c23ae37deaf17",
     ),
     (
         "NOSTR_RELAY_POLICY",
         ROOT / "vendor/browser/NOSTR_RELAYS.json",
-        "aa3922f50a19f52e5e16e91ea268c64eb120ca0dc7177219d97e611c4c7bb80f",
+        "0b768e2f308c0debabc434704ae1311d066fcea72e4860addb107ebd6957265a",
     ),
     (
         "BROWSER_PROVENANCE",
         ROOT / "vendor/browser/PROVENANCE.json",
-        "7a77c66e6fc48b5ae8c68c269bcb300f3a84f5afa7702ca62f10da21a4a41eec",
+        "7234485caaedb986c11f6e6385298f239d28623f92149c741ea7bbba0d154a85",
     ),
     (
         "KITE_STRING_JS",

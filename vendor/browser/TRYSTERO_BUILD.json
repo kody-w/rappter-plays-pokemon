@@ -33,12 +33,12 @@
     }
   ],
   "entry": "trystero-nostr-0.25.3.entry.mjs",
-  "entry_sha256": "e8074845ea7d617921321150150e97fc8a5c0aa5744e43ccb455e50eaaa6fa96",
+  "entry_sha256": "39d1b56afb267dfbdd5338b5bd5077b6ae62798c600d1a936579693b1f8babb2",
   "derivatives": [
     {
       "file": "trystero-nostr-0.25.3.rpp.ts",
-      "sha256": "af3906db367aab5fd6487e8eb05f07e70c6d333cacbd0dcaaa5dde7fb303f2f5",
-      "purpose": "Adds generation-safe subscription cleanup, last-room relay disposal, bounded publication tracking, and socket-scoped EVENT acceptance/delivery qualification to the exact upstream Nostr adapter."
+      "sha256": "5936fefdc067645a19af274f484b1eef48f38097a6901a73ad3ade7a4cbcdb4d",
+      "purpose": "Adds generation-safe subscription cleanup, last-room relay disposal, bounded publication tracking, and one bounded generation-bound relay self-probe requiring exact EVENT acceptance and subscribed delivery to the exact upstream Nostr adapter."
     },
     {
       "file": "patches/trystero-core-0.25.3-leave-finally.patch",
@@ -68,7 +68,7 @@
     "--charset=utf8"
   ],
   "output": "trystero-nostr-0.25.3.iife.min.js",
-  "output_sha256": "e77bfc06dffc27f310d43e09734d274993b80a98d0a9a10f5505efda5242d99d",
+  "output_sha256": "3a4f689e5cc156f92d118a1860bc0cd77a60db220b6521b9f60b3b6fb36b2b9d",
   "runtime_external_imports": [],
-  "notes": "The checked-in IIFE is a documented MIT-licensed derivative of exact Trystero 0.25.3 archives. The minimal reviewed derivative inputs above are applied reproducibly with POSIX patch --fuzz=0. npm, patch, and esbuild are asset-update tools only and are not used by Pages or the running agent."
+  "notes": "The checked-in IIFE is a documented MIT-licensed derivative of exact Trystero 0.25.3 archives. Its runtime self-probe is an operational same-socket check and does not replace the relay policy's independent two-client release qualification. The minimal reviewed derivative inputs above are applied reproducibly with POSIX patch --fuzz=0. npm, patch, and esbuild are asset-update tools only and are not used by Pages or the running agent."
 }

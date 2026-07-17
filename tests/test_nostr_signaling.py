@@ -228,6 +228,7 @@ def test_trystero_bundle_sources_licenses_and_policy_are_exact():
     assert len(build["derivatives"]) == 3
     assert b"disposeRelaySockets" in bundle.read_bytes()
     assert b"getRelayHealth" in bundle.read_bytes()
+    assert b"qualifyRelays" in bundle.read_bytes()
     for derivative in build["derivatives"]:
         path = VENDOR / derivative["file"]
         assert hashlib.sha256(path.read_bytes()).hexdigest() == (

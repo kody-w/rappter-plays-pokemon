@@ -47,15 +47,15 @@ Browser asset provenance
     "source_file": "trystero-nostr-0.25.3.source.ts",
     "source_sha256": "1acf1519aa27fdc9fb69c3329f43b9b7cc6d0287275fe1c7ef4f74fb6702fedf",
     "file": "trystero-nostr-0.25.3.iife.min.js",
-    "sha256": "e77bfc06dffc27f310d43e09734d274993b80a98d0a9a10f5505efda5242d99d",
+    "sha256": "3a4f689e5cc156f92d118a1860bc0cd77a60db220b6521b9f60b3b6fb36b2b9d",
     "derivative": "Minimal reviewed MIT-licensed adapter and core leave-finally patches; exact files and hashes are pinned by TRYSTERO_BUILD.json.",
     "license": "MIT",
     "license_file": "trystero-nostr-0.25.3.LICENSE",
     "license_sha256": "bbf91fd979faac0def9551c570e2e9f92b4e02d22f38ca5d98860b6284e1ea25",
     "build_file": "TRYSTERO_BUILD.json",
-    "build_sha256": "31634ee738170d3d00fffb17f708ebacc59fa49734b5f6478a0ac651526a1d6a",
+    "build_sha256": "489ca4fad767ed268ff8eeaaa64f79f91c28e8d223f25694561c23ae37deaf17",
     "relay_policy_file": "NOSTR_RELAYS.json",
-    "relay_policy_sha256": "aa3922f50a19f52e5e16e91ea268c64eb120ca0dc7177219d97e611c4c7bb80f"
+    "relay_policy_sha256": "0b768e2f308c0debabc434704ae1311d066fcea72e4860addb107ebd6957265a"
   },
   "trystero_bundled_dependencies": [
     {
@@ -122,7 +122,7 @@ Browser asset provenance
 Runtime browser derivatives
 ===========================
 The served PeerJS and QRious runtime files are the pinned upstream minified distributions with their trailing sourceMappingURL comments removed and final newlines normalized. Their SHA-256 digests are 95f57b9e94e1b96c829145b3f3ef0d04b332c9bda0567e144bed70d13712e3d0 and c46f564908ff10943a59e6f56f5de4bc5b6e827813b4750eef55353e7085157c.
-The served Trystero Nostr IIFE is a deterministic self-contained bundle with SHA-256 e77bfc06dffc27f310d43e09734d274993b80a98d0a9a10f5505efda5242d99d.
+The served Trystero Nostr IIFE is a deterministic self-contained bundle with SHA-256 3a4f689e5cc156f92d118a1860bc0cd77a60db220b6521b9f60b3b6fb36b2b9d.
 
 
 Trystero bundle build provenance
@@ -162,12 +162,12 @@ Trystero bundle build provenance
     }
   ],
   "entry": "trystero-nostr-0.25.3.entry.mjs",
-  "entry_sha256": "e8074845ea7d617921321150150e97fc8a5c0aa5744e43ccb455e50eaaa6fa96",
+  "entry_sha256": "39d1b56afb267dfbdd5338b5bd5077b6ae62798c600d1a936579693b1f8babb2",
   "derivatives": [
     {
       "file": "trystero-nostr-0.25.3.rpp.ts",
-      "sha256": "af3906db367aab5fd6487e8eb05f07e70c6d333cacbd0dcaaa5dde7fb303f2f5",
-      "purpose": "Adds generation-safe subscription cleanup, last-room relay disposal, bounded publication tracking, and socket-scoped EVENT acceptance/delivery qualification to the exact upstream Nostr adapter."
+      "sha256": "5936fefdc067645a19af274f484b1eef48f38097a6901a73ad3ade7a4cbcdb4d",
+      "purpose": "Adds generation-safe subscription cleanup, last-room relay disposal, bounded publication tracking, and one bounded generation-bound relay self-probe requiring exact EVENT acceptance and subscribed delivery to the exact upstream Nostr adapter."
     },
     {
       "file": "patches/trystero-core-0.25.3-leave-finally.patch",
@@ -197,9 +197,9 @@ Trystero bundle build provenance
     "--charset=utf8"
   ],
   "output": "trystero-nostr-0.25.3.iife.min.js",
-  "output_sha256": "e77bfc06dffc27f310d43e09734d274993b80a98d0a9a10f5505efda5242d99d",
+  "output_sha256": "3a4f689e5cc156f92d118a1860bc0cd77a60db220b6521b9f60b3b6fb36b2b9d",
   "runtime_external_imports": [],
-  "notes": "The checked-in IIFE is a documented MIT-licensed derivative of exact Trystero 0.25.3 archives. The minimal reviewed derivative inputs above are applied reproducibly with POSIX patch --fuzz=0. npm, patch, and esbuild are asset-update tools only and are not used by Pages or the running agent."
+  "notes": "The checked-in IIFE is a documented MIT-licensed derivative of exact Trystero 0.25.3 archives. Its runtime self-probe is an operational same-socket check and does not replace the relay policy's independent two-client release qualification. The minimal reviewed derivative inputs above are applied reproducibly with POSIX patch --fuzz=0. npm, patch, and esbuild are asset-update tools only and are not used by Pages or the running agent."
 }
 
 
@@ -210,7 +210,7 @@ Reviewed Nostr relay policy
   "reviewed_at": "2026-07-17T15:24:00Z",
   "policy": "Exactly these five origins are supplied to Trystero. Public invitation fragments cannot add or replace relays.",
   "upstream_source": "https://github.com/dmotz/trystero/blob/f76eb4fca528a3253e2bdfd6d41b54c8131ca11e/packages/nostr/src/index.ts",
-  "test_method": "Release qualification uses two independent bounded clients: client A subscribes to a fresh random topic, client B publishes a signed EVENT, the relay must return OK true to B and deliver the exact event ID/content to A, then both send CLOSE and disconnect. Open/EOSE alone does not qualify signaling. CI is offline and does not run this network test; runtime health separately requires observed EVENT acceptance and subscribed delivery.",
+  "test_method": "Release qualification uses two independent bounded clients: client A subscribes to a fresh random topic, client B publishes a signed EVENT, the relay must return OK true to B and deliver the exact event ID/content to A, then both send CLOSE and disconnect. Open/EOSE alone does not qualify signaling. CI is offline and does not run this network test. Runtime health separately uses a bounded same-socket operational self-probe; that check does not replace this two-client release qualification.",
   "service_level": "Best effort public infrastructure. The project has no ownership, contract, or SLA; there is no SLA.",
   "relays": [
     {
@@ -254,7 +254,7 @@ Reviewed Nostr relay policy
       "latency_ms": 838
     }
   ],
-  "privacy": "Relay operators can observe connecting IP addresses, relay URLs, timing, ephemeral Nostr public keys, event IDs/signatures, created_at, kind, and the plaintext x tag containing a deterministic topic hash. EVENT content carries Trystero-encrypted signaling. Invited peers can still cause pre-auth WebRTC candidate exchange and may learn candidate metadata. Media and application actions use direct WebRTC."
+  "privacy": "Relay operators can observe connecting IP addresses, relay URLs, timing, ephemeral Nostr public keys, event IDs/signatures, created_at, kind, and plaintext x tags. Signaling EVENT content is Trystero-encrypted. Operational probe EVENT content contains only a protocol marker and random nonsecret bytes, never a room ID, room key, or SDP. Invited peers can still cause pre-auth WebRTC candidate exchange and may learn candidate metadata. Media and application actions use direct WebRTC."
 }
 
 

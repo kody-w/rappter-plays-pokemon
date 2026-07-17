@@ -218,9 +218,12 @@ rendered QR code as bearer secrets.
 Public relay service is best effort and has no SLA. Relay operators can observe
 connecting IP addresses, timing, relay URLs, ephemeral Nostr public keys,
 event IDs/signatures, `created_at`, kind, and the plaintext `x` topic-hash tag;
-EVENT content is encrypted with the private room key. Runtime relay health
-requires observed EVENT acceptance and subscribed delivery, not merely an
-open socket/EOSE. The project owns no
+signaling EVENT content is encrypted with the private room key. Runtime relay
+health uses a unique same-socket probe containing only a protocol marker and
+random nonsecret bytes—never the room ID, room key, or SDP—and requires
+`OK true` plus exact subscribed delivery. An open socket/EOSE is insufficient.
+This operational check is separate from the two-client release qualification.
+The project owns no
 relay or signaling server and does not require Azure. The exact reviewed
 origins and local handshake review date are recorded in
 [`vendor/browser/NOSTR_RELAYS.json`](vendor/browser/NOSTR_RELAYS.json).

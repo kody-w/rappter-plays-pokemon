@@ -2010,13 +2010,16 @@ async function writeHostStatus(runtimeDir, config, browserPid, status, bridgeSta
     peer_health: status.peer_health === 'open' ? 'open' : 'offline',
     signaling: status.signaling === 'nostr' ? 'nostr' : 'peerjs',
     relay_health: [
-      'qualified', 'unqualified', 'open', 'blocked', 'offline'
+      'qualified', 'qualifying', 'unqualified', 'open', 'blocked', 'offline'
     ].includes(status.relay_health)
       ? status.relay_health
       : 'offline',
     relay_open_count: boundedInteger(status.relay_open_count, 0, 5)
       ? status.relay_open_count
       : 0,
+    relay_qualifying_count: boundedInteger(
+      status.relay_qualifying_count, 0, 5
+    ) ? status.relay_qualifying_count : 0,
     relay_qualified_count: boundedInteger(
       status.relay_qualified_count, 0, 5
     ) ? status.relay_qualified_count : 0,
