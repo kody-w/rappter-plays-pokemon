@@ -36,11 +36,12 @@ Run every check before submitting:
 bash -n bootstrap.sh launch.sh uninstall.sh
 ```
 
-No test may contact GitHub Copilot, PeerJS Cloud, the Chrome-for-Testing
-manifest/storage service, require authentication, start a browser/GUI, invoke
-ffmpeg, or use a copyrighted ROM. Mock those boundaries. A generated synthetic
-file with only the minimum test header is acceptable and must stay inside
-pytest's temporary directory.
+No test may contact GitHub Copilot, PeerJS Cloud, a Nostr relay, STUN, the
+Chrome-for-Testing manifest/storage service, require authentication, start a
+browser/GUI, invoke ffmpeg, or use a copyrighted ROM. Mock those boundaries.
+Live relay review is an explicit maintainer task and is never CI. A generated
+synthetic file with only the minimum test header is acceptable and must stay
+inside pytest's temporary directory.
 
 ## Agent contract
 
@@ -55,18 +56,23 @@ screenshot-only attachments.
 
 ## Browser dependencies
 
-The host and spectator pages must not execute runtime CDN scripts. Pinned
-PeerJS and QRious distributions, package metadata, QRious source, and their
-license notices live in `vendor/browser/`. Their compressed copies are embedded
-in `pokemon_agent.py` so the registered single-file RAPP agent remains
-self-contained.
+The host and spectator pages must not execute runtime CDN scripts. Exact
+Trystero Nostr 0.25.3/core/noble archives and sources, the deterministic
+self-contained IIFE, PeerJS rollback, QRious, metadata, provenance, relay
+policy, and license notices live in `vendor/browser/`. Their runtime bytes are
+embedded in `pokemon_agent.py`, so the registered single-file RAPP agent
+remains self-contained.
 
-The source direction is deliberate: `vendor/browser/` feeds the embedded
-browser bytes; the literal `SPECTATOR_*` and `HOST_*` constants in
-`pokemon_agent.py` define the two Pages routes; and
-`scripts/build_pages_site.py` copies those exact canonical constants into the
-checked-in `docs/watch/` and `docs/host/` publication trees. Never edit either
-generated tree manually. `scripts/kite_vtwin.js` is the reviewable
+The source direction is deliberate: `vendor/browser/` feeds dependency bytes
+and the immutable `pages-v1/` rollback snapshot; `web/pages-v2/` contains the
+reviewable current first-party Pages sources;
+`scripts/update_browser_assets.py` embeds those v2 sources as
+`SPECTATOR_*`, `HOST_*`, and `PAIRING_JS`; and
+`scripts/build_pages_site.py` deterministically writes root v1 plus
+side-by-side `docs/watch/v2/` and `docs/host/v2/`. Never edit either generated
+tree manually. `PAGES_V1.json` hash-locks rollback inputs. Versioned v2 asset
+filenames must change before an incompatible protocol change.
+`scripts/kite_vtwin.js` is the reviewable
 zero-dependency CDP string source; `scripts/update_browser_assets.py` embeds
 its exact bytes as `KITE_STRING_JS` so the registered RAPP agent stays
 self-contained. After changing any of these sources, rebuild and check them:
@@ -76,9 +82,11 @@ self-contained. After changing any of these sources, rebuild and check them:
 .venv-dev/bin/python scripts/build_pages_site.py --check
 ```
 
-The Pages trees must remain static: no runtime APIs, gameplay controls,
-analytics, service workers, storage, CDN scripts, or localhost access. The
-bare host must remain inert until exact versioned CDP bootstrap. Keep spectator
+The Pages trees must remain static: no gameplay controls, analytics, service
+workers, storage, CDN scripts, or Pages-to-localhost requests. The v2 static
+return page may perform only a visible top-level handoff to the exact
+fragment-carried loopback callback. The bare host must remain inert until exact
+versioned CDP bootstrap. Keep spectator
 capability parsing fragment-only and the host target fragment nonsecret.
 Because GitHub Pages cannot set the local server's response headers, retain
 the strict meta CSP without an ineffective `frame-ancestors` directive.
@@ -94,6 +102,18 @@ license, update the pinned digest and provenance table, then run:
 .venv-dev/bin/python scripts/check_browser_js.py
 ```
 
+For an intentional Trystero update, first review the exact upstream commit,
+source, types, defaults, dependencies, and licenses. Put only reviewed package
+archives in `vendor/browser/sources/`. Any derivative must be minimal,
+MIT-license compliant, documented and hash-pinned in `TRYSTERO_BUILD.json`;
+patches apply with `patch --fuzz=0`. Then run
+`python scripts/build_trystero_bundle.py --check`. That command may use npm as
+an asset-build tool; Pages and the runtime never do. Do not run it in CI.
+`NOSTR_RELAYS.json` must retain exactly five reviewed upstream-default origins,
+operator links where known, review date, two-client EVENT acceptance/delivery
+procedure (open/EOSE alone is insufficient), privacy warning,
+and best-effort/no-SLA language. Public links may never supply relay URLs.
+
 Node.js is optional for Python-only local development; the JavaScript checker
 prints an explicit skip when it is absent. CI installs Node and requires every
 first-party and vendored browser script to parse.
@@ -102,13 +122,22 @@ Livestream changes require ROM-free tests for both Pages builds, inert host
 bootstrap, exact target selection (including distractors/ambiguity/navigation),
 CDP RPC timeout/close cleanup, capability redaction, bounded protocol
 admission, frame dedup/latest-wins/backpressure, heartbeat loss, process/profile
-cleanup, and legacy local mode. Dashboard changes must keep
+cleanup, asynchronous leave/cache races, last-room socket/timer disposal,
+ECDSA host proof and shared-key forgery rejection, pending-host promotion,
+targeted media-ready actions, separate auth/transport/media deadlines, relay
+qualification/loss with surviving media, one-bad-peer isolation, Share-sheet
+offer/answer links, static-to-loopback return handoff, strict return endpoint,
+atomic queue/CDP delivery/replay, manual retire/capacity/tamper/expiry/size
+state machines, mixed compression capability, QR capacity fallback, and
+legacy v1/local mode. Dashboard changes must keep
 `project_dashboard_snapshot` as the sole strict public projector, enforce
 exact/versioned message keys and the 4096-byte bound, use inert DOM rendering,
 and cover sequence/cadence/staleness with synthetic memory and fake clocks.
 PiP tests must cover standard and Safari APIs without screen capture.
 Chrome-for-Testing tests use synthetic manifests/archives and injected
 extract/signature functions; tests must never download or connect to signaling.
+Never add TURN, arbitrary relay URLs, iframe/worker/service-worker policy
+bypasses, or network access to the manual pairing path.
 
 Treat CDP as unauthenticated same-user local authority. Never add first-page
 fallback, personal-profile reuse, remote-debug forwarding, arbitrary

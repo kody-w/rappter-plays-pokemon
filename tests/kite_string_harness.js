@@ -2,10 +2,13 @@
 
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
+const nodeCrypto = require('node:crypto');
 const path = require('node:path');
 const {EventEmitter} = require('node:events');
 const {PassThrough} = require('node:stream');
 const {
+  STRING_VERSION,
+  HOST_BUILD,
   validateBootstrap,
   selectExactTarget,
   discoverBrowser,
@@ -29,6 +32,10 @@ const {
   runString,
   parsePng,
   pageBootstrap,
+  hostPublicKeyToken,
+  hostFingerprint,
+  validHostIdentity,
+  consumeManualAnswers,
   sanitizedError
 } = require('../scripts/kite_vtwin.js');
 
@@ -39,7 +46,7 @@ const capability = 'd'.repeat(43);
 const joinUrl =
   `https://example.test/watch/#v=1&host=${peerId}&watch=${capability}`;
 const bootstrap = {
-  schema_version: 1,
+  schema_version: STRING_VERSION,
   generation,
   instance,
   host_base: 'https://example.test/host/',
@@ -63,7 +70,7 @@ assert.throws(
   /invitation/
 );
 
-const expectedUrl = `https://example.test/host/#v=1&instance=${instance}`;
+const expectedUrl = `https://example.test/host/#v=2&instance=${instance}`;
 const exact = {targetId: 'host', type: 'page', url: expectedUrl};
 assert.equal(
   selectExactTarget([
@@ -109,6 +116,101 @@ assert.equal(pageConfig.watch_capability, capability);
 assert.deepEqual(
   pageConfig.peer_options.config.iceServers,
   [{urls: 'stun:stun.l.google.com:19302'}]
+);
+
+const roomId = Buffer.alloc(16, 1).toString('base64url');
+const roomKey = Buffer.alloc(32, 2).toString('base64url');
+const publicJwk = {
+  crv: 'P-256',
+  ext: true,
+  key_ops: ['verify'],
+  kty: 'EC',
+  x: 'TZoJKyIkF2MGUB0oEgsu9pZThxyOBzpjHiAnjVX_k8k',
+  y: 'xG9WvTCyfXBbP4J8hovLGTYYYdRf0whrzcKwIjrxWxk'
+};
+const privateJwk = {
+  crv: 'P-256',
+  d: 'fX-cLki7u22tn7NEL7OBYunSbFDEjjS7NZ_-oZhYIGE',
+  ext: true,
+  key_ops: ['sign'],
+  kty: 'EC',
+  x: publicJwk.x,
+  y: publicJwk.y
+};
+const hostPublicKey = hostPublicKeyToken(publicJwk);
+const hostFingerprintValue = hostFingerprint(publicJwk, generation);
+const identity = {
+  schema_version: STRING_VERSION,
+  generation,
+  host_public_jwk: publicJwk,
+  host_private_jwk: privateJwk,
+  host_public_key: hostPublicKey,
+  fingerprint: hostFingerprintValue,
+  created_at: '2026-07-17T00:00:00.000Z'
+};
+assert.equal(validHostIdentity(identity, generation), true);
+const relayUrls = [
+  'wss://communities.nos.social',
+  'wss://purplerelay.com',
+  'wss://bucket.coracle.social',
+  'wss://relay.nostr.place',
+  'wss://relay.damus.io'
+];
+const nostrBootstrap = {
+  schema_version: STRING_VERSION,
+  generation,
+  instance,
+  host_base: 'https://example.test/host/',
+  join_url:
+    `https://example.test/watch/v2/#v=2&room=${roomId}&key=${roomKey}` +
+    `&gen=${generation}&pub=${hostPublicKey}&fp=${hostFingerprintValue}`,
+  signaling: 'nostr',
+  room_id: roomId,
+  room_key: roomKey,
+  host_fingerprint: hostFingerprintValue,
+  host_public_key: hostPublicKey,
+  manual_callback: {
+    origin: 'http://127.0.0.1:45678',
+    path: '/pair-return'
+  },
+  manual_return_token: Buffer.alloc(32, 8).toString('base64url'),
+  manual_return_page: 'https://example.test/host/v2/return/',
+  relay_urls: relayUrls,
+  max_viewers: 5,
+  browser_path: '',
+  startup_timeout_seconds: 20,
+  parent_pid: process.pid,
+  created_at: '2026-07-17T00:00:00.000Z'
+};
+assert.equal(validateBootstrap(nostrBootstrap).signaling, 'nostr');
+const nostrPage = pageBootstrap(
+  nostrBootstrap,
+  {sequence: 0, desired: true},
+  identity
+);
+assert.equal(nostrPage.protocol_version, 2);
+assert.equal(nostrPage.signaling, 'nostr');
+assert.equal(nostrPage.room_id, roomId);
+assert.equal(nostrPage.room_key, roomKey);
+assert.deepEqual(nostrPage.relay_urls, relayUrls);
+assert.deepEqual(
+  nostrPage.rtc_config,
+  {iceServers: [{urls: 'stun:stun.l.google.com:19302'}]}
+);
+assert(!JSON.stringify(nostrPage).includes('turn:'));
+assert.throws(
+  () => validateBootstrap({
+    ...nostrBootstrap,
+    relay_urls: [...relayUrls.slice(0, 4), 'wss://unreviewed.example']
+  }),
+  /values/
+);
+assert.throws(
+  () => validateBootstrap({
+    ...nostrBootstrap,
+    join_url: `${nostrBootstrap.join_url}&relay=wss%3A%2F%2Fevil.example`
+  }),
+  /invitation/
 );
 
 const png = Buffer.alloc(33);
@@ -221,8 +323,8 @@ async function testDelayedIngress() {
         return {
           result: {
             value: {
-              version: 1,
-              build: 'rpp-kite-host-v1',
+              version: STRING_VERSION,
+              build: HOST_BUILD,
               instance,
               generation: '',
               bootstrapped: false
@@ -386,7 +488,7 @@ async function testOwnershipAndProfiles() {
     const lock = path.join(directory, 'kite-string.lock');
     fs.mkdirSync(lock);
     fs.writeFileSync(path.join(lock, 'owner.json'), JSON.stringify({
-      schema_version: 1,
+      schema_version: STRING_VERSION,
       token: 'a'.repeat(48),
       generation,
       instance,
@@ -436,7 +538,7 @@ async function testOwnershipAndProfiles() {
     fs.writeFileSync(
       path.join(old, 'rpp-kite-profile.json'),
       JSON.stringify({
-        schema_version: 1,
+        schema_version: STRING_VERSION,
         generation: oldGeneration,
         instance,
         token: 'c'.repeat(48),
@@ -444,7 +546,7 @@ async function testOwnershipAndProfiles() {
       })
     );
     const staleRecord = {
-      schema_version: 1,
+      schema_version: STRING_VERSION,
       generation: oldGeneration,
       instance,
       token: 'c'.repeat(48),
@@ -521,7 +623,7 @@ async function testBrowserLifecycle() {
   const token = 'e'.repeat(48);
   const profile = '/private/kite-profile';
   const record = {
-    schema_version: 1,
+    schema_version: STRING_VERSION,
     generation,
     instance,
     token,
@@ -631,6 +733,172 @@ async function testTelemetryCadence() {
   assert.deepEqual(sent, [1, 2, 3]);
 }
 
+async function testManualAnswerDelivery() {
+  const directory = fs.mkdtempSync(
+    path.join(process.cwd(), '.kite-manual-delivery-contract-')
+  );
+  const queueDirectory = path.join(directory, 'kite-manual-return');
+  fs.mkdirSync(queueDirectory, {mode: 0o700});
+  const answer = 'rpp-answer-v2.encrypted-answer';
+  fs.writeFileSync(
+    path.join(queueDirectory, 'answer-000000000001.json'),
+    JSON.stringify({
+      schema_version: STRING_VERSION,
+      generation,
+      sequence: 1,
+      answer,
+      received_at: '2026-07-17T00:00:00.000Z'
+    })
+  );
+  const calls = [];
+  const ingress = {
+    async call(method, value) {
+      calls.push({method, value});
+      return {ok: true, reason: 'accepted'};
+    }
+  };
+  try {
+    const consumed = await consumeManualAnswers(
+      directory,
+      nostrBootstrap,
+      ingress,
+      0
+    );
+    assert.equal(consumed, 1);
+    assert.deepEqual(calls, [{
+      method: 'manualAnswer',
+      value: {generation, answer}
+    }]);
+    const status = JSON.parse(fs.readFileSync(
+      path.join(queueDirectory, 'status-000000000001.json')
+    ));
+    assert.equal(status.status, 'delivered');
+    assert.equal(status.sequence, 1);
+    assert.equal(Object.hasOwn(status, 'answer'), false);
+
+    fs.writeFileSync(
+      path.join(queueDirectory, 'answer-000000000001.json'),
+      JSON.stringify({
+        schema_version: STRING_VERSION,
+        generation,
+        sequence: 1,
+        answer,
+        received_at: '2026-07-17T00:00:00.000Z'
+      })
+    );
+    const duplicate = await consumeManualAnswers(
+      directory,
+      nostrBootstrap,
+      ingress,
+      0
+    );
+    assert.equal(duplicate, 1);
+    assert.equal(calls.length, 1);
+    assert.equal(
+      fs.existsSync(
+        path.join(queueDirectory, 'answer-000000000001.json')
+      ),
+      false
+    );
+
+    const replay = await consumeManualAnswers(
+      directory,
+      nostrBootstrap,
+      ingress,
+      consumed
+    );
+    assert.equal(replay, 1);
+    assert.equal(calls.length, 1);
+  } finally {
+    fs.rmSync(directory, {recursive: true, force: true});
+  }
+}
+
+async function testManualAnswerTransientFailureIsContiguous() {
+  const directory = fs.mkdtempSync(
+    path.join(process.cwd(), '.kite-manual-contiguous-contract-')
+  );
+  const queueDirectory = path.join(directory, 'kite-manual-return');
+  fs.mkdirSync(queueDirectory, {mode: 0o700});
+  const answers = [
+    'rpp-answer-v2.first-encrypted-answer',
+    'rpp-answer-v2.second-encrypted-answer'
+  ];
+  for (let index = 0; index < answers.length; index += 1) {
+    const sequence = index + 1;
+    fs.writeFileSync(
+      path.join(
+        queueDirectory,
+        `answer-${String(sequence).padStart(12, '0')}.json`
+      ),
+      JSON.stringify({
+        schema_version: STRING_VERSION,
+        generation,
+        sequence,
+        answer: answers[index],
+        received_at: '2026-07-17T00:00:00.000Z'
+      })
+    );
+  }
+  let failFirst = true;
+  const calls = [];
+  const ingress = {
+    async call(_method, value) {
+      calls.push(value.answer);
+      if (failFirst) {
+        failFirst = false;
+        throw new Error('transient CDP context loss');
+      }
+      return {ok: true, reason: 'accepted'};
+    }
+  };
+  try {
+    const blocked = await consumeManualAnswers(
+      directory,
+      nostrBootstrap,
+      ingress,
+      0
+    );
+    assert.equal(blocked, 0);
+    assert.deepEqual(calls, [answers[0]]);
+    assert.equal(
+      fs.existsSync(
+        path.join(queueDirectory, 'answer-000000000001.json')
+      ),
+      true
+    );
+    assert.equal(
+      fs.existsSync(
+        path.join(queueDirectory, 'answer-000000000002.json')
+      ),
+      true
+    );
+
+    const consumed = await consumeManualAnswers(
+      directory,
+      nostrBootstrap,
+      ingress,
+      blocked
+    );
+    assert.equal(consumed, 2);
+    assert.deepEqual(calls, [answers[0], answers[0], answers[1]]);
+    assert.equal(
+      fs.existsSync(
+        path.join(queueDirectory, 'answer-000000000001.json')
+      ),
+      false
+    );
+    assert.equal(
+      fs.existsSync(
+        path.join(queueDirectory, 'answer-000000000002.json')
+      ),
+      false
+    );
+  } finally {
+    fs.rmSync(directory, {recursive: true, force: true});
+  }
+}
+
 async function main() {
   await testCdp();
   await testDelayedIngress();
@@ -640,6 +908,8 @@ async function main() {
   await testBrowserLifecycle();
   await testLatestWins();
   await testTelemetryCadence();
+  await testManualAnswerDelivery();
+  await testManualAnswerTransientFailureIsContiguous();
   const sanitized = sanitizedError(
     `failed https://example.test/#watch=${capability}`
   );

@@ -32,6 +32,53 @@
       "license_terms_sha256": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986"
     }
   ],
+  "trystero_bundle": {
+    "package": "@trystero-p2p/nostr",
+    "version": "0.25.3",
+    "upstream_commit": "f76eb4fca528a3253e2bdfd6d41b54c8131ca11e",
+    "source": "https://registry.npmjs.org/@trystero-p2p/nostr/-/nostr-0.25.3.tgz",
+    "npm_integrity": "sha512-nZV9Fl/GXuhIkJSQ+wIkdMoRLO1oSTUL/+vZorukaojeAdOpT/61e8b9Vzbt8L1ktMTaGPEJHw2BG/B5BCwBuw==",
+    "archive_file": "sources/trystero-p2p-nostr-0.25.3.tgz",
+    "archive_sha256": "9b2e277ca830e61901cbb906c3e82e564d181b346d3caa197772e70bcd5782ee",
+    "metadata_file": "trystero-nostr-0.25.3.package.json",
+    "metadata_sha256": "e8e622a991d59d47afd3d446eebfcc87dae3409da2ca502cc3df70a6468aef74",
+    "source_file": "trystero-nostr-0.25.3.source.ts",
+    "source_sha256": "1acf1519aa27fdc9fb69c3329f43b9b7cc6d0287275fe1c7ef4f74fb6702fedf",
+    "file": "trystero-nostr-0.25.3.iife.min.js",
+    "sha256": "e77bfc06dffc27f310d43e09734d274993b80a98d0a9a10f5505efda5242d99d",
+    "derivative": "Minimal reviewed MIT-licensed adapter and core leave-finally patches; exact files and hashes are pinned by TRYSTERO_BUILD.json.",
+    "license": "MIT",
+    "license_file": "trystero-nostr-0.25.3.LICENSE",
+    "license_sha256": "bbf91fd979faac0def9551c570e2e9f92b4e02d22f38ca5d98860b6284e1ea25",
+    "build_file": "TRYSTERO_BUILD.json",
+    "build_sha256": "31634ee738170d3d00fffb17f708ebacc59fa49734b5f6478a0ac651526a1d6a",
+    "relay_policy_file": "NOSTR_RELAYS.json",
+    "relay_policy_sha256": "aa3922f50a19f52e5e16e91ea268c64eb120ca0dc7177219d97e611c4c7bb80f"
+  },
+  "trystero_bundled_dependencies": [
+    {
+      "package": "@trystero-p2p/core",
+      "version": "0.25.3",
+      "archive_file": "sources/trystero-p2p-core-0.25.3.tgz",
+      "archive_sha256": "119534b002447f97dbf4d2de020aac3934a12ce7bac344bc0fe0bcb28107db4f",
+      "metadata_file": "trystero-core-0.25.3.package.json",
+      "metadata_sha256": "85064f7657ad826d2eed6e07bd7ace4b474fa967c19461f85dabfb0f6e0914fd",
+      "license": "MIT",
+      "license_file": "trystero-core-0.25.3.LICENSE",
+      "license_sha256": "bbf91fd979faac0def9551c570e2e9f92b4e02d22f38ca5d98860b6284e1ea25"
+    },
+    {
+      "package": "@noble/secp256k1",
+      "version": "3.1.0",
+      "archive_file": "sources/noble-secp256k1-3.1.0.tgz",
+      "archive_sha256": "f5d5f57083b71143291b3bc9aa9ea48a03313337c93d41a31d70b90224b57f74",
+      "metadata_file": "noble-secp256k1-3.1.0.package.json",
+      "metadata_sha256": "8a51915ce154543d6ade3b38d14ea31a887eb29d9b7ff603f8fbe80f976495ad",
+      "license": "MIT",
+      "license_file": "noble-secp256k1-3.1.0.LICENSE",
+      "license_sha256": "394c2e6e5552e5dba202bee6390b9d6aa2754d657f5b9869e83b3d265a315501"
+    }
+  ],
   "peerjs_bundle_lock": "https://raw.githubusercontent.com/peers/peerjs/v1.5.5/package-lock.json",
   "peerjs_bundled_dependencies": [
     {

@@ -42,6 +42,11 @@ ASSETS = (
         "d1e65c661e659f51c226de9be64feff66052549ed881959aa7ebb960adfb8158",
     ),
     (
+        "TRYSTERO_NOSTR_RUNTIME_JS",
+        ROOT / "vendor/browser/trystero-nostr-0.25.3.iife.min.js",
+        "e77bfc06dffc27f310d43e09734d274993b80a98d0a9a10f5505efda5242d99d",
+    ),
+    (
         "PEERJS_LICENSE",
         ROOT / "vendor/browser/peerjs-1.5.5.LICENSE",
         "9407807dba7f47a79bfb3ac55759d63d77c9371ebd0616d5a093e97d3e810397",
@@ -77,9 +82,34 @@ ASSETS = (
         "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986",
     ),
     (
+        "TRYSTERO_LICENSE",
+        ROOT / "vendor/browser/trystero-nostr-0.25.3.LICENSE",
+        "bbf91fd979faac0def9551c570e2e9f92b4e02d22f38ca5d98860b6284e1ea25",
+    ),
+    (
+        "TRYSTERO_CORE_LICENSE",
+        ROOT / "vendor/browser/trystero-core-0.25.3.LICENSE",
+        "bbf91fd979faac0def9551c570e2e9f92b4e02d22f38ca5d98860b6284e1ea25",
+    ),
+    (
+        "NOBLE_SECP256K1_LICENSE",
+        ROOT / "vendor/browser/noble-secp256k1-3.1.0.LICENSE",
+        "394c2e6e5552e5dba202bee6390b9d6aa2754d657f5b9869e83b3d265a315501",
+    ),
+    (
+        "TRYSTERO_BUILD_PROVENANCE",
+        ROOT / "vendor/browser/TRYSTERO_BUILD.json",
+        "31634ee738170d3d00fffb17f708ebacc59fa49734b5f6478a0ac651526a1d6a",
+    ),
+    (
+        "NOSTR_RELAY_POLICY",
+        ROOT / "vendor/browser/NOSTR_RELAYS.json",
+        "aa3922f50a19f52e5e16e91ea268c64eb120ca0dc7177219d97e611c4c7bb80f",
+    ),
+    (
         "BROWSER_PROVENANCE",
         ROOT / "vendor/browser/PROVENANCE.json",
-        "def6b65036e7753a032d0081fc6383be10721aed9f78e26eee5a7d3610f64692",
+        "7a77c66e6fc48b5ae8c68c269bcb300f3a84f5afa7702ca62f10da21a4a41eec",
     ),
     (
         "KITE_STRING_JS",
@@ -87,12 +117,25 @@ ASSETS = (
         None,
     ),
 )
+TEXT_ASSETS = (
+    ("PAIRING_JS", ROOT / "web/pages-v2/shared/pairing.js"),
+    ("HOST_HTML", ROOT / "web/pages-v2/host/index.html"),
+    ("HOST_CSS", ROOT / "web/pages-v2/host/host.css"),
+    ("HOST_JS", ROOT / "web/pages-v2/host/host.js"),
+    ("SPECTATOR_HTML", ROOT / "web/pages-v2/watch/index.html"),
+    ("SPECTATOR_CSS", ROOT / "web/pages-v2/watch/spectator.css"),
+    ("SPECTATOR_JS", ROOT / "web/pages-v2/watch/spectator.js"),
+)
 
 EXPECTED_BUNDLED_DEPENDENCIES = {
     "eventemitter3": "4.0.7",
     "peerjs-js-binarypack": "2.1.0",
     "webrtc-adapter": "9.0.1",
     "sdp": "3.2.0",
+}
+EXPECTED_TRYSTERO_DEPENDENCIES = {
+    "@trystero-p2p/core": "0.25.3",
+    "@noble/secp256k1": "3.1.0",
 }
 
 
@@ -114,6 +157,19 @@ def render_asset(
     )
 
 
+def render_text_asset(name: str, path: Path) -> str:
+    payload = path.read_bytes()
+    payload.decode("utf-8")
+    encoded = base64.b64encode(zlib.compress(payload, level=9)).decode("ascii")
+    lines = "\n".join(f'    b"{part}"' for part in textwrap.wrap(encoded, 76))
+    return (
+        f"{name} = zlib.decompress(base64.b64decode(  "
+        f"# generated from {path.relative_to(ROOT)}\n"
+        f"{lines}\n"
+        ')).decode("utf-8")'
+    )
+
+
 def verify_provenance() -> None:
     vendor = ROOT / "vendor/browser"
     provenance = json.loads((vendor / "PROVENANCE.json").read_text())
@@ -128,6 +184,18 @@ def verify_provenance() -> None:
         or metadata["qrious"].get("license") != "GPL-3.0"
     ):
         raise RuntimeError("Vendored package metadata or licensing changed")
+    trystero = provenance.get("trystero_bundle", {})
+    trystero_metadata = json.loads(
+        (vendor / str(trystero.get("metadata_file", ""))).read_text()
+    )
+    if (
+        trystero.get("version") != "0.25.3"
+        or trystero.get("upstream_commit")
+        != "f76eb4fca528a3253e2bdfd6d41b54c8131ca11e"
+        or trystero_metadata.get("version") != "0.25.3"
+        or trystero_metadata.get("license") != "MIT"
+    ):
+        raise RuntimeError("Vendored Trystero pin or licensing changed")
     peer_dependencies = metadata["peerjs"].get("dependencies", {})
     for package in (
         "eventemitter3",
@@ -144,16 +212,29 @@ def verify_provenance() -> None:
         raise RuntimeError(
             "PeerJS bundled dependency versions do not match the verified lock"
         )
+    trystero_dependencies = {
+        item["package"]: item["version"]
+        for item in provenance.get("trystero_bundled_dependencies", [])
+    }
+    if trystero_dependencies != EXPECTED_TRYSTERO_DEPENDENCIES:
+        raise RuntimeError(
+            "Trystero bundled dependency versions do not match the verified lock"
+        )
     for item in [
         *provenance["assets"],
         *provenance["peerjs_bundled_dependencies"],
+        trystero,
+        *provenance.get("trystero_bundled_dependencies", []),
     ]:
         for path_key, hash_key in (
             ("file", "sha256"),
+            ("archive_file", "archive_sha256"),
             ("metadata_file", "metadata_sha256"),
             ("source_file", "source_sha256"),
             ("license_file", "license_sha256"),
             ("license_terms_file", "license_terms_sha256"),
+            ("build_file", "build_sha256"),
+            ("relay_policy_file", "relay_policy_sha256"),
         ):
             path_name = item.get(path_key)
             if not path_name:
@@ -195,7 +276,12 @@ def update(*, check: bool) -> bool:
     _old, marker, after = remainder.partition(END)
     if not marker:
         raise RuntimeError(f"Missing {END!r} in {AGENT}")
-    generated = "\n\n".join(render_asset(*asset) for asset in ASSETS)
+    generated = "\n\n".join(
+        [
+            *(render_asset(*asset) for asset in ASSETS),
+            *(render_text_asset(*asset) for asset in TEXT_ASSETS),
+        ]
+    )
     updated = f"{before}{START}\n{generated}\n{END}{after}"
     changed = updated != source
     if changed and not check:

@@ -4,40 +4,41 @@
 from __future__ import annotations
 
 import argparse
-import ast
 import shutil
 import subprocess
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from build_pages_site import CanonicalReader
+
 ROOT = Path(__file__).resolve().parents[1]
 AGENT = ROOT / "pokemon_agent.py"
-FIRST_PARTY_NAMES = ("VIEWER_JS", "SPECTATOR_JS", "HOST_JS")
+FIRST_PARTY_NAMES = (
+    "VIEWER_JS",
+    "SPECTATOR_JS",
+    "HOST_JS",
+    "PAIRING_JS",
+    "PAIR_RETURN_JS",
+)
 
 
 def extracted_first_party_scripts() -> dict[str, str]:
-    tree = ast.parse(AGENT.read_text(encoding="utf-8"), filename=str(AGENT))
-    scripts: dict[str, str] = {}
-    for node in tree.body:
-        if not isinstance(node, ast.Assign) or len(node.targets) != 1:
-            continue
-        target = node.targets[0]
-        if not isinstance(target, ast.Name) or target.id not in FIRST_PARTY_NAMES:
-            continue
-        value = ast.literal_eval(node.value)
-        if not isinstance(value, str):
-            raise RuntimeError(f"{target.id} must be a literal JavaScript string")
-        scripts[target.id] = value
-    missing = sorted(set(FIRST_PARTY_NAMES) - scripts.keys())
-    if missing:
-        raise RuntimeError(f"Missing browser scripts: {', '.join(missing)}")
-    return scripts
+    reader = CanonicalReader(AGENT)
+    return {
+        name: reader.read(name, str)
+        for name in FIRST_PARTY_NAMES
+    }
 
 
 def browser_scripts() -> dict[str, str]:
     scripts = extracted_first_party_scripts()
     kite_string = ROOT / "scripts" / "kite_vtwin.js"
     scripts[str(kite_string.relative_to(ROOT))] = kite_string.read_text(
+        encoding="utf-8"
+    )
+    return_page = ROOT / "web/pages-v2/return/return.js"
+    scripts[str(return_page.relative_to(ROOT))] = return_page.read_text(
         encoding="utf-8"
     )
     for path in sorted((ROOT / "vendor/browser").glob("*.js")):

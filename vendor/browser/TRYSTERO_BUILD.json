@@ -1,0 +1,74 @@
+{
+  "schema_version": 1,
+  "package": "@trystero-p2p/nostr",
+  "version": "0.25.3",
+  "upstream_commit": "f76eb4fca528a3253e2bdfd6d41b54c8131ca11e",
+  "upstream_commit_url": "https://github.com/dmotz/trystero/commit/f76eb4fca528a3253e2bdfd6d41b54c8131ca11e",
+  "released_at": "2026-07-13T00:29:37Z",
+  "license": "MIT",
+  "inputs": [
+    {
+      "package": "@trystero-p2p/nostr",
+      "version": "0.25.3",
+      "archive": "sources/trystero-p2p-nostr-0.25.3.tgz",
+      "source": "https://registry.npmjs.org/@trystero-p2p/nostr/-/nostr-0.25.3.tgz",
+      "npm_integrity": "sha512-nZV9Fl/GXuhIkJSQ+wIkdMoRLO1oSTUL/+vZorukaojeAdOpT/61e8b9Vzbt8L1ktMTaGPEJHw2BG/B5BCwBuw==",
+      "sha256": "9b2e277ca830e61901cbb906c3e82e564d181b346d3caa197772e70bcd5782ee"
+    },
+    {
+      "package": "@trystero-p2p/core",
+      "version": "0.25.3",
+      "archive": "sources/trystero-p2p-core-0.25.3.tgz",
+      "source": "https://registry.npmjs.org/@trystero-p2p/core/-/core-0.25.3.tgz",
+      "npm_integrity": "sha512-lQKNq/ha+vF6kQZrpaXJGzlzxLF/Fhizoy5dwJUYQlkqRrbPup/Jov2EpPX/CPr2X+f79HxVzonkeni3MxmCuQ==",
+      "sha256": "119534b002447f97dbf4d2de020aac3934a12ce7bac344bc0fe0bcb28107db4f"
+    },
+    {
+      "package": "@noble/secp256k1",
+      "version": "3.1.0",
+      "archive": "sources/noble-secp256k1-3.1.0.tgz",
+      "source": "https://registry.npmjs.org/@noble/secp256k1/-/secp256k1-3.1.0.tgz",
+      "npm_integrity": "sha512-+F7iS7tUMaNGXcc9X3PjmjvuQnXEuSjCRNzVVA2xAcKXgCaP0dHYz4SFyt4FKNHef7sOP//xihowcySSS7PK9g==",
+      "sha256": "f5d5f57083b71143291b3bc9aa9ea48a03313337c93d41a31d70b90224b57f74"
+    }
+  ],
+  "entry": "trystero-nostr-0.25.3.entry.mjs",
+  "entry_sha256": "e8074845ea7d617921321150150e97fc8a5c0aa5744e43ccb455e50eaaa6fa96",
+  "derivatives": [
+    {
+      "file": "trystero-nostr-0.25.3.rpp.ts",
+      "sha256": "af3906db367aab5fd6487e8eb05f07e70c6d333cacbd0dcaaa5dde7fb303f2f5",
+      "purpose": "Adds generation-safe subscription cleanup, last-room relay disposal, bounded publication tracking, and socket-scoped EVENT acceptance/delivery qualification to the exact upstream Nostr adapter."
+    },
+    {
+      "file": "patches/trystero-core-0.25.3-leave-finally.patch",
+      "sha256": "5dfe24f86de831ea4618f9b55913ecb810a04234cd898bdc7a0910fb1f85e4e9",
+      "purpose": "Makes room.leave idempotent and guarantees local deregistration when the leave action rejects."
+    },
+    {
+      "file": "patches/trystero-core-0.25.3-socket-lifecycle.patch",
+      "sha256": "e446ddb74078715d6112c78bdafb180d8c4f017045c127ac04e3df37af5f4840",
+      "purpose": "Cancels pending reconnect timers and suspends sockets after the last room, then explicitly recreates them for a later join."
+    }
+  ],
+  "build_tool": {
+    "package": "esbuild",
+    "version": "0.25.6",
+    "npm_integrity": "sha512-GVuzuUwtdsghE3ocJ9Bs8PNoF13HNQ5TXbEi2AhvVb8xU1Iwt9Fos9FEamfoee+u/TOsn7GUWc04lz46n2bbTg==",
+    "license": "MIT"
+  },
+  "arguments": [
+    "--bundle",
+    "--format=iife",
+    "--global-name=RppTrysteroNostr",
+    "--platform=browser",
+    "--target=es2022",
+    "--minify",
+    "--legal-comments=none",
+    "--charset=utf8"
+  ],
+  "output": "trystero-nostr-0.25.3.iife.min.js",
+  "output_sha256": "e77bfc06dffc27f310d43e09734d274993b80a98d0a9a10f5505efda5242d99d",
+  "runtime_external_imports": [],
+  "notes": "The checked-in IIFE is a documented MIT-licensed derivative of exact Trystero 0.25.3 archives. The minimal reviewed derivative inputs above are applied reproducibly with POSIX patch --fuzz=0. npm, patch, and esbuild are asset-update tools only and are not used by Pages or the running agent."
+}

@@ -423,7 +423,7 @@ def test_dashboard_markup_transport_pip_and_resilience_contracts():
     assert 'id="completion">Unknown' in SPECTATOR_HTML
     assert "0 / 8 badges" not in SPECTATOR_HTML
     assert 'id="completion">Not yet' not in SPECTATOR_HTML
-    assert SPECTATOR_HTML.count('aria-live="polite"') == 2
+    assert SPECTATOR_HTML.count('aria-live="polite"') == 3
     assert "Last known run details" in SPECTATOR_JS
     for event in ("playing", "waiting", "stalled", "pause", "error"):
         assert f"video.addEventListener('{event}'" in SPECTATOR_JS

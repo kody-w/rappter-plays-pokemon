@@ -5,9 +5,10 @@ Canonical direction:
 
 * ``vendor/browser`` feeds the embedded browser assets via
   ``update_browser_assets.py``.
-* The literal spectator and kited-host constants in ``pokemon_agent.py`` are
-  the canonical first-party sources.
-* This script is the only writer for ``docs/watch`` and ``docs/host``.
+* ``vendor/browser/pages-v1`` retains the immutable rollback first-party files.
+* The v2 literals embedded from ``web/pages-v2`` into ``pokemon_agent.py`` are
+  the canonical current first-party sources.
+* This script is the only writer for both root v1 and side-by-side v2 trees.
 
 The restricted AST reader below evaluates only literals, byte/string
 concatenation, and the two compression calls used by the embedded assets. It
@@ -20,6 +21,7 @@ import argparse
 import ast
 import base64
 import hashlib
+import json
 import shutil
 import stat
 import sys
@@ -31,8 +33,11 @@ ROOT = Path(__file__).resolve().parents[1]
 AGENT = ROOT / "pokemon_agent.py"
 WATCH = ROOT / "docs" / "watch"
 HOST = ROOT / "docs" / "host"
+V1 = ROOT / "vendor" / "browser" / "pages-v1"
+V2 = ROOT / "web" / "pages-v2"
 FILE_MODE = 0o644
 DIRECTORY_MODE = 0o755
+V1_MANIFEST = ROOT / "vendor" / "browser" / "PAGES_V1.json"
 
 
 def display_path(path: Path) -> Path:
@@ -40,6 +45,27 @@ def display_path(path: Path) -> Path:
         return path.relative_to(ROOT)
     except ValueError:
         return path
+
+
+def verify_v1_manifest() -> None:
+    value = json.loads(V1_MANIFEST.read_text(encoding="utf-8"))
+    if (
+        value.get("schema_version") != 1
+        or value.get("protocol_version") != 1
+        or not isinstance(value.get("files"), list)
+    ):
+        raise RuntimeError("Immutable v1 Pages manifest is invalid")
+    for item in value["files"]:
+        if not isinstance(item, dict):
+            raise RuntimeError("Immutable v1 Pages manifest item is invalid")
+        source = ROOT / str(item.get("source", ""))
+        if (
+            not source.is_file()
+            or source.is_symlink()
+            or hashlib.sha256(source.read_bytes()).hexdigest()
+            != item.get("sha256")
+        ):
+            raise RuntimeError(f"Immutable v1 Pages input changed: {source}")
 
 
 class CanonicalReader:
@@ -102,6 +128,18 @@ class CanonicalReader:
                 raise RuntimeError("Canonical concatenation must use bytes or strings")
             return left + right
         if isinstance(node, ast.Call):
+            if (
+                isinstance(node.func, ast.Attribute)
+                and node.func.attr == "decode"
+                and not node.keywords
+                and len(node.args) == 1
+                and isinstance(node.args[0], ast.Constant)
+                and node.args[0].value == "utf-8"
+            ):
+                payload = self._evaluate(node.func.value)
+                if not isinstance(payload, bytes):
+                    raise RuntimeError("Canonical decode requires bytes")
+                return payload.decode("utf-8")
             return self._call(node)
         raise RuntimeError(
             f"Unsupported canonical expression: {type(node).__name__}"
@@ -132,14 +170,22 @@ class CanonicalReader:
 
 
 def canonical_files() -> dict[Path, bytes]:
+    verify_v1_manifest()
     reader = CanonicalReader(AGENT)
     html = reader.read("SPECTATOR_HTML", str).encode("utf-8")
     css = reader.read("SPECTATOR_CSS", str).encode("utf-8")
     javascript = reader.read("SPECTATOR_JS", str).encode("utf-8")
+    pairing = reader.read("PAIRING_JS", str).encode("utf-8")
     peerjs = reader.read("PEERJS_RUNTIME_JS", bytes)
+    trystero = reader.read("TRYSTERO_NOSTR_RUNTIME_JS", bytes)
+    qrious = reader.read("QRIOUS_RUNTIME_JS", bytes)
     notices = reader.read("THIRD_PARTY_BROWSER_LICENSES", bytes)
     peerjs_version = reader.read("PEERJS_VERSION", str)
     peerjs_sha256 = reader.read("PEERJS_RUNTIME_SHA256", str)
+    trystero_version = reader.read("TRYSTERO_NOSTR_VERSION", str)
+    trystero_sha256 = reader.read("TRYSTERO_NOSTR_RUNTIME_SHA256", str)
+    qrious_version = reader.read("QRIOUS_VERSION", str)
+    qrious_sha256 = reader.read("QRIOUS_RUNTIME_SHA256", str)
 
     vendor_peerjs = (
         ROOT
@@ -157,26 +203,55 @@ def canonical_files() -> dict[Path, bytes]:
         raise RuntimeError(
             f"PeerJS has SHA-256 {actual_sha256}, expected {peerjs_sha256}"
         )
+    vendor = ROOT / "vendor" / "browser"
+    if trystero != (
+        vendor / f"trystero-nostr-{trystero_version}.iife.min.js"
+    ).read_bytes():
+        raise RuntimeError("Embedded Trystero differs from vendor/browser")
+    if hashlib.sha256(trystero).hexdigest() != trystero_sha256:
+        raise RuntimeError("Embedded Trystero digest does not match its pin")
+    if qrious != (
+        vendor / f"qrious-{qrious_version}.runtime.min.js"
+    ).read_bytes():
+        raise RuntimeError("Embedded QRious differs from vendor/browser")
+    if hashlib.sha256(qrious).hexdigest() != qrious_sha256:
+        raise RuntimeError("Embedded QRious digest does not match its pin")
 
-    return {
-        Path("index.html"): html,
-        Path("spectator.css"): css,
-        Path("spectator.js"): javascript,
+    v1 = {
+        Path("index.html"): (V1 / "watch/index.html").read_bytes(),
+        Path("spectator.css"): (V1 / "watch/spectator.css").read_bytes(),
+        Path("spectator.js"): (V1 / "watch/spectator.js").read_bytes(),
         Path("vendor/peerjs.min.js"): peerjs,
-        Path("vendor/licenses.txt"): notices,
+        Path("vendor/licenses.txt"): (V1 / "watch/licenses.txt").read_bytes(),
     }
+    v2 = {
+        Path("v2/index.html"): html,
+        Path("v2/spectator.rpp-v2.css"): css,
+        Path("v2/spectator.rpp-v2.js"): javascript,
+        Path("v2/pairing.rpp-v2.js"): pairing,
+        Path("v2/vendor/peerjs-1.5.5.runtime.min.js"): peerjs,
+        Path("v2/vendor/trystero-nostr-0.25.3-rpp1.min.js"): trystero,
+        Path("v2/vendor/qrious-4.0.2.runtime.min.js"): qrious,
+        Path("v2/vendor/licenses.txt"): notices,
+    }
+    return {**v1, **v2}
 
 
 def canonical_host_files() -> dict[Path, bytes]:
+    verify_v1_manifest()
     reader = CanonicalReader(AGENT)
     html = reader.read("HOST_HTML", str).encode("utf-8")
     css = reader.read("HOST_CSS", str).encode("utf-8")
     javascript = reader.read("HOST_JS", str).encode("utf-8")
+    pairing = reader.read("PAIRING_JS", str).encode("utf-8")
     peerjs = reader.read("PEERJS_RUNTIME_JS", bytes)
+    trystero = reader.read("TRYSTERO_NOSTR_RUNTIME_JS", bytes)
     qrious = reader.read("QRIOUS_RUNTIME_JS", bytes)
     notices = reader.read("THIRD_PARTY_BROWSER_LICENSES", bytes)
     peerjs_sha256 = reader.read("PEERJS_RUNTIME_SHA256", str)
     peerjs_version = reader.read("PEERJS_VERSION", str)
+    trystero_sha256 = reader.read("TRYSTERO_NOSTR_RUNTIME_SHA256", str)
+    trystero_version = reader.read("TRYSTERO_NOSTR_VERSION", str)
     qrious_sha256 = reader.read("QRIOUS_RUNTIME_SHA256", str)
     qrious_version = reader.read("QRIOUS_VERSION", str)
 
@@ -187,18 +262,42 @@ def canonical_host_files() -> dict[Path, bytes]:
         vendor / f"qrious-{qrious_version}.runtime.min.js"
     ).read_bytes():
         raise RuntimeError("Embedded QRious runtime differs from vendor/browser")
+    if trystero != (
+        vendor / f"trystero-nostr-{trystero_version}.iife.min.js"
+    ).read_bytes():
+        raise RuntimeError("Embedded Trystero runtime differs from vendor/browser")
     if hashlib.sha256(peerjs).hexdigest() != peerjs_sha256:
         raise RuntimeError("Embedded PeerJS digest does not match its pin")
     if hashlib.sha256(qrious).hexdigest() != qrious_sha256:
         raise RuntimeError("Embedded QRious digest does not match its pin")
-    return {
-        Path("index.html"): html,
-        Path("host.css"): css,
-        Path("host.js"): javascript,
+    if hashlib.sha256(trystero).hexdigest() != trystero_sha256:
+        raise RuntimeError("Embedded Trystero digest does not match its pin")
+    v1 = {
+        Path("index.html"): (V1 / "host/index.html").read_bytes(),
+        Path("host.css"): (V1 / "host/host.css").read_bytes(),
+        Path("host.js"): (V1 / "host/host.js").read_bytes(),
         Path("vendor/peerjs.min.js"): peerjs,
         Path("vendor/qrious.min.js"): qrious,
-        Path("vendor/licenses.txt"): notices,
+        Path("vendor/licenses.txt"): (V1 / "host/licenses.txt").read_bytes(),
     }
+    v2 = {
+        Path("v2/index.html"): html,
+        Path("v2/host.rpp-kite-v2.css"): css,
+        Path("v2/host.rpp-kite-v2.js"): javascript,
+        Path("v2/pairing.rpp-v2.js"): pairing,
+        Path("v2/vendor/peerjs-1.5.5.runtime.min.js"): peerjs,
+        Path("v2/vendor/trystero-nostr-0.25.3-rpp1.min.js"): trystero,
+        Path("v2/vendor/qrious-4.0.2.runtime.min.js"): qrious,
+        Path("v2/vendor/licenses.txt"): notices,
+        Path("v2/return/index.html"): (V2 / "return/index.html").read_bytes(),
+        Path("v2/return/return.rpp-v2.css"): (
+            V2 / "return/return.css"
+        ).read_bytes(),
+        Path("v2/return/return.rpp-v2.js"): (
+            V2 / "return/return.js"
+        ).read_bytes(),
+    }
+    return {**v1, **v2}
 
 
 def drift(
@@ -263,7 +362,7 @@ def main() -> int:
     parser.add_argument(
         "--check",
         action="store_true",
-        help="fail if docs/watch is not the exact canonical build",
+        help="fail if root v1 and side-by-side v2 Pages trees drift",
     )
     args = parser.parse_args()
     try:

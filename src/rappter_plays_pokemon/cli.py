@@ -63,7 +63,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--livestream",
         action="store_true",
         dest="livestream",
-        help="Enable browser-hosted PeerJS video broadcasting",
+        help="Enable direct browser-to-browser video broadcasting",
     )
     livestream_group.add_argument(
         "--no-livestream",
@@ -88,6 +88,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--livestream-host",
         choices=("kite", "local"),
         help="Pages kited twin (recommended) or legacy local browser host",
+    )
+    parser.add_argument(
+        "--signaling",
+        choices=("nostr", "peerjs"),
+        help="Encrypted Nostr signaling (kite default) or legacy PeerJS",
     )
     parser.add_argument(
         "--browser-path",
@@ -148,6 +153,15 @@ def agent_kwargs(args: argparse.Namespace, config: dict[str, Any]) -> dict[str, 
     if args.action != "start":
         return kwargs
 
+    livestream_host = _configured(
+        args,
+        config,
+        "livestream_host",
+        "kite",
+    )
+    signaling = _configured(args, config, "signaling")
+    if signaling is None:
+        signaling = "nostr" if livestream_host == "kite" else "peerjs"
     values = {
         "rom_path": _configured(
             args,
@@ -157,12 +171,8 @@ def agent_kwargs(args: argparse.Namespace, config: dict[str, Any]) -> dict[str, 
         ),
         "port": _configured(args, config, "port", 8765),
         "livestream": _configured(args, config, "livestream", False),
-        "livestream_host": _configured(
-            args,
-            config,
-            "livestream_host",
-            "kite",
-        ),
+        "livestream_host": livestream_host,
+        "signaling": signaling,
         "browser_path": _configured(
             args,
             config,
@@ -174,7 +184,7 @@ def agent_kwargs(args: argparse.Namespace, config: dict[str, Any]) -> dict[str, 
             args,
             config,
             "host_base",
-            "https://kody-w.github.io/rappter-plays-pokemon/host/",
+            "https://kody-w.github.io/rappter-plays-pokemon/host/v2/",
         ),
         "bridge_startup_timeout": _configured(
             args,

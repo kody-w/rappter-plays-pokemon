@@ -3,8 +3,8 @@
 Run a real, single-file OpenRappter agent that lets GitHub Copilot autonomously
 attempt a full playthrough of Pokémon Red in a local PyBoy emulator. It can
 persist progress for long-running sessions, record segmented MP4 clips, expose
-an authenticated local viewer, optionally broadcast browser-to-browser with
-PeerJS, and hand control to you at any time.
+an authenticated local viewer, optionally broadcast directly
+browser-to-browser, and hand control to you at any time.
 
 > [!IMPORTANT]
 > This repository is **ROM-free**. You must supply your own legally obtained
@@ -30,8 +30,9 @@ Fame, but **it is not guaranteed to beat the game**.
   `127.0.0.1`, strict same-origin controls, pause/resume, manual buttons, and
   return-to-autonomy.
 - **Optional kited-twin livestream:** a dedicated GitHub Pages tab hosts
-  PeerJS video and a tightly allowlisted run dashboard. A local CDP string
-  tethers that tab to private runtime frames without exposing localhost.
+  direct WebRTC video and a tightly allowlisted run dashboard. Encrypted Nostr
+  relays perform handshake-only signaling; a local CDP string tethers the tab
+  to private runtime frames without exposing localhost.
 - **Bounded recording:** local, rotating H.264 MP4 clips with manifests,
   retention limits, a disk budget, and a free-space reserve.
 - **Local-only state:** ROM path, screenshots, saves, logs, and videos stay in a
@@ -140,15 +141,15 @@ delete existing saves.
 
 Livestreaming is opt-in. The recommended and default livestream host is the
 **kited twin** at
-<https://kody-w.github.io/rappter-plays-pokemon/host/>:
+<https://kody-w.github.io/rappter-plays-pokemon/host/v2/>:
 
 ```bash
 ./launch.sh start \
   --rom "/absolute/path/to/your/Pokemon Red.gb" \
   --livestream \
   --livestream-host kite \
-  --join-base https://kody-w.github.io/rappter-plays-pokemon/watch/ \
-  --host-base https://kody-w.github.io/rappter-plays-pokemon/host/ \
+  --join-base https://kody-w.github.io/rappter-plays-pokemon/watch/v2/ \
+  --host-base https://kody-w.github.io/rappter-plays-pokemon/host/v2/ \
   --port 0
 ./launch.sh share
 ```
@@ -160,25 +161,35 @@ The architecture deliberately reverses the old local-host arrangement:
 2. A zero-dependency Node 22 **string** launches a visible, dedicated
    Chrome/Chromium process with a private generation profile and loopback-only
    Chrome DevTools Protocol endpoint.
-3. The string selects only the exact Pages `/host/` URL and nonsecret instance
+3. The string selects only the exact Pages `/host/v2/` URL and nonsecret instance
    fragment, verifies the host build, then injects bootstrap, frames,
    telemetry, and heartbeats through a versioned page ingress object.
-4. The Pages tab owns the canvas capture stream, PeerJS host, strict spectator
-   admission, viewer fanout, QRious QR, share link, and standard/Safari Picture
-   in Picture. It has stream controls only; game controls remain in the
-   authenticated loopback viewer.
-5. Viewer tabs at `/watch/` retain the existing fragment-only invitation and
-   wire protocol. Media and dashboard snapshots travel directly over WebRTC
-   and the paired PeerJS data channel.
+4. The Pages tab actively joins a private Trystero/Nostr room, owns the canvas
+   capture stream, strict spectator admission, viewer fanout, Share-sheet/QR
+   UI, and
+   standard/Safari Picture in Picture. Viewer tabs join with `passive:true`, so
+   viewers do not mesh with one another.
+5. A v2 invitation is
+   `/watch/v2/#v=2&room=…&key=…&gen=…&pub=…&fp=…`. Python independently
+   generates a 128-bit room ID and 256-bit shared signaling key. The local
+   Node string generates and persists a generation-private ECDSA P-256 key in
+   mode-`0600` state, injects its private JWK only into host page memory, and
+   places only its public JWK/fingerprint in invitations.
+6. Trystero sends encrypted SDP redundantly through five reviewed public Nostr
+   relays. After the authenticated role/capability handshake, canvas media
+   travels directly via WebRTC/DTLS-SRTP and dashboard actions travel directly
+   via SCTP/DTLS. Established media is not torn down merely because relay
+   sockets disconnect.
 
 This follows the `kody-w/rapp-kite` kited-twin/string/tether pattern, but not
 its broad console-evaluation, chat, or localhost-proxy sample behavior. This
 string is a generation-bound one-way video/telemetry diode.
 
 GitHub Pages never relays game bytes and never requests localhost. It serves
-only static checked-in HTML, CSS, JavaScript, pinned PeerJS/QRious assets, and
-licenses. The bare host page is inert: it creates no PeerJS connection until
-the exact local CDP bootstrap arrives. The local string accepts no remote
+only static checked-in HTML, CSS, JavaScript, pinned
+Trystero/PeerJS/QRious assets, and licenses. The bare host page is inert: it
+creates no signaling or media connection until the exact local CDP bootstrap
+arrives. The local string accepts no remote
 commands and sends no control surface to Pages.
 
 The string validates the PNG signature, dimensions, size (128 KiB maximum),
@@ -187,17 +198,46 @@ targets at most 10 unique frames per second, keeps only one CDP call in flight,
 and replaces one pending slot with the latest frame. Safe telemetry is at most
 4096 bytes, changed at most once per second, with an unchanged heartbeat around
 five seconds. Missing source/string heartbeats visibly degrade health and tear
-down PeerJS and capture tracks after a bounded grace. Browser or string failure
+down signaling rooms and capture tracks after a bounded grace. Browser or string failure
 is a nonfatal sidecar failure: gameplay, Copilot, recording, and checkpoints
 continue while `status` reports the livestream as degraded.
 
-The private host ID and watch capability exist only in mode-`0600` bootstrap
-state and page memory. The browser target URL contains only a nonsecret
-instance selector. The spectator invitation is added after `#`; browsers do
-not include fragments in normal HTTP requests, so GitHub Pages and its access
-logs do not receive it. `share` does not publish the invitation until the host
-has a validated frame and an open PeerJS identity. Treat the complete link and
-locally rendered QR code as bearer secrets.
+The room key exists only in mode-`0600` bootstrap state, the URL fragment, QR,
+and page memory. The browser target URL contains only a nonsecret instance
+selector. Valid viewers clear the fragment from the address bar after parsing;
+browsers do not include fragments in normal HTTP requests, so GitHub Pages and
+its access logs do not receive the secret. Viewer role proofs use the shared
+key, but host identity never does: the host signs the complete peer IDs,
+roles, nonces, generation, target, expiry, and sequence transcript with its
+generation-only ECDSA key. A viewer holding the room key cannot forge that
+signature. `share` reports automatic and manual signaling health separately
+and exposes the key
+only inside the explicit private join URL. Treat the complete link and locally
+rendered QR code as bearer secrets.
+
+Public relay service is best effort and has no SLA. Relay operators can observe
+connecting IP addresses, timing, relay URLs, ephemeral Nostr public keys,
+event IDs/signatures, `created_at`, kind, and the plaintext `x` topic-hash tag;
+EVENT content is encrypted with the private room key. Runtime relay health
+requires observed EVENT acceptance and subscribed delivery, not merely an
+open socket/EOSE. The project owns no
+relay or signaling server and does not require Azure. The exact reviewed
+origins and local handshake review date are recorded in
+[`vendor/browser/NOSTR_RELAYS.json`](vendor/browser/NOSTR_RELAYS.json).
+
+If every signaling WebSocket is blocked, select **Create Manual Share**. The
+host shares a five-minute, single-use fragment-only offer link through
+`navigator.share({url})`, QR, or copy. The viewer creates the encrypted answer
+and selects **Share Answer Back**. That public `/host/v2/return/#…` link keeps
+the answer, exact loopback callback, generation, and pairing-only return token
+after `#`; when opened in any default browser on the streamer Mac, it performs
+a visible top-level handoff (never a Pages-to-localhost fetch) to
+`http://127.0.0.1:<current-port>/pair-return#…`. The inert local page posts the
+bounded answer same-origin to a token/generation/Origin/Host-checked pairing
+endpoint, and the CDP string delivers it to the exact host ingress. Copy/QR and
+the host-page raw-answer paste remain fallbacks. New v2 senders always use
+bounded uncompressed SDP (`zip=none`) because receiver gzip capability is not
+known; oversized links become copy/share-only and are never truncated.
 
 `./launch.sh view` opens only the authenticated local game/control page.
 `./launch.sh host` asks the already managed CDP connection to focus the exact
@@ -239,6 +279,7 @@ Useful livestream options:
 
 ```text
 --livestream-host MODE     kite (default/recommended) or local rollback
+--signaling MODE           nostr (kite default) or peerjs legacy rollback
 --browser-path PATH        dedicated Chrome/Chromium executable
 --host-base HTTPS_URL      static Pages host base
 --bridge-startup-timeout S bounded target/bootstrap timeout (2-120)
@@ -252,6 +293,13 @@ slashes. `--port 0` remains supported. Kite mode starts no LAN spectator
 server. For rollback, `--livestream-host local` preserves the prior
 authenticated-viewer broadcaster and LAN static spectator server; only that
 mode uses `--spectator-port` and `--advertised-host`.
+`--signaling peerjs` preserves v1 fragment links for rollback. PeerJS is not
+the default signaling dependency. Legacy local hosting supports PeerJS only.
+Existing root `/host/` and `/watch/` v1 URLs remain byte-for-byte rollback
+assets. New runners default to the side-by-side `/host/v2/` and `/watch/v2/`
+trees with immutable versioned script filenames, so a cached v1 HTML document
+cannot load a v2 protocol script. Deploy both trees before changing runner
+defaults.
 
 To use a config file, copy the safe template outside version control, fill in
 your local ROM path, and pass it explicitly:
@@ -281,6 +329,8 @@ files containing local state are mode `0600`.
 | `livestream-auth.json` | Ephemeral private join capability; removed on clean shutdown |
 | `livestream-status.json` | Browser-published LIVE state and bounded viewer count |
 | `kite-bootstrap.json` | Generation-bound mode-`0600` CDP bootstrap; never sent in a URL |
+| `kite-host-identity.json` | Mode-`0600` generation-only ECDSA private/public JWK state |
+| `kite-manual-return/` | Mode-`0700` monotonic answer queue and redacted delivery acknowledgements |
 | `kite-frame.json` / `kite-telemetry.json` | Atomic bounded string inputs |
 | `kite-host-status.json` | Redacted bounded Pages/string health |
 | `kite-profile-*` | Ephemeral dedicated browser profile, removed on stop |
@@ -310,7 +360,8 @@ flowchart LR
     K -->|versioned ingress over loopback CDP| H[GitHub Pages kited host]
     H -->|WebRTC video + safe dashboard snapshots| W
     W[GitHub Pages spectator tabs]
-    H -.->|signaling only| PJS[PeerJS Cloud]
+    H -.->|encrypted SDP handshake only| NR[5 public Nostr relays]
+    H <-.->|manual two-pass fallback| W
     R --> B[CopilotBrain]
     B -->|PNG screenshot only| C[GitHub Copilot SDK<br/>gpt-5.6-sol / max]
     C -->|JSON buttons, zero tools| R
@@ -339,12 +390,16 @@ after repeated crashes.
   API, frame, script, stylesheet, and clip requests require that cookie.
   Mutating requests additionally require an exact loopback Origin and JSON
   content type. Host checks mitigate DNS rebinding.
-- **Pages and spectator isolation:** the checked-in `/host/` and `/watch/`
-  surfaces are static and contain no runtime API or game controls. The host is
-  inert before CDP bootstrap. After the exact watch hello, each
-  DataConnection is host-to-spectator only; later spectator data closes that
-  viewer. Host and watch IDs are independent high-entropy values in the watch
-  URL fragment. A fixed GET/HEAD-only LAN asset server exists only in explicit
+- **Pages and spectator isolation:** immutable v1 rollback assets remain at
+  `/host/` and `/watch/`; cache-isolated current assets live at `/host/v2/`
+  and `/watch/v2/`. All are static and contain no gameplay controls. The host is
+  inert before CDP bootstrap. The active host admits only passive viewers that
+  complete the versioned, generation-bound role proof; media and telemetry are
+  targeted only after admission. Passive mode is cooperative rather than a
+  pre-SDP security boundary: an invited malicious peer can trigger encrypted
+  signaling/candidate exchange before role authentication and may learn
+  candidate metadata. Room ID, key, generation, public host key, and
+  fingerprint are fragment-only. A fixed GET/HEAD-only LAN asset server exists only in explicit
   `--livestream-host local` rollback mode.
 - **CDP string boundary:** Chrome DevTools Protocol is unauthenticated local
   same-user authority. It binds to loopback for a dedicated private browser
@@ -352,25 +407,27 @@ after repeated crashes.
   profile. Exact target URL/build checks, a generation lock, fixed
   `Runtime.callFunctionOn` methods, and no fallback target limit that authority.
   The Pages tab cannot command the string or access localhost.
-- **P2P boundary:** PeerJS Cloud performs signaling. Game media is a WebRTC
-  video track protected in transit with DTLS-SRTP and sent directly between
-  browsers where connectivity permits. The watch link is a bearer capability;
-  anyone who receives it can attempt to watch until the host session ends.
-  Both host and spectator pass the same explicit ICE configuration: Google
-  `stun:stun.l.google.com:19302` only, with no TURN relay.
+- **P2P boundary:** five allowlisted public Nostr relays redundantly carry only
+  encrypted Trystero handshake SDP. Game media is protected with DTLS-SRTP;
+  dashboard telemetry is direct SCTP/DTLS. Both browsers explicitly pass only
+  Google `stun:stun.l.google.com:19302`, with no TURN relay. The brokerless
+  manual fallback exchanges complete SDP through attended QR/copy steps.
 - **Dashboard minimization:** strict Python `project_dashboard_snapshot`
   produces the only telemetry accepted by the string. The host never receives
   `/api/status`, paths, hashes, logs, errors, screen text, model reasoning, or
   action history. Snapshots are at most 4096 UTF-8 bytes, sequence checked,
   limited to one changed update per second, and sent with an unchanged
   heartbeat around five seconds. Legacy local mode retains `/api/dashboard`.
-- **Local secrets:** the short-lived viewer bootstrap token is written only to
+- **Local secrets:** the short-lived viewer bootstrap token, ECDSA private JWK,
+  and pairing-only manual-return token are written only to
   a mode-`0600` runtime file. Livestream credentials use a separate mode-`0600`
   file. Both are removed on clean shutdown. Never paste either private URL into
   chat, logs, or bug reports.
-- **Pinned browser code:** PeerJS 1.5.5 and QRious 4.0.2 are served from
-  hash-checked embedded copies, not runtime CDNs. CSP permits only the exact
-  PeerJS Cloud HTTPS/WSS signaling origin required by the enabled stream.
+- **Pinned browser code:** `@trystero-p2p/nostr` 0.25.3 at commit
+  `f76eb4f…a11e`, its exact dependencies, documented minimal MIT-licensed
+  leave/socket-lifecycle derivative patches, PeerJS 1.5.5 rollback, and
+  QRious 4.0.2 are served from hash-checked embedded copies, not runtime CDNs. CSP
+  allowlists five exact Nostr WSS origins plus the exact legacy PeerJS origin.
 
 The model still sees screenshots of gameplay and structured RAM-derived game
 state. GitHub's Copilot service terms and privacy policy apply to that inference.
@@ -378,13 +435,16 @@ state. GitHub's Copilot service terms and privacy policy apply to that inference
 ### Livestream scope and limitations
 
 - The media track carries game video; emulator audio is not captured.
-  Dashboard v1 travels separately over the authenticated PeerJS
-  DataConnection.
+  Dashboard v1 snapshots travel over targeted direct Trystero actions or the
+  manual peer's direct RTCDataChannel.
 - WebRTC can reveal network metadata/IP candidates to peers. Use the link only
   with people you trust.
 - Symmetric NATs and restrictive firewalls may prevent a direct connection.
   The explicit Google STUN server discovers candidates but is not a relay; this
   release intentionally configures no TURN URLs.
+- Nostr signaling redundancy is best effort, not a public relay SLA. If WSS is
+  blocked by managed browser or network policy, use Manual Share pairing rather
+  than attempting a policy bypass.
 - Direct WebRTC peers may learn network metadata and IP candidates. The STUN
   server also observes connection metadata needed for candidate discovery.
 - The canonical GitHub Pages surfaces provide HTTPS static assets. The local
@@ -430,9 +490,10 @@ authenticated session. Do not reuse an old viewer URL after a restart.
 
 ### Spectators cannot open the join page
 
-Confirm the viewer opened the complete `/watch/#...` invitation and can reach
+Confirm the viewer opened the complete `/watch/v2/#...` invitation and can reach
 GitHub Pages. `share` intentionally withholds the link until the Pages host is
-tethered, has drawn a valid frame, and has opened PeerJS. For the legacy LAN
+tethered and has drawn a valid frame; `status` separately reports relay and
+direct-media health. For the legacy LAN
 rollback only, use `--livestream-host local --spectator-port 0` and set
 `--advertised-host` if automatic LAN detection is wrong.
 
@@ -441,8 +502,20 @@ rollback only, use `--livestream-host local --spectator-port 0` and set
 Run `./launch.sh status`, then `./launch.sh host` to focus the managed Pages
 host and use its Retry button. `SOURCE LOST`, `STRING LOST`, or degraded
 browser health identifies a local tether problem. Ad blockers, restrictive
-firewalls, NAT behavior, or blocked access to `0.peerjs.com` can prevent
-signaling or a direct WebRTC path. v1 does not provision a TURN relay.
+firewalls, or NAT behavior can prevent a direct WebRTC path. If all five relays
+remain unqualified, ask the host to create a fresh **Manual Share** offer,
+open it on the viewer, then share/open the answer link on the streamer Mac.
+The answer QR transfers that same return link; no host camera scanner is
+implemented. Raw copy/paste remains a fallback.
+Manual pairing is two-pass because the viewer's complete WebRTC answer cannot
+exist before it processes the offer. Neither automatic nor manual mode
+provisions TURN, so restrictive NAT/UDP policy can still prevent media.
+
+Managed Edge or network policy may intentionally block public WSS origins.
+This project does not use iframes, injected code, workers, service workers, CDN
+swaps, or other attempts to bypass that policy. Manual pairing is the compliant
+brokerless fallback. PeerJS-specific failures at `0.peerjs.com` apply only to
+explicit `--signaling peerjs` or v1 rollback invitations.
 
 ### A stale process keeps restarting
 
@@ -495,7 +568,8 @@ ffmpeg. See [CONTRIBUTING.md](CONTRIBUTING.md) and
 ## License and trademarks
 
 Code in this repository is available under the [MIT License](LICENSE).
-Vendored PeerJS is MIT licensed; notices for eventemitter3,
+Vendored Trystero Nostr 0.25.3, Trystero core, noble-secp256k1, and PeerJS are
+MIT licensed; notices for eventemitter3,
 peerjs-js-binarypack, webrtc-adapter, and sdp bundled into its browser build are
 also retained. QRious 4.0.2 is GPL-3.0-or-later according to its release
 metadata and distribution header; its notice, complete terms, package metadata,

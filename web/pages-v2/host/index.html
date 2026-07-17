@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<meta name="rpp-kite-host-build" content="rpp-kite-host-v2">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; media-src blob:; connect-src https://0.peerjs.com wss://0.peerjs.com wss://communities.nos.social wss://purplerelay.com wss://bucket.coracle.social wss://relay.nostr.place wss://relay.damus.io; base-uri 'none'; form-action 'none'; object-src 'none'">
+<title>RAPPter Plays Pokémon — kited twin host</title>
+<link rel="stylesheet" href="./host.rpp-kite-v2.css">
+</head>
+<body>
+<main>
+  <header>
+    <div>
+      <p class="eyebrow">Kited twin</p>
+      <h1>RAPPter Plays Pokémon</h1>
+      <p id="host-message" class="sub" role="status" aria-live="polite">Waiting for the local CDP string. This page is inert until it is tethered.</p>
+    </div>
+    <span id="live-badge" class="badge offline">UNTETHERED</span>
+  </header>
+  <div class="layout">
+    <section class="card stage">
+      <canvas id="game" width="160" height="144" aria-label="Pokémon Red live frame"></canvas>
+      <video id="pip-video" autoplay muted playsinline aria-hidden="true"></video>
+      <div class="controls" aria-label="Stream controls">
+        <button id="go-live" type="button" disabled>Go Live</button>
+        <button id="end-live" class="warn" type="button" disabled>End</button>
+        <button id="retry-live" class="alt" type="button" disabled>Retry</button>
+        <button id="pip-toggle" class="alt" type="button" disabled>Picture in Picture</button>
+        <button id="copy-link" class="alt" type="button" disabled>Copy spectator link</button>
+      </div>
+      <p id="pip-status" class="note" role="status" aria-live="polite">Picture in Picture becomes available after the canvas stream starts.</p>
+    </section>
+    <aside class="card">
+      <h2>String health</h2>
+      <dl class="health">
+        <div><dt>Source</dt><dd id="source-health" class="lost">LOST</dd></div>
+        <div><dt>String</dt><dd id="string-health" class="lost">LOST</dd></div>
+        <div><dt>Runtime</dt><dd id="runtime-health">WAITING</dd></div>
+        <div><dt>Signaling relays</dt><dd id="peer-health">OFFLINE</dd></div>
+        <div><dt>Direct media</dt><dd id="media-health">IDLE</dd></div>
+        <div><dt>Automatic share</dt><dd id="automatic-health" class="lost">OFFLINE</dd></div>
+        <div><dt>Manual Share</dt><dd id="manual-health" class="lost">OFFLINE</dd></div>
+      </dl>
+      <p><strong id="viewer-count">0</strong> / <span id="viewer-limit">0</span> viewers</p>
+      <div id="share" hidden>
+        <canvas id="stream-qr" width="220" height="220" aria-label="Spectator join QR code"></canvas>
+        <a id="join-link" target="_blank" rel="noopener noreferrer">Open spectator page</a>
+        <p id="share-status" class="note">Automatic link is not live.</p>
+      </div>
+      <section id="manual-pairing" class="manual" hidden aria-labelledby="manual-heading">
+        <h2 id="manual-heading">Manual Share pairing</h2>
+        <p class="note">Use this brokerless two-pass fallback when signaling WebSockets are blocked. Each exchanged link is single-use and expires after five minutes.</p>
+        <button id="manual-create" class="alt" type="button">Create Manual Share</button>
+        <div id="manual-offer" hidden>
+          <canvas id="manual-offer-qr" width="320" height="320" aria-label="Manual viewer offer QR code"></canvas>
+          <label for="manual-offer-text">Offer link</label>
+          <textarea id="manual-offer-text" rows="5" readonly></textarea>
+          <button id="manual-share-offer" class="alt" type="button">Share Offer</button>
+          <button id="manual-copy-offer" class="alt" type="button">Copy offer link</button>
+          <p id="manual-qr-note" class="note"></p>
+        </div>
+        <label for="manual-answer-text">Fallback: paste viewer answer</label>
+        <textarea id="manual-answer-text" rows="5" autocomplete="off" spellcheck="false"></textarea>
+        <button id="manual-import-answer" class="alt" type="button">Import answer</button>
+        <p id="manual-status" class="note" role="status" aria-live="polite"></p>
+      </section>
+      <p class="note">Nostr relays carry encrypted signaling and are best effort with no SLA. Video and telemetry stay on direct STUN-only WebRTC. A malicious invited peer may expose candidate metadata before role authentication completes. The local string injects bounded frames and telemetry through a dedicated loopback-only Chrome DevTools connection.</p>
+      <a class="note" href="./vendor/licenses.txt" target="_blank" rel="noopener">Third-party notices</a>
+    </aside>
+  </div>
+</main>
+<script src="./vendor/trystero-nostr-0.25.3-rpp1.min.js" defer></script>
+<script src="./vendor/qrious-4.0.2.runtime.min.js" defer></script>
+<script src="./pairing.rpp-v2.js" defer></script>
+<script src="./host.rpp-kite-v2.js" defer></script>
+</body>
+</html>

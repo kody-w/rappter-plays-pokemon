@@ -1,0 +1,10 @@
+:root { color-scheme: dark; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+* { box-sizing: border-box; }
+body { margin: 0; min-width: 320px; background: #0d1117; color: #e6edf3; }
+main { width: min(680px, calc(100% - 32px)); margin: 12vh auto; padding: 24px; background: #161b22; border: 1px solid #30363d; border-radius: 12px; }
+h1 { color: #ffdf4d; }
+.eyebrow { color: #58a6ff; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+.note { color: #9da7b3; overflow-wrap: anywhere; }
+.button { display: inline-block; margin: 12px 0; border-radius: 6px; padding: 11px 15px; background: #2f81f7; color: white; font-weight: 800; text-decoration: none; }
+.button:focus-visible { outline: 3px solid #ffdf4d; outline-offset: 3px; }
+@media (forced-colors: active) { main, .button { border: 1px solid CanvasText; } }

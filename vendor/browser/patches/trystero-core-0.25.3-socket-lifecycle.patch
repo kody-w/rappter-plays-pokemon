@@ -1,0 +1,68 @@
+diff --git a/node_modules/@trystero-p2p/core/dist/utils.mjs b/node_modules/@trystero-p2p/core/dist/utils.mjs
+--- a/node_modules/@trystero-p2p/core/dist/utils.mjs
++++ b/node_modules/@trystero-p2p/core/dist/utils.mjs
+@@ -71,32 +71,59 @@ const makeSocket = (url, onMessage, onReconnect) => {
+ 	const client = {};
+ 	let didOpen = false;
+ 	let isReconnectPending = false;
++	let reconnectTimer = null;
++	let suspended = false;
++	let lifecycleEpoch = 0;
+ 	let resolveReady = noOp;
+ 	client.ready = new Promise((res) => resolveReady = res);
+-	const init = () => {
++	const init = (expectedEpoch = lifecycleEpoch) => {
++		if (suspended || expectedEpoch !== lifecycleEpoch) return;
+ 		isReconnectPending = false;
+ 		const socket = new WebSocket(url);
+ 		socket.onclose = () => {
+-			if (isReconnectPending) return;
++			if (suspended || isReconnectPending) return;
+ 			isReconnectPending = true;
++			const reconnectEpoch = lifecycleEpoch;
+ 			if (reconnectionLockingPromise) {
+-				reconnectionLockingPromise.then(init);
++				reconnectionLockingPromise.then(() => init(reconnectEpoch));
+ 				return;
+ 			}
+ 			const period = socketRetryPeriods[url] ??= defaultRetryMs;
+-			setTimeout(init, Math.random() * period);
++			reconnectTimer = setTimeout(
++				() => init(reconnectEpoch),
++				Math.random() * period
++			);
+ 			socketRetryPeriods[url] = min(period * 2, maxRetryMs);
+ 		};
+ 		socket.onmessage = (e) => onMessage(String(e.data));
+ 		client.socket = socket;
+ 		client.url = socket.url;
++		socket.__rppSuspend = () => {
++			if (suspended) return;
++			suspended = true;
++			lifecycleEpoch++;
++			if (reconnectTimer !== null) {
++				clearTimeout(reconnectTimer);
++				reconnectTimer = null;
++			}
++			isReconnectPending = false;
++			socket.onclose = null;
++			socket.close();
++		};
++		socket.__rppResume = () => {
++			if (!suspended) return;
++			suspended = false;
++			lifecycleEpoch++;
++			init();
++		};
+ 		socket.onopen = () => {
+ 			const isReconnect = didOpen;
+ 			didOpen = true;
+ 			resolveReady(client);
+ 			socketRetryPeriods[url] = defaultRetryMs;
++			reconnectTimer = null;
+ 			if (isReconnect) onReconnect?.();
+ 		};
+ 		client.send = (data) => {
+ 			if (socket.readyState === 1) socket.send(data);
+ 		};
+ 	};

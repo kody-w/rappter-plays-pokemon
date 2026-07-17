@@ -34,6 +34,7 @@ class Element {
     this.hidden = false;
     this.disabled = false;
     this.href = '';
+    this.value = '';
     this.readyState = 1;
     this.srcObject = null;
     this.webkitPresentationMode = 'inline';
@@ -204,7 +205,12 @@ const elementIds = [
   'game', 'pip-video', 'pip-toggle', 'pip-status', 'go-live', 'end-live',
   'retry-live', 'copy-link', 'source-health', 'string-health',
   'runtime-health', 'peer-health', 'viewer-count', 'viewer-limit',
-  'share', 'join-link', 'stream-qr', 'host-message', 'live-badge'
+  'media-health', 'automatic-health', 'manual-health', 'share',
+  'share-status', 'join-link', 'stream-qr', 'host-message',
+  'live-badge', 'manual-pairing', 'manual-create', 'manual-copy-offer',
+  'manual-share-offer',
+  'manual-import-answer', 'manual-offer', 'manual-offer-text',
+  'manual-offer-qr', 'manual-qr-note', 'manual-answer-text', 'manual-status'
 ];
 const elements = new Map(elementIds.map(id => [id, new Element(id)]));
 let now = 0;
@@ -231,7 +237,7 @@ const context = {
   window,
   document,
   location: {
-    hash: `#v=1&instance=instance-${'i'.repeat(24)}`
+    hash: `#v=2&instance=instance-${'i'.repeat(24)}`
   },
   performance: {now: () => now},
   crypto: crypto.webcrypto,
@@ -244,7 +250,8 @@ const context = {
     clipboard: {
       writeText: async value => {
         context.copied = value;
-      }
+      },
+      share: async () => {}
     }
   },
   Peer: FakePeer,
@@ -297,7 +304,7 @@ function pngFrame() {
 
 async function run() {
   vm.runInNewContext(source, context, {filename: 'HOST_JS'});
-  const ingress = window.__RPP_KITE_HOST_V1__;
+  const ingress = window.__RPP_KITE_HOST_V2__;
   assert(ingress);
   assert.equal(FakePeer.instances.length, 0);
   assert.equal(ingress.status().bootstrapped, false);
@@ -309,7 +316,7 @@ async function run() {
   const joinUrl =
     `https://example.test/watch/#v=1&host=${peerId}&watch=${capability}`;
   const bootstrap = {
-    build: 'rpp-kite-host-v1',
+    build: 'rpp-kite-host-v2',
     broadcast_desired: true,
     broadcast_sequence: 0,
     frame_rate: 10,
@@ -492,7 +499,7 @@ async function run() {
   assert.equal(ingress.status().broadcast_desired, false);
   assert.equal(ingress.status().broadcast_sequence, 1);
   assert.equal(elements.get('join-link').href, joinUrl);
-  assert.equal(elements.get('share').hidden, false);
+  assert.equal(elements.get('share').hidden, true);
 
   const refreshed = ingress.heartbeat({
     generation,
@@ -506,6 +513,7 @@ async function run() {
   assert.equal(refreshed.source_accepted, true);
   assert.equal(ingress.status().peer_open, false);
   elements.get('retry-live').click();
+  await new Promise(resolve => setImmediate(resolve));
   const replacement = FakePeer.instances.at(-1);
   replacement.emit('open', peerId);
   assert.equal(ingress.status().peer_open, true);
@@ -556,11 +564,11 @@ async function run() {
   assert.equal(lost.state, 'error');
   assert.equal(replacement.destroyed, true);
 
-  assert.equal(ingress.shutdown({
+  assert.equal((await ingress.shutdown({
     generation,
     instance,
     sequence: 1
-  }).ok, true);
+  })).ok, true);
   assert.equal(ingress.status().state, 'stopped');
   process.stdout.write('host contracts passed\n');
 }

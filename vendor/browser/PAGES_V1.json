@@ -1,0 +1,62 @@
+{
+  "schema_version": 1,
+  "protocol_version": 1,
+  "policy": "Immutable rollback inputs copied from git HEAD before v2 publication.",
+  "files": [
+    {
+      "target": "host/index.html",
+      "source": "vendor/browser/pages-v1/host/index.html",
+      "sha256": "2f79919b76dbca7d3b16a3154269094563b15f1a8e7d254401b188122bdc2b00"
+    },
+    {
+      "target": "host/host.css",
+      "source": "vendor/browser/pages-v1/host/host.css",
+      "sha256": "0980ef1a306def7e43363991acb7f44ab891cad63c3c2c99459a56312172b109"
+    },
+    {
+      "target": "host/host.js",
+      "source": "vendor/browser/pages-v1/host/host.js",
+      "sha256": "285a95b39357cf5b397a72cb8ca47a229e8f97d110cbc8de5f630f46ff5fc9b2"
+    },
+    {
+      "target": "host/vendor/peerjs.min.js",
+      "source": "vendor/browser/peerjs-1.5.5.runtime.min.js",
+      "sha256": "95f57b9e94e1b96c829145b3f3ef0d04b332c9bda0567e144bed70d13712e3d0"
+    },
+    {
+      "target": "host/vendor/qrious.min.js",
+      "source": "vendor/browser/qrious-4.0.2.runtime.min.js",
+      "sha256": "c46f564908ff10943a59e6f56f5de4bc5b6e827813b4750eef55353e7085157c"
+    },
+    {
+      "target": "host/vendor/licenses.txt",
+      "source": "vendor/browser/pages-v1/host/licenses.txt",
+      "sha256": "fc8d7f4d8796e9c685deb50f7fca9dab05ae1f59a8a97c3c0324a1fed8af49c7"
+    },
+    {
+      "target": "watch/index.html",
+      "source": "vendor/browser/pages-v1/watch/index.html",
+      "sha256": "718946cf5429f6f0f07dab9dfd12657d3f832655c33516cdba4b53e2b6d54c05"
+    },
+    {
+      "target": "watch/spectator.css",
+      "source": "vendor/browser/pages-v1/watch/spectator.css",
+      "sha256": "178ef2d48b0fc970e4c650fd1985d3039e09e2acd6b7dc08527bceffaac4a0c0"
+    },
+    {
+      "target": "watch/spectator.js",
+      "source": "vendor/browser/pages-v1/watch/spectator.js",
+      "sha256": "88a915a8df179c9080e4475ea459b7ecb39fed8fb9cbd3411f099ad5b64a0ff0"
+    },
+    {
+      "target": "watch/vendor/peerjs.min.js",
+      "source": "vendor/browser/peerjs-1.5.5.runtime.min.js",
+      "sha256": "95f57b9e94e1b96c829145b3f3ef0d04b332c9bda0567e144bed70d13712e3d0"
+    },
+    {
+      "target": "watch/vendor/licenses.txt",
+      "source": "vendor/browser/pages-v1/watch/licenses.txt",
+      "sha256": "fc8d7f4d8796e9c685deb50f7fca9dab05ae1f59a8a97c3c0324a1fed8af49c7"
+    }
+  ]
+}

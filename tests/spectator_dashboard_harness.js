@@ -244,6 +244,7 @@ function telemetry(sequence, locationValue) {
 
 (async () => {
   eval(spectatorSource);
+  await new Promise(resolve => setImmediate(resolve));
 
   assert.strictEqual(peers.length, 1);
   const peer = peers[0];
@@ -341,11 +342,13 @@ function telemetry(sequence, locationValue) {
   assert.strictEqual(data.sent.length, 1, "the watch hello is the only outbound data");
 
   call.emit("close");
+  await new Promise(resolve => setImmediate(resolve));
   assert.strictEqual(element("details-health").textContent, "Waiting");
   assert.strictEqual(element("location").textContent, "Unknown");
   const retry = timeouts.find((entry) => !entry.cleared);
   assert(retry && retry.delay >= 750);
   retry.callback();
+  await new Promise(resolve => setImmediate(resolve));
   assert.strictEqual(peers.length, 2, "media reconnect should create a fresh Peer");
   assert.notStrictEqual(peers[1].id, peer.id, "retries use a fresh local peer ID");
 

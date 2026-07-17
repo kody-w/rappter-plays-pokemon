@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'none'; base-uri 'none'; form-action 'none'; object-src 'none'">
+<title>Return Manual Share answer</title>
+<link rel="stylesheet" href="./return.rpp-v2.css">
+</head>
+<body>
+<main>
+  <p class="eyebrow">Manual Share</p>
+  <h1>Return answer to the streamer</h1>
+  <p id="return-status" role="status" aria-live="polite">Checking the fragment-only answer link locally…</p>
+  <a id="handoff" class="button" hidden>Deliver to the local streamer host</a>
+  <p class="note">This static page does not send the answer to GitHub Pages and does not fetch localhost. It performs a top-level handoff to the exact loopback callback carried in the encrypted pairing flow.</p>
+</main>
+<script src="./return.rpp-v2.js" defer></script>
+</body>
+</html>

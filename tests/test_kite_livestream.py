@@ -13,6 +13,7 @@ from openrappter.agents.pokemon_agent import (
     DEFAULT_PAGES_HOST_BASE,
     DEFAULT_PAGES_WATCH_BASE,
     KITE_STRING_JS,
+    KITE_STRING_SCHEMA_VERSION,
     KiteBroadcaster,
     PokemonAgent,
     PokemonRunner,
@@ -111,7 +112,7 @@ def test_kite_mode_creates_private_bootstrap_without_lan_server(tmp_path):
         assert bootstrap["host_base"] == DEFAULT_PAGES_HOST_BASE
         assert bootstrap["instance"] == runner.kite_instance
         assert desired == {
-            "schema_version": 1,
+            "schema_version": KITE_STRING_SCHEMA_VERSION,
             "generation": generation,
             "instance": runner.kite_instance,
             "sequence": 0,
@@ -186,15 +187,20 @@ def test_share_waits_for_kite_peer_and_first_frame(tmp_path):
         )
     )
     base_status = {
-        "schema_version": 1,
+        "schema_version": KITE_STRING_SCHEMA_VERSION,
         "generation": generation,
         "instance": "instance-" + "i" * 24,
         "bridge_state": "ready",
         "share_ready": False,
+        "automatic_share_ready": False,
+        "manual_share_ready": True,
         "source_health": "ok",
         "string_health": "ok",
         "runtime_health": "ready",
         "peer_health": "offline",
+        "signaling": "nostr",
+        "relay_health": "blocked",
+        "relay_qualified_count": 0,
         "first_frame": True,
         "updated_at": pokemon_module.utc_now(),
     }
@@ -202,12 +208,17 @@ def test_share_waits_for_kite_peer_and_first_frame(tmp_path):
 
     unavailable = livestream_share_info(tmp_path)
     assert unavailable["available"] is False
+    assert unavailable["automatic_available"] is False
+    assert unavailable["manual_available"] is True
     assert "join_url" not in unavailable
 
     base_status.update(
         {
             "share_ready": True,
+            "automatic_share_ready": True,
             "peer_health": "open",
+            "relay_health": "qualified",
+            "relay_qualified_count": 1,
             "updated_at": pokemon_module.utc_now(),
         }
     )
@@ -259,7 +270,7 @@ def test_host_action_uses_generation_bound_focus_file(
 
     assert result["status"] == "success"
     assert command == {
-        "schema_version": 1,
+        "schema_version": KITE_STRING_SCHEMA_VERSION,
         "generation": generation,
         "instance": instance,
         "sequence": 1,
@@ -287,7 +298,7 @@ def test_go_live_explicitly_clears_generation_bound_end_latch(
     (tmp_path / "kite-broadcast-state.json").write_text(
         json.dumps(
             {
-                "schema_version": 1,
+                "schema_version": KITE_STRING_SCHEMA_VERSION,
                 "generation": generation,
                 "instance": instance,
                 "sequence": 7,
@@ -355,7 +366,7 @@ def test_sidecar_cleanup_targets_only_tracked_process_groups(
     (sidecar.profile_path / "rpp-kite-profile.json").write_text(
         json.dumps(
             {
-                "schema_version": 1,
+                "schema_version": KITE_STRING_SCHEMA_VERSION,
                 "generation": generation,
                 "instance": instance,
                 "token": "a" * 48,
@@ -386,7 +397,7 @@ def test_sidecar_cleanup_targets_only_tracked_process_groups(
     process = Process()
     sidecar.process = process
     sidecar.browser_records["b" * 48] = {
-        "schema_version": 1,
+        "schema_version": KITE_STRING_SCHEMA_VERSION,
         "generation": generation,
         "instance": instance,
         "token": "b" * 48,
@@ -433,7 +444,7 @@ def test_sidecar_never_kills_reused_browser_pid(tmp_path, monkeypatch):
     sidecar = KiteBroadcaster(tmp_path, generation, 10)
     token = "c" * 48
     sidecar.browser_records[token] = {
-        "schema_version": 1,
+        "schema_version": KITE_STRING_SCHEMA_VERSION,
         "generation": generation,
         "instance": instance,
         "token": token,
@@ -479,7 +490,7 @@ def test_python_sidecar_never_unlinks_string_ownership_lock(tmp_path):
     (lock / "owner.json").write_text(
         json.dumps(
             {
-                "schema_version": 1,
+                "schema_version": KITE_STRING_SCHEMA_VERSION,
                 "token": "d" * 48,
                 "generation": generation,
                 "instance": "instance-" + "i" * 24,
@@ -491,7 +502,7 @@ def test_python_sidecar_never_unlinks_string_ownership_lock(tmp_path):
     browser_owner.write_text(
         json.dumps(
             {
-                "schema_version": 1,
+                "schema_version": KITE_STRING_SCHEMA_VERSION,
                 "token": "e" * 48,
                 "generation": generation,
                 "instance": "instance-" + "i" * 24,

@@ -9,8 +9,8 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 const {spawn, spawnSync} = require('node:child_process');
 
-const STRING_VERSION = 1;
-const HOST_BUILD = 'rpp-kite-host-v1';
+const STRING_VERSION = 2;
+const HOST_BUILD = 'rpp-kite-host-v2';
 const MAX_FRAME_BYTES = 128 * 1024;
 const FRAME_INTERVAL_MS = 100;
 const RPC_TIMEOUT_MS = 10000;
@@ -22,12 +22,22 @@ const HOST_STATUS_FILE = 'kite-host-status.json';
 const LIVESTREAM_STATUS_FILE = 'livestream-status.json';
 const BROWSER_OWNER_FILE = 'kite-browser-owner.json';
 const BROADCAST_STATE_FILE = 'kite-broadcast-state.json';
+const HOST_IDENTITY_FILE = 'kite-host-identity.json';
+const MANUAL_RETURN_DIRECTORY = 'kite-manual-return';
 const LOCK_DIRECTORY = 'kite-string.lock';
 const PROFILE_MARKER_FILE = 'rpp-kite-profile.json';
 const IDENTIFIER = /^[A-Za-z0-9_-]{16,128}$/;
 const OWNER_TOKEN = /^[a-f0-9]{32,64}$/;
 const FRAME_FAILURE_LIMIT = 3;
+const MAX_MANUAL_ANSWER_BYTES = 384 * 1024;
 const MAX_BROWSER_STDERR_BYTES = 4096;
+const REVIEWED_RELAYS = Object.freeze([
+  'wss://communities.nos.social',
+  'wss://purplerelay.com',
+  'wss://bucket.coracle.social',
+  'wss://relay.nostr.place',
+  'wss://relay.damus.io'
+]);
 
 function abortError() {
   const error = new Error('operation aborted');
@@ -89,6 +99,21 @@ function sanitizedError(error) {
 
 function parseArguments(argv) {
   if (
+    argv.length === 5 &&
+    argv[0] === '--initialize-identity' &&
+    argv[1] === '--runtime-dir' &&
+    typeof argv[2] === 'string' &&
+    path.isAbsolute(argv[2]) &&
+    argv[3] === '--generation' &&
+    IDENTIFIER.test(argv[4] || '')
+  ) {
+    return {
+      mode: 'initialize-identity',
+      runtimeDir: path.resolve(argv[2]),
+      generation: argv[4]
+    };
+  }
+  if (
     argv.length !== 2 ||
     argv[0] !== '--runtime-dir' ||
     typeof argv[1] !== 'string' ||
@@ -96,7 +121,7 @@ function parseArguments(argv) {
   ) {
     throw new Error('usage: --runtime-dir ABSOLUTE_PATH');
   }
-  return {runtimeDir: path.resolve(argv[1])};
+  return {mode: 'run', runtimeDir: path.resolve(argv[1])};
 }
 
 async function assertPrivateDirectory(directory) {
@@ -158,6 +183,149 @@ async function atomicWriteJson(file, value) {
   await fsp.chmod(file, 0o600);
 }
 
+function canonicalJson(value) {
+  const visit = item => {
+    if (
+      item === null ||
+      typeof item === 'string' ||
+      typeof item === 'boolean'
+    ) return JSON.stringify(item);
+    if (typeof item === 'number' && Number.isFinite(item)) {
+      return JSON.stringify(item);
+    }
+    if (Array.isArray(item)) return `[${item.map(visit).join(',')}]`;
+    if (item && typeof item === 'object') {
+      return `{${Object.keys(item).sort().map(
+        key => `${JSON.stringify(key)}:${visit(item[key])}`
+      ).join(',')}}`;
+    }
+    throw new Error('value is not canonical JSON');
+  };
+  return visit(value);
+}
+
+function publicJwk(value) {
+  return {
+    crv: 'P-256',
+    ext: true,
+    key_ops: ['verify'],
+    kty: 'EC',
+    x: value.x,
+    y: value.y
+  };
+}
+
+function privateJwk(value) {
+  return {
+    crv: 'P-256',
+    d: value.d,
+    ext: true,
+    key_ops: ['sign'],
+    kty: 'EC',
+    x: value.x,
+    y: value.y
+  };
+}
+
+function hostPublicKeyToken(value) {
+  return Buffer.from(canonicalJson(value), 'utf8').toString('base64url');
+}
+
+function hostFingerprint(hostPublicKey, generation) {
+  return crypto.createHash('sha256')
+    .update(Buffer.from(`rpp-host-signing-v2\0${generation}\0`, 'ascii'))
+    .update(Buffer.from(canonicalJson(hostPublicKey), 'utf8'))
+    .digest('hex')
+    .slice(0, 32);
+}
+
+function validEcCoordinate(value) {
+  return canonicalToken(value, 32);
+}
+
+function validHostIdentity(value, generation = value && value.generation) {
+  if (!exactKeys(value, [
+    'created_at', 'fingerprint', 'generation', 'host_private_jwk',
+    'host_public_jwk', 'host_public_key', 'schema_version'
+  ])) return false;
+  const publicKey = value.host_public_jwk;
+  const privateKey = value.host_private_jwk;
+  return Boolean(
+    value.schema_version === STRING_VERSION &&
+    value.generation === generation &&
+    IDENTIFIER.test(value.generation || '') &&
+    exactKeys(publicKey, ['crv', 'ext', 'key_ops', 'kty', 'x', 'y']) &&
+    exactKeys(
+      privateKey,
+      ['crv', 'd', 'ext', 'key_ops', 'kty', 'x', 'y']
+    ) &&
+    publicKey.crv === 'P-256' &&
+    privateKey.crv === 'P-256' &&
+    publicKey.kty === 'EC' &&
+    privateKey.kty === 'EC' &&
+    publicKey.ext === true &&
+    privateKey.ext === true &&
+    Array.isArray(publicKey.key_ops) &&
+    publicKey.key_ops.length === 1 &&
+    publicKey.key_ops[0] === 'verify' &&
+    Array.isArray(privateKey.key_ops) &&
+    privateKey.key_ops.length === 1 &&
+    privateKey.key_ops[0] === 'sign' &&
+    validEcCoordinate(publicKey.x) &&
+    validEcCoordinate(publicKey.y) &&
+    validEcCoordinate(privateKey.x) &&
+    validEcCoordinate(privateKey.y) &&
+    validEcCoordinate(privateKey.d) &&
+    privateKey.x === publicKey.x &&
+    privateKey.y === publicKey.y &&
+    value.host_public_key === hostPublicKeyToken(publicKey) &&
+    value.fingerprint === hostFingerprint(publicKey, value.generation) &&
+    typeof value.created_at === 'string' &&
+    value.created_at.length <= 48 &&
+    Number.isFinite(Date.parse(value.created_at))
+  );
+}
+
+async function ensureHostIdentity(runtimeDir, generation) {
+  const identityPath = path.join(runtimeDir, HOST_IDENTITY_FILE);
+  try {
+    const existing = await readJson(identityPath, 16 * 1024);
+    if (validHostIdentity(existing, generation)) return existing;
+    if (validHostIdentity(existing)) {
+      await fsp.unlink(identityPath);
+    } else {
+      throw new Error('generation host identity is invalid');
+    }
+  } catch (error) {
+    if (error.code !== 'ENOENT') throw error;
+  }
+  const keys = await crypto.webcrypto.subtle.generateKey(
+    {name: 'ECDSA', namedCurve: 'P-256'},
+    true,
+    ['sign', 'verify']
+  );
+  const exportedPublic = publicJwk(
+    await crypto.webcrypto.subtle.exportKey('jwk', keys.publicKey)
+  );
+  const exportedPrivate = privateJwk(
+    await crypto.webcrypto.subtle.exportKey('jwk', keys.privateKey)
+  );
+  const identity = {
+    schema_version: STRING_VERSION,
+    generation,
+    host_public_jwk: exportedPublic,
+    host_private_jwk: exportedPrivate,
+    host_public_key: hostPublicKeyToken(exportedPublic),
+    fingerprint: hostFingerprint(exportedPublic, generation),
+    created_at: new Date().toISOString()
+  };
+  if (!validHostIdentity(identity, generation)) {
+    throw new Error('generated host identity failed validation');
+  }
+  await atomicWriteJson(identityPath, identity);
+  return identity;
+}
+
 function normalizeHttpsBase(raw, name) {
   let url;
   try {
@@ -178,7 +346,68 @@ function normalizeHttpsBase(raw, name) {
   return url.toString();
 }
 
-function validateJoinUrl(raw, peerId, capability) {
+function canonicalToken(value, bytes) {
+  if (
+    typeof value !== 'string' ||
+    !/^[A-Za-z0-9_-]+$/.test(value)
+  ) return false;
+  try {
+    const decoded = Buffer.from(value, 'base64url');
+    return decoded.length === bytes &&
+      decoded.toString('base64url') === value;
+  } catch (_error) {
+    return false;
+  }
+}
+
+function parseHostPublicKeyToken(value) {
+  try {
+    const serialized = Buffer.from(value, 'base64url').toString('utf8');
+    if (
+      Buffer.from(serialized, 'utf8').toString('base64url') !== value
+    ) return null;
+    const parsed = JSON.parse(serialized);
+    if (
+      canonicalJson(parsed) !== serialized ||
+      !exactKeys(parsed, ['crv', 'ext', 'key_ops', 'kty', 'x', 'y']) ||
+      parsed.crv !== 'P-256' ||
+      parsed.kty !== 'EC' ||
+      parsed.ext !== true ||
+      !Array.isArray(parsed.key_ops) ||
+      parsed.key_ops.length !== 1 ||
+      parsed.key_ops[0] !== 'verify' ||
+      !validEcCoordinate(parsed.x) ||
+      !validEcCoordinate(parsed.y)
+    ) return null;
+    return parsed;
+  } catch (_error) {
+    return null;
+  }
+}
+
+function validManualCallback(value) {
+  if (!exactKeys(value, ['origin', 'path'])) return false;
+  try {
+    const url = new URL(value.origin);
+    return Boolean(
+      url.protocol === 'http:' &&
+      url.hostname === '127.0.0.1' &&
+      url.port &&
+      Number(url.port) <= 65535 &&
+      url.pathname === '/' &&
+      !url.search &&
+      !url.hash &&
+      !url.username &&
+      !url.password &&
+      url.origin === value.origin &&
+      value.path === '/pair-return'
+    );
+  } catch (_error) {
+    return false;
+  }
+}
+
+function validateJoinUrl(raw, config) {
   let url;
   try {
     url = new URL(raw);
@@ -186,32 +415,81 @@ function validateJoinUrl(raw, peerId, capability) {
     return false;
   }
   const parameters = new URLSearchParams(url.hash.slice(1));
-  return Boolean(
+  if (!(
     url.protocol === 'https:' &&
     !url.username &&
     !url.password &&
-    !url.search &&
+    !url.search
+  )) return false;
+  if (config.signaling === 'nostr') {
+    return Boolean(
+      [...parameters.keys()].sort().join(',') === 'fp,gen,key,pub,room,v' &&
+      parameters.get('v') === '2' &&
+      parameters.get('room') === config.room_id &&
+      parameters.get('key') === config.room_key &&
+      parameters.get('gen') === config.generation &&
+      parameters.get('pub') === config.host_public_key &&
+      parameters.get('fp') === config.host_fingerprint
+    );
+  }
+  return Boolean(
     [...parameters.keys()].sort().join(',') === 'host,v,watch' &&
     parameters.get('v') === '1' &&
-    parameters.get('host') === peerId &&
-    parameters.get('watch') === capability
+    parameters.get('host') === config.peer_id &&
+    parameters.get('watch') === config.watch_capability
   );
 }
 
 function validateBootstrap(value) {
-  if (!exactKeys(value, [
+  const legacy = exactKeys(value, [
     'browser_path', 'created_at', 'generation', 'host_base', 'instance',
     'join_url', 'max_viewers', 'parent_pid', 'peer_id',
     'schema_version', 'startup_timeout_seconds', 'watch_capability'
-  ])) {
+  ]);
+  const nostr = exactKeys(value, [
+    'browser_path', 'created_at', 'generation', 'host_base',
+    'host_fingerprint', 'host_public_key', 'instance', 'join_url',
+    'manual_callback', 'manual_return_page', 'manual_return_token',
+    'max_viewers', 'parent_pid', 'relay_urls', 'room_id', 'room_key',
+    'schema_version', 'signaling', 'startup_timeout_seconds'
+  ]);
+  if (!legacy && !nostr) {
     throw new Error('bootstrap schema mismatch');
   }
   if (
     value.schema_version !== STRING_VERSION ||
     !IDENTIFIER.test(value.generation || '') ||
     !/^[A-Za-z0-9_-]{16,64}$/.test(value.instance || '') ||
-    !/^rpp-[a-f0-9]{32}$/.test(value.peer_id || '') ||
-    !/^[A-Za-z0-9_-]{32,128}$/.test(value.watch_capability || '') ||
+    (
+      legacy &&
+      (
+        !/^rpp-[a-f0-9]{32}$/.test(value.peer_id || '') ||
+        !/^[A-Za-z0-9_-]{32,128}$/.test(value.watch_capability || '')
+      )
+    ) ||
+    (
+      nostr &&
+      (
+        value.signaling !== 'nostr' ||
+        !canonicalToken(value.room_id, 16) ||
+        !canonicalToken(value.room_key, 32) ||
+        !canonicalToken(value.manual_return_token, 32) ||
+        !validManualCallback(value.manual_callback) ||
+        typeof value.manual_return_page !== 'string' ||
+        value.manual_return_page.length > 512 ||
+        !parseHostPublicKeyToken(value.host_public_key) ||
+        !/^[a-f0-9]{32}$/.test(value.host_fingerprint || '') ||
+        value.host_fingerprint !== hostFingerprint(
+          parseHostPublicKeyToken(value.host_public_key),
+          value.generation
+        ) ||
+        !Array.isArray(value.relay_urls) ||
+        value.relay_urls.length !== REVIEWED_RELAYS.length ||
+        value.relay_urls.some(
+          (url, index) => url !== REVIEWED_RELAYS[index]
+        )
+      )
+    ) ||
     !boundedInteger(value.max_viewers, 1, 8) ||
     !boundedInteger(value.parent_pid, 1, 2 ** 31 - 1) ||
     typeof value.created_at !== 'string' ||
@@ -227,14 +505,24 @@ function validateBootstrap(value) {
     throw new Error('bootstrap values are invalid');
   }
   const hostBase = normalizeHttpsBase(value.host_base, 'host base');
-  if (!validateJoinUrl(
-    value.join_url,
-    value.peer_id,
-    value.watch_capability
-  )) {
+  let manualReturnPage = value.manual_return_page;
+  if (nostr) {
+    manualReturnPage = normalizeHttpsBase(
+      value.manual_return_page,
+      'manual return page'
+    );
+    if (!new URL(manualReturnPage).pathname.endsWith('/return/')) {
+      throw new Error('manual return page must end in /return/');
+    }
+  }
+  if (!validateJoinUrl(value.join_url, value)) {
     throw new Error('watch invitation is invalid');
   }
-  return {...value, host_base: hostBase};
+  return {
+    ...value,
+    host_base: hostBase,
+    ...(nostr ? {manual_return_page: manualReturnPage} : {})
+  };
 }
 
 function standardBrowserCandidates(home = os.homedir(), platform = process.platform) {
@@ -664,6 +952,7 @@ class IngressClient {
       telemetry: 'function(value) { return this.telemetry(value); }',
       heartbeat: 'function(value) { return this.heartbeat(value); }',
       broadcast: 'function(value) { return this.broadcast(value); }',
+      manualAnswer: 'function(value) { return this.manualAnswer(value); }',
       shutdown: 'function(value) { return this.shutdown(value); }',
       status: 'function() { return this.status(); }'
     };
@@ -757,8 +1046,8 @@ async function attachIngress(
     sessionId = attached.sessionId;
     await cdp.request('Runtime.enable', {}, sessionId, undefined, options.signal);
     const evaluated = await cdp.request('Runtime.evaluate', {
-      expression: 'globalThis.__RPP_KITE_HOST_V1__',
-      objectGroup: 'rpp-kite-host-v1',
+      expression: 'globalThis.__RPP_KITE_HOST_V2__',
+      objectGroup: 'rpp-kite-host-v2',
       includeCommandLineAPI: false,
       returnByValue: false,
       silent: true
@@ -1617,8 +1906,8 @@ async function writeBroadcastState(runtimeDir, config, sequence, desired) {
 function pageBootstrap(config, broadcastState = {
   sequence: 0,
   desired: true
-}) {
-  return {
+}, identity = null) {
+  const shared = {
     build: HOST_BUILD,
     broadcast_desired: broadcastState.desired,
     broadcast_sequence: broadcastState.sequence,
@@ -1630,6 +1919,36 @@ function pageBootstrap(config, broadcastState = {
     max_negotiating: Math.min(16, Math.max(2, config.max_viewers * 2)),
     max_telemetry_bytes: 4096,
     max_viewers: config.max_viewers,
+    telemetry_version: 1
+  };
+  if (config.signaling === 'nostr') {
+    if (
+      !validHostIdentity(identity, config.generation) ||
+      identity.host_public_key !== config.host_public_key ||
+      identity.fingerprint !== config.host_fingerprint
+    ) throw new Error('generation host identity does not match bootstrap');
+    return {
+      ...shared,
+      signaling: 'nostr',
+      room_id: config.room_id,
+      room_key: config.room_key,
+      host_fingerprint: config.host_fingerprint,
+      host_public_key: config.host_public_key,
+      host_private_jwk: identity.host_private_jwk,
+      manual_callback: {...config.manual_callback},
+      manual_return_token: config.manual_return_token,
+      manual_return_page: config.manual_return_page,
+      relay_urls: [...config.relay_urls],
+      rtc_config: {
+        iceServers: [{urls: 'stun:stun.l.google.com:19302'}]
+      },
+      max_hello_bytes: 2048,
+      protocol_version: 2
+    };
+  }
+  return {
+    ...shared,
+    max_hello_bytes: 512,
     peer_id: config.peer_id,
     peer_options: {
       host: '0.peerjs.com',
@@ -1641,8 +1960,7 @@ function pageBootstrap(config, broadcastState = {
         iceServers: [{urls: 'stun:stun.l.google.com:19302'}]
       }
     },
-    protocol_version: STRING_VERSION,
-    telemetry_version: STRING_VERSION,
+    protocol_version: 1,
     watch_capability: config.watch_capability
   };
 }
@@ -1682,12 +2000,45 @@ async function writeHostStatus(runtimeDir, config, browserPid, status, bridgeSta
     peer_open: status.peer_open === true,
     first_frame: status.first_frame === true,
     share_ready: status.share_ready === true,
+    automatic_share_ready: status.automatic_share_ready === true,
+    manual_share_ready: status.manual_share_ready === true,
     source_health: status.source_health === 'ok' ? 'ok' : 'lost',
     string_health: status.string_health === 'ok' ? 'ok' : 'lost',
     runtime_health: ['starting', 'ready', 'degraded', 'stopping'].includes(
       status.runtime_health
     ) ? status.runtime_health : 'degraded',
     peer_health: status.peer_health === 'open' ? 'open' : 'offline',
+    signaling: status.signaling === 'nostr' ? 'nostr' : 'peerjs',
+    relay_health: [
+      'qualified', 'unqualified', 'open', 'blocked', 'offline'
+    ].includes(status.relay_health)
+      ? status.relay_health
+      : 'offline',
+    relay_open_count: boundedInteger(status.relay_open_count, 0, 5)
+      ? status.relay_open_count
+      : 0,
+    relay_qualified_count: boundedInteger(
+      status.relay_qualified_count, 0, 5
+    ) ? status.relay_qualified_count : 0,
+    relay_total: boundedInteger(status.relay_total, 0, 5)
+      ? status.relay_total
+      : 0,
+    direct_health: ['idle', 'connecting', 'connected'].includes(
+      status.direct_health
+    ) ? status.direct_health : 'idle',
+    direct_peer_count: boundedInteger(status.direct_peer_count, 0, 8)
+      ? status.direct_peer_count
+      : 0,
+    media_ready_count: boundedInteger(status.media_ready_count, 0, 8)
+      ? status.media_ready_count
+      : 0,
+    candidate_types: (
+      Array.isArray(status.candidate_types)
+        ? [...new Set(status.candidate_types)].filter(
+          value => ['host', 'srflx', 'prflx'].includes(value)
+        ).sort()
+        : []
+    ),
     frame_sequence: boundedInteger(
       status.frame_sequence, 0, Number.MAX_SAFE_INTEGER
     ) ? status.frame_sequence : 0,
@@ -1738,11 +2089,139 @@ async function runtimeState(runtimeDir) {
   return 'degraded';
 }
 
+function validManualAnswerQueueItem(value, config, sequence) {
+  return Boolean(
+    exactKeys(value, [
+      'answer', 'generation', 'received_at', 'schema_version', 'sequence'
+    ]) &&
+    value.schema_version === STRING_VERSION &&
+    value.generation === config.generation &&
+    value.sequence === sequence &&
+    typeof value.answer === 'string' &&
+    value.answer.startsWith('rpp-answer-v2.') &&
+    Buffer.byteLength(value.answer) <= MAX_MANUAL_ANSWER_BYTES &&
+    typeof value.received_at === 'string' &&
+    value.received_at.length <= 48 &&
+    Number.isFinite(Date.parse(value.received_at))
+  );
+}
+
+function validManualAnswerStatus(value, config, sequence) {
+  return Boolean(
+    exactKeys(value, [
+      'generation', 'reason', 'schema_version', 'sequence',
+      'status', 'updated_at'
+    ]) &&
+    value.schema_version === STRING_VERSION &&
+    value.generation === config.generation &&
+    value.sequence === sequence &&
+    ['delivered', 'rejected'].includes(value.status)
+  );
+}
+
+async function consumeManualAnswers(
+  runtimeDir,
+  config,
+  ingress,
+  lastSequence = 0
+) {
+  const directory = path.join(runtimeDir, MANUAL_RETURN_DIRECTORY);
+  let names;
+  try {
+    names = await fsp.readdir(directory);
+  } catch (error) {
+    if (error.code === 'ENOENT') return lastSequence;
+    throw error;
+  }
+  const queued = names.flatMap(name => {
+    const match = name.match(/^answer-(\d{12})\.json$/);
+    return match ? [{name, sequence: Number(match[1])}] : [];
+  }).filter(item =>
+    boundedInteger(item.sequence, 1, Number.MAX_SAFE_INTEGER) &&
+    item.sequence > lastSequence
+  ).sort((left, right) => left.sequence - right.sequence).slice(0, 32);
+  for (const item of queued) {
+    const statusPath = path.join(
+      directory,
+      `status-${String(item.sequence).padStart(12, '0')}.json`
+    );
+    try {
+      const existing = await readJson(statusPath, 4096);
+      if (validManualAnswerStatus(existing, config, item.sequence)) {
+        await fsp.unlink(path.join(directory, item.name)).catch(() => {});
+        lastSequence = item.sequence;
+        continue;
+      }
+    } catch (_error) {
+      // A missing status means this monotonic queue item is pending.
+    }
+    let result = {ok: false, reason: 'queue'};
+    let queuedAnswer = null;
+    try {
+      queuedAnswer = await readJson(
+        path.join(directory, item.name),
+        MAX_MANUAL_ANSWER_BYTES + 4096
+      );
+    } catch (_error) {
+      result = {ok: false, reason: 'queue'};
+    }
+    if (
+      queuedAnswer &&
+      validManualAnswerQueueItem(
+        queuedAnswer,
+        config,
+        item.sequence
+      )
+    ) {
+      try {
+        result = await ingress.call('manualAnswer', {
+          generation: config.generation,
+          answer: queuedAnswer.answer
+        });
+      } catch (_error) {
+        // Preserve the atomic queue item across CDP/context recovery.
+        break;
+      }
+    }
+    await atomicWriteJson(statusPath, {
+      schema_version: STRING_VERSION,
+      generation: config.generation,
+      sequence: item.sequence,
+      status: result && result.ok ? 'delivered' : 'rejected',
+      reason: result && result.ok
+        ? 'accepted'
+        : String(result && result.reason || 'rejected')
+          .replace(/[^a-z-]/gi, '')
+          .slice(0, 32),
+      updated_at: new Date().toISOString()
+    });
+    await fsp.unlink(path.join(directory, item.name)).catch(() => {});
+    const statuses = (await fsp.readdir(directory)).filter(
+      name => /^status-\d{12}\.json$/.test(name)
+    ).sort();
+    for (const stale of statuses.slice(0, -64)) {
+      await fsp.unlink(path.join(directory, stale)).catch(() => {});
+    }
+    lastSequence = item.sequence;
+  }
+  return lastSequence;
+}
+
 async function runString(runtimeDir, dependencies = {}) {
   await assertPrivateDirectory(runtimeDir);
   const config = validateBootstrap(
     await readJson(path.join(runtimeDir, BOOTSTRAP_FILE), 16 * 1024)
   );
+  const hostIdentity = config.signaling === 'nostr'
+    ? await ensureHostIdentity(runtimeDir, config.generation)
+    : null;
+  if (
+    hostIdentity &&
+    (
+      hostIdentity.host_public_key !== config.host_public_key ||
+      hostIdentity.fingerprint !== config.host_fingerprint
+    )
+  ) throw new Error('bootstrap host identity changed');
   if (!await processAlive(config.parent_pid)) {
     throw new Error('owning runtime process is not alive');
   }
@@ -1780,6 +2259,8 @@ async function runString(runtimeDir, dependencies = {}) {
   let lastHeartbeatAt = 0;
   let lastStatusAt = 0;
   let lastTelemetryReadAt = 0;
+  let lastManualAnswerReadAt = 0;
+  let lastManualAnswerSequence = 0;
   let lastTargetValidationAt = 0;
   let targetInvalid = false;
   let contextInvalid = false;
@@ -1835,7 +2316,7 @@ async function runString(runtimeDir, dependencies = {}) {
     throwIfAborted(signal);
     const hostBase = normalizeHttpsBase(config.host_base, 'host base');
     expectedUrl =
-      `${hostBase}#v=1&instance=${encodeURIComponent(config.instance)}`;
+      `${hostBase}#v=2&instance=${encodeURIComponent(config.instance)}`;
     const browser = discoverBrowser(config.browser_path);
     browserProcess = launch(
       browser,
@@ -1867,6 +2348,8 @@ async function runString(runtimeDir, dependencies = {}) {
       peer_open: false,
       first_frame: false,
       share_ready: false,
+      automatic_share_ready: false,
+      manual_share_ready: false,
       source_health: 'lost',
       string_health: 'lost',
       runtime_health: 'starting',
@@ -1957,7 +2440,7 @@ async function runString(runtimeDir, dependencies = {}) {
     });
     const bootstrapped = await ingress.call(
       'bootstrap',
-      pageBootstrap(config, broadcastState)
+      pageBootstrap(config, broadcastState, hostIdentity)
     );
     throwIfAborted(signal);
     if (!bootstrapped.ok) throw new Error('Pages host rejected bootstrap');
@@ -2047,7 +2530,7 @@ async function runString(runtimeDir, dependencies = {}) {
         if (!recovered.status.bootstrapped) {
           const rebound = await ingress.call(
             'bootstrap',
-            pageBootstrap(config, broadcastState)
+            pageBootstrap(config, broadcastState, hostIdentity)
           );
           throwIfAborted(signal);
           if (!rebound.ok) {
@@ -2121,6 +2604,20 @@ async function runString(runtimeDir, dependencies = {}) {
       }
       await telemetry.tick();
       throwIfAborted(signal);
+
+      if (
+        config.signaling === 'nostr' &&
+        now - lastManualAnswerReadAt >= 100
+      ) {
+        lastManualAnswerReadAt = now;
+        lastManualAnswerSequence = await consumeManualAnswers(
+          runtimeDir,
+          config,
+          ingress,
+          lastManualAnswerSequence
+        );
+        throwIfAborted(signal);
+      }
 
       if (now - lastHeartbeatAt >= 1000) {
         lastHeartbeatAt = now;
@@ -2323,7 +2820,13 @@ async function main(argv = process.argv.slice(2)) {
     if (Number(process.versions.node.split('.')[0]) < 22) {
       throw new Error('Node.js 22 or newer is required');
     }
-    ({runtimeDir} = parseArguments(argv));
+    const parsed = parseArguments(argv);
+    ({runtimeDir} = parsed);
+    if (parsed.mode === 'initialize-identity') {
+      await assertPrivateDirectory(runtimeDir);
+      await ensureHostIdentity(runtimeDir, parsed.generation);
+      return 0;
+    }
     await runString(runtimeDir);
     return 0;
   } catch (error) {
@@ -2352,6 +2855,8 @@ async function main(argv = process.argv.slice(2)) {
             peer_open: false,
             first_frame: false,
             share_ready: false,
+            automatic_share_ready: false,
+            manual_share_ready: false,
             source_health: 'lost',
             string_health: 'lost',
             runtime_health: 'degraded',
@@ -2385,6 +2890,11 @@ module.exports = {
   MAX_FRAME_BYTES,
   exactKeys,
   parseArguments,
+  canonicalJson,
+  validHostIdentity,
+  ensureHostIdentity,
+  hostFingerprint,
+  hostPublicKeyToken,
   validateBootstrap,
   validateJoinUrl,
   normalizeHttpsBase,
@@ -2423,6 +2933,9 @@ module.exports = {
   pageBootstrap,
   livestreamStatusFromPage,
   writeHostStatus,
+  validManualAnswerQueueItem,
+  validManualAnswerStatus,
+  consumeManualAnswers,
   runString,
   sanitizedError,
   main

@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; media-src blob:; connect-src https://0.peerjs.com wss://0.peerjs.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta name="referrer" content="no-referrer">
+<title>Copilot Plays Pokemon Red — Live</title>
+<link rel="stylesheet" href="./spectator.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">RAPPTER <span>LIVE</span></div>
+  <div id="connection" class="connection">CONNECTING</div>
+</header>
+<main class="dashboard">
+  <section class="player-column" aria-labelledby="stream-title">
+    <div class="stage">
+      <video id="stream" autoplay muted playsinline aria-label="Copilot Plays Pokemon Red livestream"></video>
+      <div id="overlay">
+        <div class="overlay-status">
+          <div id="spinner" class="spinner"></div>
+          <strong id="headline">Joining livestream…</strong>
+          <p id="detail">Peer-to-peer video will appear here.</p>
+        </div>
+        <button id="play-stream" type="button" hidden>Play Stream</button>
+        <button id="retry-stream" type="button" hidden>Retry</button>
+      </div>
+    </div>
+    <section class="stream-summary">
+      <div>
+        <h1 id="stream-title">Copilot Plays Pokemon Red</h1>
+        <p>Live browser stream with run details. Video has no audio.</p>
+      </div>
+      <span class="pill">P2P</span>
+    </section>
+  </section>
+  <aside class="side-rail" aria-label="Live run details">
+    <p id="details-banner" class="details-banner delayed">Waiting for live run details…</p>
+    <section class="panel" aria-labelledby="now-playing-heading">
+      <h2 id="now-playing-heading">Now Playing</h2>
+      <dl class="facts">
+        <div><dt>Location</dt><dd id="location">Unknown</dd></div>
+        <div><dt>Objective</dt><dd id="objective">Unknown</dd></div>
+        <div><dt>Player</dt><dd id="player-mode">Unknown</dd></div>
+      </dl>
+    </section>
+    <section class="panel" aria-labelledby="progress-heading">
+      <div class="panel-heading">
+        <h2 id="progress-heading">Run Progress</h2>
+        <strong id="badge-count">— / 8 badges</strong>
+      </div>
+      <ul id="badge-list" class="badge-list" aria-label="Pokemon League badges">
+        <li data-badge="Boulder">Boulder</li>
+        <li data-badge="Cascade">Cascade</li>
+        <li data-badge="Thunder">Thunder</li>
+        <li data-badge="Rainbow">Rainbow</li>
+        <li data-badge="Soul">Soul</li>
+        <li data-badge="Marsh">Marsh</li>
+        <li data-badge="Volcano">Volcano</li>
+        <li data-badge="Earth">Earth</li>
+      </ul>
+      <dl class="progress-grid">
+        <div><dt>Caught / owned</dt><dd><span id="caught-count">—</span> / 151</dd></div>
+        <div><dt>Seen</dt><dd><span id="seen-count">—</span> / 151</dd></div>
+        <div><dt>Hall of Fame</dt><dd id="completion">Unknown</dd></div>
+      </dl>
+    </section>
+    <section class="panel" aria-labelledby="party-heading">
+      <h2 id="party-heading">Current Party</h2>
+      <ol id="party-list" class="party-list">
+        <li class="empty">Party unavailable.</li>
+      </ol>
+    </section>
+    <section class="panel" aria-labelledby="details-heading">
+      <h2 id="details-heading">Run Details</h2>
+      <dl class="facts compact">
+        <div><dt>Pokemon time</dt><dd id="play-time">Unknown</dd></div>
+        <div><dt>Session time</dt><dd id="session-time">Unknown</dd></div>
+        <div><dt>Last checkpoint/save</dt><dd id="checkpoint">Unknown</dd></div>
+      </dl>
+    </section>
+    <section class="panel" aria-labelledby="health-heading">
+      <h2 id="health-heading">Stream Health</h2>
+      <dl class="facts compact">
+        <div><dt>Video</dt><dd id="video-health">Connecting</dd></div>
+        <div><dt>Run details</dt><dd id="details-health">Waiting</dd></div>
+        <div><dt>Viewers</dt><dd id="viewers">— / —</dd></div>
+      </dl>
+    </section>
+  </aside>
+  <p id="video-announcer" class="sr-only" aria-live="polite" aria-atomic="true"></p>
+  <p id="details-announcer" class="sr-only" aria-live="polite" aria-atomic="true"></p>
+</main>
+<footer>
+  The join link is a bearer capability. Do not share it unintentionally.
+  <a href="./vendor/licenses.txt" target="_blank" rel="noopener">Third-party notices</a>
+</footer>
+<script src="./vendor/peerjs.min.js" defer></script>
+<script src="./spectator.js" defer></script>
+</body>
+</html>

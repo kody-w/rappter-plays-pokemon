@@ -2,3 +2,8 @@
 vendor/browser/qrious-4.0.2.LICENSE.md -whitespace
 docs/watch/vendor/licenses.txt -whitespace
 docs/host/vendor/licenses.txt -whitespace
+docs/host/v2/vendor/licenses.txt -whitespace
+docs/watch/v2/vendor/licenses.txt -whitespace
+vendor/browser/pages-v1/host/licenses.txt -whitespace
+vendor/browser/pages-v1/watch/licenses.txt -whitespace
+vendor/browser/patches/*.patch -whitespace

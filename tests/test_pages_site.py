@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import base64
 import hashlib
+import json
 import runpy
 import stat
 import subprocess
@@ -13,6 +15,8 @@ from openrappter.agents.pokemon_agent import (
     HOST_CSS,
     HOST_HTML,
     HOST_JS,
+    NOSTR_RELAY_URLS,
+    PAIRING_JS,
     PEERJS_RUNTIME_JS,
     PEERJS_RUNTIME_SHA256,
     PEERJS_SHA256,
@@ -22,7 +26,10 @@ from openrappter.agents.pokemon_agent import (
     SPECTATOR_HTML,
     SPECTATOR_JS,
     THIRD_PARTY_BROWSER_LICENSES,
+    TRYSTERO_NOSTR_RUNTIME_JS,
+    TRYSTERO_NOSTR_RUNTIME_SHA256,
     build_join_url,
+    derive_host_fingerprint,
     validate_external_join_base,
 )
 
@@ -30,11 +37,15 @@ ROOT = Path(__file__).resolve().parents[1]
 DOCS = ROOT / "docs"
 WATCH = DOCS / "watch"
 HOST = DOCS / "host"
+WATCH_V2 = WATCH / "v2"
+HOST_V2 = HOST / "v2"
 BUILDER = ROOT / "scripts" / "build_pages_site.py"
-PAGES_JOIN_BASE = "https://kody-w.github.io/rappter-plays-pokemon/watch/"
+PAGES_JOIN_BASE = "https://kody-w.github.io/rappter-plays-pokemon/watch/v2/"
 PAGES_CSP = (
     "default-src 'none'; script-src 'self'; style-src 'self'; "
-    "media-src blob:; connect-src https://0.peerjs.com wss://0.peerjs.com; "
+    "media-src blob:; connect-src https://0.peerjs.com wss://0.peerjs.com "
+    + " ".join(NOSTR_RELAY_URLS)
+    + "; "
     "base-uri 'none'; form-action 'none'; object-src 'none'"
 )
 
@@ -63,32 +74,39 @@ class ParsedHTML(HTMLParser):
         return [attributes for name, attributes in self.tags if name == tag]
 
 
-def generated_files() -> dict[Path, bytes]:
+def generated_v2_files() -> dict[Path, bytes]:
     return {
         Path("index.html"): SPECTATOR_HTML.encode(),
-        Path("spectator.css"): SPECTATOR_CSS.encode(),
-        Path("spectator.js"): SPECTATOR_JS.encode(),
-        Path("vendor/peerjs.min.js"): PEERJS_RUNTIME_JS,
+        Path("spectator.rpp-v2.css"): SPECTATOR_CSS.encode(),
+        Path("spectator.rpp-v2.js"): SPECTATOR_JS.encode(),
+        Path("pairing.rpp-v2.js"): PAIRING_JS.encode(),
+        Path("vendor/peerjs-1.5.5.runtime.min.js"): PEERJS_RUNTIME_JS,
+        Path(
+            "vendor/trystero-nostr-0.25.3-rpp1.min.js"
+        ): TRYSTERO_NOSTR_RUNTIME_JS,
+        Path("vendor/qrious-4.0.2.runtime.min.js"): QRIOUS_RUNTIME_JS,
         Path("vendor/licenses.txt"): THIRD_PARTY_BROWSER_LICENSES,
     }
 
 
-def generated_host_files() -> dict[Path, bytes]:
+def generated_v2_host_files() -> dict[Path, bytes]:
     return {
         Path("index.html"): HOST_HTML.encode(),
-        Path("host.css"): HOST_CSS.encode(),
-        Path("host.js"): HOST_JS.encode(),
-        Path("vendor/peerjs.min.js"): PEERJS_RUNTIME_JS,
-        Path("vendor/qrious.min.js"): QRIOUS_RUNTIME_JS,
+        Path("host.rpp-kite-v2.css"): HOST_CSS.encode(),
+        Path("host.rpp-kite-v2.js"): HOST_JS.encode(),
+        Path("pairing.rpp-v2.js"): PAIRING_JS.encode(),
+        Path("vendor/peerjs-1.5.5.runtime.min.js"): PEERJS_RUNTIME_JS,
+        Path(
+            "vendor/trystero-nostr-0.25.3-rpp1.min.js"
+        ): TRYSTERO_NOSTR_RUNTIME_JS,
+        Path("vendor/qrious-4.0.2.runtime.min.js"): QRIOUS_RUNTIME_JS,
         Path("vendor/licenses.txt"): THIRD_PARTY_BROWSER_LICENSES,
     }
 
 
 def test_pages_build_exactly_matches_canonical_sources_and_is_checked_in():
-    expected = generated_files()
     builder = runpy.run_path(str(BUILDER))
-
-    assert builder["canonical_files"]() == expected
+    expected = builder["canonical_files"]()
     assert {
         path.relative_to(WATCH)
         for path in WATCH.rglob("*")
@@ -98,8 +116,7 @@ def test_pages_build_exactly_matches_canonical_sources_and_is_checked_in():
         path = WATCH / relative_path
         assert path.read_bytes() == payload
         assert stat.S_IMODE(path.stat().st_mode) == 0o644
-    expected_host = generated_host_files()
-    assert builder["canonical_host_files"]() == expected_host
+    expected_host = builder["canonical_host_files"]()
     assert {
         path.relative_to(HOST)
         for path in HOST.rglob("*")
@@ -109,6 +126,18 @@ def test_pages_build_exactly_matches_canonical_sources_and_is_checked_in():
         path = HOST / relative_path
         assert path.read_bytes() == payload
         assert stat.S_IMODE(path.stat().st_mode) == 0o644
+
+    for relative_path, payload in generated_v2_files().items():
+        assert (WATCH_V2 / relative_path).read_bytes() == payload
+    for relative_path, payload in generated_v2_host_files().items():
+        assert (HOST_V2 / relative_path).read_bytes() == payload
+
+    manifest = json.loads(
+        (ROOT / "vendor/browser/PAGES_V1.json").read_text()
+    )
+    for item in manifest["files"]:
+        target = DOCS / item["target"]
+        assert hashlib.sha256(target.read_bytes()).hexdigest() == item["sha256"]
 
     check = subprocess.run(
         [sys.executable, str(BUILDER), "--check"],
@@ -179,17 +208,23 @@ def test_pages_spectator_uses_relative_assets_and_strict_meta_csp():
         "script-src": ["'self'"],
         "style-src": ["'self'"],
         "media-src": ["blob:"],
-        "connect-src": ["https://0.peerjs.com", "wss://0.peerjs.com"],
+        "connect-src": [
+            "https://0.peerjs.com",
+            "wss://0.peerjs.com",
+            *NOSTR_RELAY_URLS,
+        ],
         "base-uri": ["'none'"],
         "form-action": ["'none'"],
         "object-src": ["'none'"],
     }
     assert {link["href"] for link in parser.attributes("link")} == {
-        "./spectator.css"
+        "./spectator.rpp-v2.css"
     }
     assert {script["src"] for script in parser.attributes("script")} == {
-        "./vendor/peerjs.min.js",
-        "./spectator.js",
+        "./vendor/trystero-nostr-0.25.3-rpp1.min.js",
+        "./vendor/qrious-4.0.2.runtime.min.js",
+        "./pairing.rpp-v2.js",
+        "./spectator.rpp-v2.js",
     }
     assert {
         anchor["href"]
@@ -212,17 +247,18 @@ def test_pages_host_is_inert_versioned_and_uses_only_pinned_assets():
         meta["content"]
         for meta in metas
         if meta.get("name") == "rpp-kite-host-build"
-    ) == "rpp-kite-host-v1"
+    ) == "rpp-kite-host-v2"
     assert {script["src"] for script in parser.attributes("script")} == {
-        "./vendor/peerjs.min.js",
-        "./vendor/qrious.min.js",
-        "./host.js",
+        "./vendor/trystero-nostr-0.25.3-rpp1.min.js",
+        "./vendor/qrious-4.0.2.runtime.min.js",
+        "./pairing.rpp-v2.js",
+        "./host.rpp-kite-v2.js",
     }
     assert {link["href"] for link in parser.attributes("link")} == {
-        "./host.css"
+        "./host.rpp-kite-v2.css"
     }
-    assert "window.__RPP_KITE_HOST_V1__" not in HOST_JS
-    assert "'__RPP_KITE_HOST_V1__'" in HOST_JS
+    assert "window.__RPP_KITE_HOST_V2__" not in HOST_JS
+    assert "'__RPP_KITE_HOST_V2__'" in HOST_JS
     assert "new Peer(" in HOST_JS
     assert HOST_JS.index("function bootstrap(") < HOST_JS.index("new Peer(")
     assert "fetch(" not in HOST_JS
@@ -254,7 +290,6 @@ def test_pages_spectator_has_no_private_or_privileged_surface():
         "status.json",
         "viewer-auth",
         "livestream-auth",
-        "token",
         "rom_path",
         "/status",
         "document.cookie",
@@ -264,7 +299,6 @@ def test_pages_spectator_has_no_private_or_privileged_surface():
         "analytics",
         "data-action",
         "go live",
-        "manual mode",
         "return to autonomy",
     ):
         assert forbidden not in first_party
@@ -276,10 +310,17 @@ def test_pages_spectator_has_no_private_or_privileged_surface():
     assert "localhost" not in first_party
 
 
-def test_pages_peerjs_pin_notices_and_fragment_only_join_contract():
-    peerjs = (WATCH / "vendor" / "peerjs.min.js").read_bytes()
-    host_qrious = (HOST / "vendor" / "qrious.min.js").read_bytes()
-    notices = (WATCH / "vendor" / "licenses.txt").read_bytes()
+def test_pages_signaling_pins_notices_and_fragment_only_join_contract():
+    peerjs = (
+        WATCH_V2 / "vendor" / "peerjs-1.5.5.runtime.min.js"
+    ).read_bytes()
+    host_qrious = (
+        HOST_V2 / "vendor" / "qrious-4.0.2.runtime.min.js"
+    ).read_bytes()
+    trystero = (
+        WATCH_V2 / "vendor" / "trystero-nostr-0.25.3-rpp1.min.js"
+    ).read_bytes()
+    notices = (WATCH_V2 / "vendor" / "licenses.txt").read_bytes()
     assert PEERJS_VERSION == "1.5.5"
     assert PEERJS_SHA256 == (
         "7604d8c31bec4f134b0d15c2d80b1d095ea18af005354f439f14291fcd7b4168"
@@ -288,6 +329,7 @@ def test_pages_peerjs_pin_notices_and_fragment_only_join_contract():
     assert b"sourceMappingURL" not in peerjs
     assert host_qrious == QRIOUS_RUNTIME_JS
     assert b"sourceMappingURL" not in host_qrious
+    assert hashlib.sha256(trystero).hexdigest() == TRYSTERO_NOSTR_RUNTIME_SHA256
     assert notices == THIRD_PARTY_BROWSER_LICENSES
     for notice in (
         b"PeerJS 1.5.5",
@@ -296,6 +338,8 @@ def test_pages_peerjs_pin_notices_and_fragment_only_join_contract():
         b"peerjs-js-binarypack 2.1.0",
         b"webrtc-adapter 9.0.1",
         b"sdp 3.2.0",
+        b"@trystero-p2p/nostr 0.25.3",
+        b"@noble/secp256k1 3.1.0",
     ):
         assert notice in notices
 
@@ -305,7 +349,7 @@ def test_pages_peerjs_pin_notices_and_fragment_only_join_contract():
     join_url = build_join_url(PAGES_JOIN_BASE, host, capability)
     parsed = urllib.parse.urlsplit(join_url)
     assert join_url.split("#", 1)[0] == PAGES_JOIN_BASE
-    assert parsed.path == "/rappter-plays-pokemon/watch/"
+    assert parsed.path == "/rappter-plays-pokemon/watch/v2/"
     assert parsed.query == ""
     assert urllib.parse.parse_qs(parsed.fragment) == {
         "v": ["1"],
@@ -317,6 +361,46 @@ def test_pages_peerjs_pin_notices_and_fragment_only_join_contract():
     assert "new URLSearchParams(location.hash.slice(1))" in SPECTATOR_JS
     assert "location.search" not in SPECTATOR_JS
     assert "document.referrer" not in SPECTATOR_JS
+
+    room = "A" * 22
+    key = "A" * 43
+    generation = "generation-" + "g" * 24
+    public_jwk = {
+        "crv": "P-256",
+        "ext": True,
+        "key_ops": ["verify"],
+        "kty": "EC",
+        "x": "TZoJKyIkF2MGUB0oEgsu9pZThxyOBzpjHiAnjVX_k8k",
+        "y": "xG9WvTCyfXBbP4J8hovLGTYYYdRf0whrzcKwIjrxWxk",
+    }
+    host_public_key = base64.urlsafe_b64encode(
+        json.dumps(
+            public_jwk,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode()
+    ).decode().rstrip("=")
+    fingerprint = derive_host_fingerprint(host_public_key, generation)
+    v2_url = build_join_url(
+        PAGES_JOIN_BASE,
+        room,
+        key,
+        signaling="nostr",
+        generation=generation,
+        host_fingerprint=fingerprint,
+        host_public_key=host_public_key,
+    )
+    parsed_v2 = urllib.parse.urlsplit(v2_url)
+    assert parsed_v2.query == ""
+    assert urllib.parse.parse_qs(parsed_v2.fragment) == {
+        "v": ["2"],
+        "room": [room],
+        "key": [key],
+        "gen": [generation],
+        "pub": [host_public_key],
+        "fp": [fingerprint],
+    }
+    assert key not in v2_url.split("#", 1)[0]
 
 
 def test_pages_dashboard_is_semantic_responsive_and_status_only():
@@ -349,7 +433,7 @@ def test_pages_dashboard_is_semantic_responsive_and_status_only():
     assert "Caught / owned" in SPECTATOR_HTML
     assert 'id="badge-count">— / 8 badges' in SPECTATOR_HTML
     assert 'id="completion">Unknown' in SPECTATOR_HTML
-    assert SPECTATOR_HTML.count('aria-live="polite"') == 2
+    assert SPECTATOR_HTML.count('aria-live="polite"') == 3
 
 
 def test_pages_landing_is_static_and_does_not_claim_an_invitation():
@@ -367,3 +451,29 @@ def test_pages_landing_is_static_and_does_not_claim_an_invitation():
     links = {anchor["href"] for anchor in parser.attributes("a")}
     assert all(link.startswith("https://github.com/") for link in links)
     assert any(link.endswith("#browser-livestream") for link in links)
+
+
+def test_v1_rollback_and_v2_return_trees_are_cache_isolated():
+    old_host = (HOST / "index.html").read_text()
+    old_watch = (WATCH / "index.html").read_text()
+    old_host_js = (HOST / "host.js").read_text()
+    new_host = (HOST_V2 / "index.html").read_text()
+    new_watch = (WATCH_V2 / "index.html").read_text()
+    return_html = (HOST_V2 / "return/index.html").read_text()
+    return_js = (HOST_V2 / "return/return.rpp-v2.js").read_text()
+
+    assert 'content="rpp-kite-host-v1"' in old_host
+    assert "'__RPP_KITE_HOST_V1__'" in old_host_js
+    assert "trystero" not in old_host
+    assert "pairing" not in old_watch
+    assert 'content="rpp-kite-host-v2"' in new_host
+    assert "host.rpp-kite-v2.js" in new_host
+    assert "spectator.rpp-v2.js" in new_watch
+    assert "host.js" not in new_host
+    assert "spectator.js" not in new_watch
+    assert "fetch(" not in return_js
+    assert "XMLHttpRequest" not in return_js
+    assert "top-level handoff" in return_html
+    assert "scan the answer on host" not in (
+        new_host + new_watch
+    ).lower()

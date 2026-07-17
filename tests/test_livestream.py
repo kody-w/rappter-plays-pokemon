@@ -332,6 +332,14 @@ def test_spectator_server_is_read_only_and_route_isolated():
             payload = response.read()
             assert payload == PEERJS_RUNTIME_JS
             assert hashlib.sha256(payload).hexdigest() == PEERJS_RUNTIME_SHA256
+        with urllib.request.urlopen(
+            base + "/vendor/trystero-nostr.min.js"
+        ) as response:
+            assert response.read() == pokemon_module.TRYSTERO_NOSTR_RUNTIME_JS
+        with urllib.request.urlopen(base + "/vendor/qrious.min.js") as response:
+            assert response.read() == QRIOUS_RUNTIME_JS
+        with urllib.request.urlopen(base + "/pairing.js") as response:
+            assert response.read() == pokemon_module.PAIRING_JS.encode()
         with urllib.request.urlopen(base + "/vendor/licenses.txt") as response:
             assert b"PeerJS 1.5.5" in response.read()
 
@@ -341,7 +349,6 @@ def test_spectator_server_is_read_only_and_route_isolated():
             "/api/control",
             "/frame.png",
             "/viewer.js",
-            "/vendor/qrious.min.js",
             "/clips/clip-0001-20260711-120000.mp4",
         ):
             with pytest.raises(urllib.error.HTTPError) as missing:
@@ -565,7 +572,7 @@ def test_browser_contract_has_explicit_ice_bounded_admission_and_teardown():
     assert "turn:" not in serialized_ice
     assert "turns:" not in serialized_ice
     spectator_constructor = SPECTATOR_JS[
-        SPECTATOR_JS.index("peer = new Peer(") : SPECTATOR_JS.index(
+        SPECTATOR_JS.index("const activePeer = new Peer(") : SPECTATOR_JS.index(
             "peer.on('open'"
         )
     ].lower()
@@ -607,10 +614,10 @@ def test_browser_contract_has_explicit_ice_bounded_admission_and_teardown():
     assert 'id="stop-runtime"' in VIEWER_HTML
 
     assert 'id="play-stream" type="button"' in SPECTATOR_HTML
-    assert SPECTATOR_HTML.count('aria-live="polite"') == 2
+    assert SPECTATOR_HTML.count('aria-live="polite"') == 3
     assert "await video.play()" in SPECTATOR_JS
     assert "MAX_AUTOMATIC_RETRIES = 6" in SPECTATOR_JS
-    assert "Automatic retries ended. Ask the host for a fresh link." in SPECTATOR_JS
+    assert "Host authentication or direct media timed out." in SPECTATOR_JS
 
 
 def test_stream_secrets_are_private_and_redacted_from_status(tmp_path):

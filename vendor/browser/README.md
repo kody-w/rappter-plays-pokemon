@@ -5,6 +5,7 @@ they do not load scripts from a CDN at runtime.
 
 | Asset | Version | Upstream package file | SHA-256 | License |
 | --- | --- | --- | --- | --- |
+| Trystero Nostr browser IIFE | 0.25.3 + RPP derivative 1 | deterministic bundle of `@trystero-p2p/nostr`, core, and noble at commit `f76eb4f…a11e` with reviewed lifecycle/qualification hardening | `e77bfc06dffc27f310d43e09734d274993b80a98d0a9a10f5505efda5242d99d` | MIT |
 | PeerJS | 1.5.5 | `peerjs/dist/peerjs.min.js` | `7604d8c31bec4f134b0d15c2d80b1d095ea18af005354f439f14291fcd7b4168` | MIT |
 | PeerJS runtime | 1.5.5 | pinned minified file with its trailing `sourceMappingURL` removed and final newline normalized | `95f57b9e94e1b96c829145b3f3ef0d04b332c9bda0567e144bed70d13712e3d0` | MIT |
 | QRious | 4.0.2 | `qrious/dist/qrious.min.js` | `db99dcaf40a926181bce4522477c2efc5924f6c4b29111b6a97faea477c9528b` | GPL-3.0-or-later |
@@ -37,6 +38,25 @@ notices:
 and SHA-256 hashes for the upstream distributions and notices. Package
 metadata is retained for both top-level dependencies; the derived runtime hash
 is pinned by `scripts/update_browser_assets.py`.
+
+The exact Trystero Nostr/core/noble npm archives are retained under
+`sources/`; package metadata, licenses, the exact upstream Nostr TypeScript
+source, reviewed derivative, core patches, and bundle entry are adjacent.
+The derivative (1) makes `room.leave()` idempotent with cleanup in `finally`,
+(2) suspends sockets and cancels reconnect timers after the last room while
+recreating them on retry, and (3) exposes relay EVENT acceptance/subscribed
+delivery qualification. `TRYSTERO_BUILD.json` pins every input, patch, commit,
+esbuild 0.25.6, build argument, and output hash. Patches apply with POSIX
+`patch --fuzz=0`; exact npm archives remain unchanged. The IIFE has no runtime
+external imports. To verify a deliberate asset update (not in CI):
+
+```bash
+python scripts/build_trystero_bundle.py --check
+```
+
+`NOSTR_RELAYS.json` is the checked-in allowlist and dated review record for the
+five public best-effort WSS origins. They have no SLA. Pages CSP and the CDP
+bootstrap use the exact same list; invitations cannot override it.
 
 After deliberately updating a pinned file and its expected digest, regenerate
 the embedded copies in the single-file agent:
