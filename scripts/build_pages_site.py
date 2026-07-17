@@ -5,9 +5,9 @@ Canonical direction:
 
 * ``vendor/browser`` feeds the embedded browser assets via
   ``update_browser_assets.py``.
-* ``SPECTATOR_HTML``, ``SPECTATOR_CSS``, and ``SPECTATOR_JS`` in
-  ``pokemon_agent.py`` are the canonical spectator sources.
-* This script is the only writer for ``docs/watch``.
+* The literal spectator and kited-host constants in ``pokemon_agent.py`` are
+  the canonical first-party sources.
+* This script is the only writer for ``docs/watch`` and ``docs/host``.
 
 The restricted AST reader below evaluates only literals, byte/string
 concatenation, and the two compression calls used by the embedded assets. It
@@ -30,6 +30,7 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[1]
 AGENT = ROOT / "pokemon_agent.py"
 WATCH = ROOT / "docs" / "watch"
+HOST = ROOT / "docs" / "host"
 FILE_MODE = 0o644
 DIRECTORY_MODE = 0o755
 
@@ -135,13 +136,16 @@ def canonical_files() -> dict[Path, bytes]:
     html = reader.read("SPECTATOR_HTML", str).encode("utf-8")
     css = reader.read("SPECTATOR_CSS", str).encode("utf-8")
     javascript = reader.read("SPECTATOR_JS", str).encode("utf-8")
-    peerjs = reader.read("PEERJS_MIN_JS", bytes)
+    peerjs = reader.read("PEERJS_RUNTIME_JS", bytes)
     notices = reader.read("THIRD_PARTY_BROWSER_LICENSES", bytes)
     peerjs_version = reader.read("PEERJS_VERSION", str)
-    peerjs_sha256 = reader.read("PEERJS_SHA256", str)
+    peerjs_sha256 = reader.read("PEERJS_RUNTIME_SHA256", str)
 
     vendor_peerjs = (
-        ROOT / "vendor" / "browser" / f"peerjs-{peerjs_version}.min.js"
+        ROOT
+        / "vendor"
+        / "browser"
+        / f"peerjs-{peerjs_version}.runtime.min.js"
     ).read_bytes()
     if peerjs != vendor_peerjs:
         raise RuntimeError(
@@ -163,26 +167,64 @@ def canonical_files() -> dict[Path, bytes]:
     }
 
 
-def drift(expected: dict[Path, bytes]) -> list[str]:
+def canonical_host_files() -> dict[Path, bytes]:
+    reader = CanonicalReader(AGENT)
+    html = reader.read("HOST_HTML", str).encode("utf-8")
+    css = reader.read("HOST_CSS", str).encode("utf-8")
+    javascript = reader.read("HOST_JS", str).encode("utf-8")
+    peerjs = reader.read("PEERJS_RUNTIME_JS", bytes)
+    qrious = reader.read("QRIOUS_RUNTIME_JS", bytes)
+    notices = reader.read("THIRD_PARTY_BROWSER_LICENSES", bytes)
+    peerjs_sha256 = reader.read("PEERJS_RUNTIME_SHA256", str)
+    peerjs_version = reader.read("PEERJS_VERSION", str)
+    qrious_sha256 = reader.read("QRIOUS_RUNTIME_SHA256", str)
+    qrious_version = reader.read("QRIOUS_VERSION", str)
+
+    vendor = ROOT / "vendor" / "browser"
+    if peerjs != (vendor / f"peerjs-{peerjs_version}.runtime.min.js").read_bytes():
+        raise RuntimeError("Embedded PeerJS runtime differs from vendor/browser")
+    if qrious != (
+        vendor / f"qrious-{qrious_version}.runtime.min.js"
+    ).read_bytes():
+        raise RuntimeError("Embedded QRious runtime differs from vendor/browser")
+    if hashlib.sha256(peerjs).hexdigest() != peerjs_sha256:
+        raise RuntimeError("Embedded PeerJS digest does not match its pin")
+    if hashlib.sha256(qrious).hexdigest() != qrious_sha256:
+        raise RuntimeError("Embedded QRious digest does not match its pin")
+    return {
+        Path("index.html"): html,
+        Path("host.css"): css,
+        Path("host.js"): javascript,
+        Path("vendor/peerjs.min.js"): peerjs,
+        Path("vendor/qrious.min.js"): qrious,
+        Path("vendor/licenses.txt"): notices,
+    }
+
+
+def drift(
+    expected: dict[Path, bytes],
+    site: Path | None = None,
+) -> list[str]:
+    site = WATCH if site is None else site
     issues: list[str] = []
-    if not WATCH.is_dir() or WATCH.is_symlink():
-        return [f"missing generated directory: {display_path(WATCH)}"]
+    if not site.is_dir() or site.is_symlink():
+        return [f"missing generated directory: {display_path(site)}"]
 
     expected_nodes = set(expected)
     for relative_path in expected:
         expected_nodes.update(relative_path.parents)
     expected_nodes.discard(Path("."))
     actual_nodes = {
-        path.relative_to(WATCH)
-        for path in WATCH.rglob("*")
+        path.relative_to(site)
+        for path in site.rglob("*")
     }
     for path in sorted(expected_nodes - actual_nodes):
-        issues.append(f"missing: {display_path(WATCH / path)}")
+        issues.append(f"missing: {display_path(site / path)}")
     for path in sorted(actual_nodes - expected_nodes):
-        issues.append(f"unexpected: {display_path(WATCH / path)}")
+        issues.append(f"unexpected: {display_path(site / path)}")
 
     for relative_path, payload in expected.items():
-        path = WATCH / relative_path
+        path = site / relative_path
         if not path.is_file() or path.is_symlink():
             issues.append(f"not a regular file: {display_path(path)}")
             continue
@@ -197,15 +239,19 @@ def drift(expected: dict[Path, bytes]) -> list[str]:
     return issues
 
 
-def write_site(expected: dict[Path, bytes]) -> None:
-    if WATCH.is_symlink() or WATCH.is_file():
-        WATCH.unlink()
-    elif WATCH.exists():
-        shutil.rmtree(WATCH)
-    WATCH.mkdir(parents=True)
-    WATCH.chmod(DIRECTORY_MODE)
+def write_site(
+    expected: dict[Path, bytes],
+    site: Path | None = None,
+) -> None:
+    site = WATCH if site is None else site
+    if site.is_symlink() or site.is_file():
+        site.unlink()
+    elif site.exists():
+        shutil.rmtree(site)
+    site.mkdir(parents=True)
+    site.chmod(DIRECTORY_MODE)
     for relative_path, payload in expected.items():
-        path = WATCH / relative_path
+        path = site / relative_path
         path.parent.mkdir(parents=True, exist_ok=True)
         path.parent.chmod(DIRECTORY_MODE)
         path.write_bytes(payload)
@@ -221,21 +267,30 @@ def main() -> int:
     )
     args = parser.parse_args()
     try:
-        expected = canonical_files()
+        sites = {
+            WATCH: canonical_files(),
+            HOST: canonical_host_files(),
+        }
         if args.check:
-            issues = drift(expected)
+            issues = [
+                issue
+                for site, expected in sites.items()
+                for issue in drift(expected, site)
+            ]
             if issues:
-                print("GitHub Pages spectator site is out of date:", file=sys.stderr)
+                print("GitHub Pages site is out of date:", file=sys.stderr)
                 for issue in issues:
                     print(f"  - {issue}", file=sys.stderr)
                 return 1
-            print("GitHub Pages spectator site is in sync")
+            print("GitHub Pages watch and host sites are in sync")
             return 0
-        write_site(expected)
+        for site, expected in sites.items():
+            write_site(expected, site)
     except (OSError, RuntimeError, SyntaxError, zlib.error) as error:
-        print(f"Cannot build GitHub Pages spectator site: {error}", file=sys.stderr)
+        print(f"Cannot build GitHub Pages sites: {error}", file=sys.stderr)
         return 2
-    print(f"Wrote {len(expected)} files under {display_path(WATCH)}")
+    count = sum(len(expected) for expected in sites.values())
+    print(f"Wrote {count} files under docs/watch and docs/host")
     return 0
 
 

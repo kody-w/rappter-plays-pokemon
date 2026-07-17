@@ -1,3 +1,4 @@
 # Preserve verbatim upstream license notices, including Markdown hard breaks.
 vendor/browser/qrious-4.0.2.LICENSE.md -whitespace
 docs/watch/vendor/licenses.txt -whitespace
+docs/host/vendor/licenses.txt -whitespace

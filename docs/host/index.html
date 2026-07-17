@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<meta name="rpp-kite-host-build" content="rpp-kite-host-v1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; media-src blob:; connect-src https://0.peerjs.com wss://0.peerjs.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<title>RAPPter Plays Pokémon — kited twin host</title>
+<link rel="stylesheet" href="./host.css">
+</head>
+<body>
+<main>
+  <header>
+    <div>
+      <p class="eyebrow">Kited twin</p>
+      <h1>RAPPter Plays Pokémon</h1>
+      <p id="host-message" class="sub" role="status" aria-live="polite">Waiting for the local CDP string. This page is inert until it is tethered.</p>
+    </div>
+    <span id="live-badge" class="badge offline">UNTETHERED</span>
+  </header>
+  <div class="layout">
+    <section class="card stage">
+      <canvas id="game" width="160" height="144" aria-label="Pokémon Red live frame"></canvas>
+      <video id="pip-video" autoplay muted playsinline aria-hidden="true"></video>
+      <div class="controls" aria-label="Stream controls">
+        <button id="go-live" type="button" disabled>Go Live</button>
+        <button id="end-live" class="warn" type="button" disabled>End</button>
+        <button id="retry-live" class="alt" type="button" disabled>Retry</button>
+        <button id="pip-toggle" class="alt" type="button" disabled>Picture in Picture</button>
+        <button id="copy-link" class="alt" type="button" disabled>Copy spectator link</button>
+      </div>
+      <p id="pip-status" class="note" role="status" aria-live="polite">Picture in Picture becomes available after the canvas stream starts.</p>
+    </section>
+    <aside class="card">
+      <h2>String health</h2>
+      <dl class="health">
+        <div><dt>Source</dt><dd id="source-health" class="lost">LOST</dd></div>
+        <div><dt>String</dt><dd id="string-health" class="lost">LOST</dd></div>
+        <div><dt>Runtime</dt><dd id="runtime-health">WAITING</dd></div>
+        <div><dt>PeerJS</dt><dd id="peer-health">OFFLINE</dd></div>
+      </dl>
+      <p><strong id="viewer-count">0</strong> / <span id="viewer-limit">0</span> viewers</p>
+      <div id="share" hidden>
+        <canvas id="stream-qr" width="220" height="220" aria-label="Spectator join QR code"></canvas>
+        <a id="join-link" target="_blank" rel="noopener noreferrer">Open spectator page</a>
+      </div>
+      <p class="note">The Pages tab hosts WebRTC. The local string injects bounded frames and telemetry through a dedicated loopback-only Chrome DevTools connection.</p>
+      <a class="note" href="./vendor/licenses.txt" target="_blank" rel="noopener">Third-party notices</a>
+    </aside>
+  </div>
+</main>
+<script src="./vendor/peerjs.min.js" defer></script>
+<script src="./vendor/qrious.min.js" defer></script>
+<script src="./host.js" defer></script>
+</body>
+</html>

@@ -23,8 +23,12 @@ from openrappter.agents.pokemon_agent import (
     LIVESTREAM_REPORT_STALE_SECONDS,
     PEERJS_ICE_CONFIG,
     PEERJS_MIN_JS,
+    PEERJS_RUNTIME_JS,
+    PEERJS_RUNTIME_SHA256,
     PEERJS_SHA256,
     QRIOUS_MIN_JS,
+    QRIOUS_RUNTIME_JS,
+    QRIOUS_RUNTIME_SHA256,
     QRIOUS_SHA256,
     SPECTATOR_HTML,
     SPECTATOR_JS,
@@ -239,7 +243,12 @@ def test_supervisor_propagates_livestream_configuration(tmp_path):
     )
     assert command[command.index("--max-viewers") + 1] == "4"
     assert "--livestream" in command
-    assert "--open-viewer" in command
+    assert command[command.index("--livestream-host") + 1] == "kite"
+    assert "--open-viewer" not in command
+
+    args.livestream_host = "local"
+    local_command = runtime_command(args, open_viewer=False)
+    assert "--open-viewer" in local_command
 
 
 def test_vendored_peerjs_and_qrious_are_pinned_and_embedded():
@@ -249,7 +258,28 @@ def test_vendored_peerjs_and_qrious_are_pinned_and_embedded():
     assert hashlib.sha256(PEERJS_MIN_JS).hexdigest() == PEERJS_SHA256
     assert hashlib.sha256(QRIOUS_MIN_JS).hexdigest() == QRIOUS_SHA256
     assert PEERJS_MIN_JS == (vendor / "peerjs-1.5.5.min.js").read_bytes()
+    assert PEERJS_RUNTIME_JS == (
+        vendor / "peerjs-1.5.5.runtime.min.js"
+    ).read_bytes()
+    assert hashlib.sha256(PEERJS_RUNTIME_JS).hexdigest() == PEERJS_RUNTIME_SHA256
+    assert b"sourceMappingURL" not in PEERJS_RUNTIME_JS
+    assert PEERJS_RUNTIME_JS == PEERJS_MIN_JS.rsplit(
+        b"\n//# sourceMappingURL=peerjs.min.js.map",
+        1,
+    )[0] + b"\n"
     assert QRIOUS_MIN_JS == (vendor / "qrious-4.0.2.min.js").read_bytes()
+    assert QRIOUS_RUNTIME_JS == (
+        vendor / "qrious-4.0.2.runtime.min.js"
+    ).read_bytes()
+    assert hashlib.sha256(QRIOUS_RUNTIME_JS).hexdigest() == QRIOUS_RUNTIME_SHA256
+    assert b"sourceMappingURL" not in QRIOUS_RUNTIME_JS
+    assert QRIOUS_RUNTIME_JS == (
+        QRIOUS_MIN_JS.rsplit(
+            b"\n//# sourceMappingURL=qrious.min.js.map",
+            1,
+        )[0].rstrip(b"\n")
+        + b"\n"
+    )
     assert b"Peer" in PEERJS_MIN_JS
     assert b"QRious" in QRIOUS_MIN_JS
     assert "MIT License" in (vendor / "peerjs-1.5.5.LICENSE").read_text()
@@ -299,7 +329,9 @@ def test_spectator_server_is_read_only_and_route_isolated():
             assert response.read() == b""
 
         with urllib.request.urlopen(base + "/vendor/peerjs.min.js") as response:
-            assert hashlib.sha256(response.read()).hexdigest() == PEERJS_SHA256
+            payload = response.read()
+            assert payload == PEERJS_RUNTIME_JS
+            assert hashlib.sha256(payload).hexdigest() == PEERJS_RUNTIME_SHA256
         with urllib.request.urlopen(base + "/vendor/licenses.txt") as response:
             assert b"PeerJS 1.5.5" in response.read()
 
@@ -416,7 +448,10 @@ def test_host_assets_and_livestream_state_remain_authenticated(tmp_path):
             assert returned_config["join_url"] == join_url
             assert returned_config["peer_options"]["config"] == PEERJS_ICE_CONFIG
         with opener.open(base + "/vendor/qrious.min.js") as response:
-            assert hashlib.sha256(response.read()).hexdigest() == QRIOUS_SHA256
+            payload = response.read()
+            assert payload == QRIOUS_RUNTIME_JS
+            assert hashlib.sha256(payload).hexdigest() == QRIOUS_RUNTIME_SHA256
+            assert b"sourceMappingURL" not in payload
         with opener.open(base + "/vendor/qrious.js") as response:
             assert b"QRious v4.0.2" in response.read(200)
 

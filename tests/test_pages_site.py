@@ -10,9 +10,14 @@ from html.parser import HTMLParser
 from pathlib import Path
 
 from openrappter.agents.pokemon_agent import (
-    PEERJS_MIN_JS,
+    HOST_CSS,
+    HOST_HTML,
+    HOST_JS,
+    PEERJS_RUNTIME_JS,
+    PEERJS_RUNTIME_SHA256,
     PEERJS_SHA256,
     PEERJS_VERSION,
+    QRIOUS_RUNTIME_JS,
     SPECTATOR_CSS,
     SPECTATOR_HTML,
     SPECTATOR_JS,
@@ -24,6 +29,7 @@ from openrappter.agents.pokemon_agent import (
 ROOT = Path(__file__).resolve().parents[1]
 DOCS = ROOT / "docs"
 WATCH = DOCS / "watch"
+HOST = DOCS / "host"
 BUILDER = ROOT / "scripts" / "build_pages_site.py"
 PAGES_JOIN_BASE = "https://kody-w.github.io/rappter-plays-pokemon/watch/"
 PAGES_CSP = (
@@ -62,7 +68,18 @@ def generated_files() -> dict[Path, bytes]:
         Path("index.html"): SPECTATOR_HTML.encode(),
         Path("spectator.css"): SPECTATOR_CSS.encode(),
         Path("spectator.js"): SPECTATOR_JS.encode(),
-        Path("vendor/peerjs.min.js"): PEERJS_MIN_JS,
+        Path("vendor/peerjs.min.js"): PEERJS_RUNTIME_JS,
+        Path("vendor/licenses.txt"): THIRD_PARTY_BROWSER_LICENSES,
+    }
+
+
+def generated_host_files() -> dict[Path, bytes]:
+    return {
+        Path("index.html"): HOST_HTML.encode(),
+        Path("host.css"): HOST_CSS.encode(),
+        Path("host.js"): HOST_JS.encode(),
+        Path("vendor/peerjs.min.js"): PEERJS_RUNTIME_JS,
+        Path("vendor/qrious.min.js"): QRIOUS_RUNTIME_JS,
         Path("vendor/licenses.txt"): THIRD_PARTY_BROWSER_LICENSES,
     }
 
@@ -79,6 +96,17 @@ def test_pages_build_exactly_matches_canonical_sources_and_is_checked_in():
     } == set(expected)
     for relative_path, payload in expected.items():
         path = WATCH / relative_path
+        assert path.read_bytes() == payload
+        assert stat.S_IMODE(path.stat().st_mode) == 0o644
+    expected_host = generated_host_files()
+    assert builder["canonical_host_files"]() == expected_host
+    assert {
+        path.relative_to(HOST)
+        for path in HOST.rglob("*")
+        if path.is_file()
+    } == set(expected_host)
+    for relative_path, payload in expected_host.items():
+        path = HOST / relative_path
         assert path.read_bytes() == payload
         assert stat.S_IMODE(path.stat().st_mode) == 0o644
 
@@ -170,6 +198,54 @@ def test_pages_spectator_uses_relative_assets_and_strict_meta_csp():
     } == {"./vendor/licenses.txt"}
 
 
+def test_pages_host_is_inert_versioned_and_uses_only_pinned_assets():
+    parser = ParsedHTML()
+    parser.feed(HOST_HTML)
+    metas = parser.attributes("meta")
+    csp = next(
+        meta["content"]
+        for meta in metas
+        if meta.get("http-equiv") == "Content-Security-Policy"
+    )
+    assert csp == PAGES_CSP
+    assert next(
+        meta["content"]
+        for meta in metas
+        if meta.get("name") == "rpp-kite-host-build"
+    ) == "rpp-kite-host-v1"
+    assert {script["src"] for script in parser.attributes("script")} == {
+        "./vendor/peerjs.min.js",
+        "./vendor/qrious.min.js",
+        "./host.js",
+    }
+    assert {link["href"] for link in parser.attributes("link")} == {
+        "./host.css"
+    }
+    assert "window.__RPP_KITE_HOST_V1__" not in HOST_JS
+    assert "'__RPP_KITE_HOST_V1__'" in HOST_JS
+    assert "new Peer(" in HOST_JS
+    assert HOST_JS.index("function bootstrap(") < HOST_JS.index("new Peer(")
+    assert "fetch(" not in HOST_JS
+    assert "XMLHttpRequest" not in HOST_JS
+    assert "WebSocket" not in HOST_JS
+    assert "localhost" not in HOST_JS.lower()
+    assert "127.0.0.1" not in HOST_JS
+    assert "serviceWorker" not in HOST_JS
+    assert "localStorage" not in HOST_JS
+    assert "sessionStorage" not in HOST_JS
+    assert "data-action" not in HOST_HTML
+    for gameplay in ("Take Over", "Return to AI", "Pause", "Resume", "press"):
+        assert gameplay not in HOST_HTML
+    for stream_control in (
+        "Go Live",
+        "End",
+        "Retry",
+        "Picture in Picture",
+        "Copy spectator link",
+    ):
+        assert stream_control in HOST_HTML
+
+
 def test_pages_spectator_has_no_private_or_privileged_surface():
     first_party = f"{SPECTATOR_HTML}\n{SPECTATOR_JS}".lower()
     for forbidden in (
@@ -202,12 +278,16 @@ def test_pages_spectator_has_no_private_or_privileged_surface():
 
 def test_pages_peerjs_pin_notices_and_fragment_only_join_contract():
     peerjs = (WATCH / "vendor" / "peerjs.min.js").read_bytes()
+    host_qrious = (HOST / "vendor" / "qrious.min.js").read_bytes()
     notices = (WATCH / "vendor" / "licenses.txt").read_bytes()
     assert PEERJS_VERSION == "1.5.5"
     assert PEERJS_SHA256 == (
         "7604d8c31bec4f134b0d15c2d80b1d095ea18af005354f439f14291fcd7b4168"
     )
-    assert hashlib.sha256(peerjs).hexdigest() == PEERJS_SHA256
+    assert hashlib.sha256(peerjs).hexdigest() == PEERJS_RUNTIME_SHA256
+    assert b"sourceMappingURL" not in peerjs
+    assert host_qrious == QRIOUS_RUNTIME_JS
+    assert b"sourceMappingURL" not in host_qrious
     assert notices == THIRD_PARTY_BROWSER_LICENSES
     for notice in (
         b"PeerJS 1.5.5",

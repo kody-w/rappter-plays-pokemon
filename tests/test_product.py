@@ -5,6 +5,7 @@ import base64
 import json
 import os
 import stat
+import subprocess
 import threading
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -293,6 +294,108 @@ def test_launchers_preserve_rom_paths_as_single_arguments():
 
     assert 'rappter_plays_pokemon.cli "$@"' in launch
     assert '"${LAUNCH_ARGS[@]}"' in bootstrap
+    assert 'if [[ "$ACTION" == "start" ]]' in launch
+    assert launch.index('if [[ "$ACTION" == "start" ]]') < launch.index(
+        "rappter_plays_pokemon.install_agent"
+    )
+    assert "refusing to replace the registered agent" in launch
+
+
+def test_launch_preflight_bypasses_controls_and_blocks_live_start(
+    monkeypatch,
+    tmp_path,
+):
+    assert cli.launch_preflight(
+        ["stop", "--runtime-dir", str(tmp_path)]
+    ) == ("stop", False)
+
+    monkeypatch.setattr(
+        PokemonAgent,
+        "perform",
+        lambda self, **kwargs: json.dumps(
+            {
+                "status": "success",
+                "running": kwargs["action"] == "status",
+            }
+        ),
+    )
+    assert cli.launch_preflight(
+        ["start", "--runtime-dir", str(tmp_path)]
+    ) == ("start", True)
+
+    monkeypatch.setattr(
+        PokemonAgent,
+        "perform",
+        lambda self, **kwargs: json.dumps(
+            {"status": "success", "running": False}
+        ),
+    )
+    (tmp_path / "supervisor.json").write_text(
+        json.dumps({"running": True, "pid": os.getpid()}),
+        encoding="utf-8",
+    )
+    assert cli.launch_preflight(
+        ["start", "--runtime-dir", str(tmp_path)]
+    ) == ("start", True)
+
+
+@pytest.mark.parametrize(
+    ("preflight", "action", "expected_install", "expected_code"),
+    [
+        ("stop\t0", "stop", False, 0),
+        ("start\t0", "start", True, 0),
+        ("start\t1", "start", False, 1),
+    ],
+)
+def test_launch_shell_never_installs_for_controls_or_live_start(
+    tmp_path,
+    preflight,
+    action,
+    expected_install,
+    expected_code,
+):
+    launcher = tmp_path / "launch.sh"
+    launcher.write_bytes((ROOT / "launch.sh").read_bytes())
+    launcher.chmod(0o755)
+    (tmp_path / "pokemon_agent.py").write_text("synthetic", encoding="utf-8")
+    python = tmp_path / ".venv" / "bin" / "python"
+    python.parent.mkdir(parents=True)
+    log = tmp_path / "python.log"
+    python.write_text(
+        "#!/usr/bin/env bash\n"
+        f"printf '%s\\n' \"$*\" >> {str(log)!r}\n"
+        'if [[ "$1" == "-c" ]]; then\n'
+        f"  printf '%b\\n' {preflight!r}\n"
+        "fi\n",
+        encoding="utf-8",
+    )
+    python.chmod(0o755)
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    uname = bin_dir / "uname"
+    uname.write_text(
+        "#!/usr/bin/env bash\nprintf 'Darwin\\n'\n",
+        encoding="utf-8",
+    )
+    uname.chmod(0o755)
+
+    result = subprocess.run(
+        [str(launcher), action],
+        cwd=tmp_path,
+        env={
+            **os.environ,
+            "PATH": f"{bin_dir}:{os.environ.get('PATH', '')}",
+        },
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == expected_code
+    invocations = log.read_text(encoding="utf-8")
+    assert ("rappter_plays_pokemon.install_agent" in invocations) is expected_install
+    if action == "stop":
+        assert "rappter_plays_pokemon.cli stop" in invocations
 
 
 def test_rom_free_runner_smoke_uses_mock_runtime(monkeypatch, tmp_path):

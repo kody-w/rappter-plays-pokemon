@@ -12,7 +12,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 AGENT = ROOT / "pokemon_agent.py"
-FIRST_PARTY_NAMES = ("VIEWER_JS", "SPECTATOR_JS")
+FIRST_PARTY_NAMES = ("VIEWER_JS", "SPECTATOR_JS", "HOST_JS")
 
 
 def extracted_first_party_scripts() -> dict[str, str]:
@@ -36,6 +36,10 @@ def extracted_first_party_scripts() -> dict[str, str]:
 
 def browser_scripts() -> dict[str, str]:
     scripts = extracted_first_party_scripts()
+    kite_string = ROOT / "scripts" / "kite_vtwin.js"
+    scripts[str(kite_string.relative_to(ROOT))] = kite_string.read_text(
+        encoding="utf-8"
+    )
     for path in sorted((ROOT / "vendor/browser").glob("*.js")):
         scripts[str(path.relative_to(ROOT))] = path.read_text(encoding="utf-8")
     return scripts

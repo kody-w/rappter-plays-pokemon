@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Embed pinned browser distributions into the single-file RAPP agent."""
+"""Embed pinned browser assets and the reviewed CDP string into the RAPP agent."""
 
 from __future__ import annotations
 
@@ -22,9 +22,19 @@ ASSETS = (
         "7604d8c31bec4f134b0d15c2d80b1d095ea18af005354f439f14291fcd7b4168",
     ),
     (
+        "PEERJS_RUNTIME_JS",
+        ROOT / "vendor/browser/peerjs-1.5.5.runtime.min.js",
+        "95f57b9e94e1b96c829145b3f3ef0d04b332c9bda0567e144bed70d13712e3d0",
+    ),
+    (
         "QRIOUS_MIN_JS",
         ROOT / "vendor/browser/qrious-4.0.2.min.js",
         "db99dcaf40a926181bce4522477c2efc5924f6c4b29111b6a97faea477c9528b",
+    ),
+    (
+        "QRIOUS_RUNTIME_JS",
+        ROOT / "vendor/browser/qrious-4.0.2.runtime.min.js",
+        "c46f564908ff10943a59e6f56f5de4bc5b6e827813b4750eef55353e7085157c",
     ),
     (
         "QRIOUS_SOURCE_JS",
@@ -71,6 +81,11 @@ ASSETS = (
         ROOT / "vendor/browser/PROVENANCE.json",
         "def6b65036e7753a032d0081fc6383be10721aed9f78e26eee5a7d3610f64692",
     ),
+    (
+        "KITE_STRING_JS",
+        ROOT / "scripts/kite_vtwin.js",
+        None,
+    ),
 )
 
 EXPECTED_BUNDLED_DEPENDENCIES = {
@@ -81,10 +96,14 @@ EXPECTED_BUNDLED_DEPENDENCIES = {
 }
 
 
-def render_asset(name: str, path: Path, expected_sha256: str) -> str:
+def render_asset(
+    name: str,
+    path: Path,
+    expected_sha256: str | None,
+) -> str:
     payload = path.read_bytes()
     actual = hashlib.sha256(payload).hexdigest()
-    if actual != expected_sha256:
+    if expected_sha256 is not None and actual != expected_sha256:
         raise RuntimeError(f"{path} has SHA-256 {actual}, expected {expected_sha256}")
     encoded = base64.b64encode(zlib.compress(payload, level=9)).decode("ascii")
     lines = "\n".join(f'    b"{part}"' for part in textwrap.wrap(encoded, 76))
@@ -144,6 +163,27 @@ def verify_provenance() -> None:
                 raise RuntimeError(
                     f"{path_name} has SHA-256 {actual}, expected {item[hash_key]}"
                 )
+    for original_name, runtime_name, marker in (
+        (
+            "peerjs-1.5.5.min.js",
+            "peerjs-1.5.5.runtime.min.js",
+            b"\n//# sourceMappingURL=peerjs.min.js.map",
+        ),
+        (
+            "qrious-4.0.2.min.js",
+            "qrious-4.0.2.runtime.min.js",
+            b"\n//# sourceMappingURL=qrious.min.js.map",
+        ),
+    ):
+        original = (vendor / original_name).read_bytes()
+        head, separator, tail = original.rpartition(marker)
+        if not separator or tail not in {b"", b"\n"}:
+            raise RuntimeError(f"{original_name} source-map trailer changed")
+        if (vendor / runtime_name).read_bytes() != head.rstrip(b"\n") + b"\n":
+            raise RuntimeError(
+                f"{runtime_name} must remove the source-map trailer "
+                "and normalize its final newline"
+            )
 
 
 def update(*, check: bool) -> bool:

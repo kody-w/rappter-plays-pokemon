@@ -18,7 +18,10 @@ ACTIONS = (
     "checkpoint",
     "press",
     "view",
+    "host",
+    "go-live",
     "share",
+    "provision-browser",
     "stop",
 )
 BUTTONS = ("a", "b", "start", "select", "up", "down", "left", "right")
@@ -82,6 +85,25 @@ def build_parser() -> argparse.ArgumentParser:
         help="Compatible externally hosted HTTPS spectator page base",
     )
     parser.add_argument(
+        "--livestream-host",
+        choices=("kite", "local"),
+        help="Pages kited twin (recommended) or legacy local browser host",
+    )
+    parser.add_argument(
+        "--browser-path",
+        help="Dedicated Chrome/Chromium executable override",
+    )
+    parser.add_argument(
+        "--host-base",
+        help="HTTPS GitHub Pages kited-host base",
+    )
+    parser.add_argument("--bridge-startup-timeout", type=float)
+    parser.add_argument(
+        "--browser-cache",
+        type=Path,
+        help="Private Chrome-for-Testing cache for provision-browser",
+    )
+    parser.add_argument(
         "--max-viewers",
         type=int,
         help="P2P viewer fanout (default 5, hard limit 8)",
@@ -135,6 +157,31 @@ def agent_kwargs(args: argparse.Namespace, config: dict[str, Any]) -> dict[str, 
         ),
         "port": _configured(args, config, "port", 8765),
         "livestream": _configured(args, config, "livestream", False),
+        "livestream_host": _configured(
+            args,
+            config,
+            "livestream_host",
+            "kite",
+        ),
+        "browser_path": _configured(
+            args,
+            config,
+            "browser_path",
+            os.environ.get("RPP_BROWSER_PATH")
+            or os.environ.get("CHROME_PATH"),
+        ),
+        "host_base": _configured(
+            args,
+            config,
+            "host_base",
+            "https://kody-w.github.io/rappter-plays-pokemon/host/",
+        ),
+        "bridge_startup_timeout": _configured(
+            args,
+            config,
+            "bridge_startup_timeout",
+            20,
+        ),
         "spectator_port": _configured(args, config, "spectator_port", 8766),
         "advertised_host": _configured(args, config, "advertised_host"),
         "join_base": _configured(args, config, "join_base"),
@@ -155,10 +202,91 @@ def agent_kwargs(args: argparse.Namespace, config: dict[str, Any]) -> dict[str, 
     return kwargs
 
 
+def launch_preflight(argv: Sequence[str] | None = None) -> tuple[str, bool]:
+    """Return the parsed action and whether installing would hot-swap a runner."""
+    args = build_parser().parse_args(argv)
+    if args.action != "start":
+        return args.action, False
+    config = load_config(args.config)
+    runtime_dir = Path(agent_kwargs(args, config)["runtime_dir"]).expanduser()
+    agent_running = False
+    try:
+        from openrappter.agents.pokemon_agent import PokemonAgent
+
+        result = json.loads(
+            PokemonAgent().perform(
+                action="status",
+                runtime_dir=runtime_dir,
+            )
+        )
+        if isinstance(result, dict):
+            agent_running = result.get("running") is True
+    except (ImportError, json.JSONDecodeError, RuntimeError):
+        pass
+    if agent_running:
+        return args.action, True
+    try:
+        status = json.loads(
+            (runtime_dir / "status.json").read_text(encoding="utf-8")
+        )
+        pid = int(status.get("pid", 0))
+        if pid > 1 and status.get("running") is True:
+            os.kill(pid, 0)
+            return args.action, True
+    except (
+        FileNotFoundError,
+        json.JSONDecodeError,
+        TypeError,
+        ValueError,
+        ProcessLookupError,
+        PermissionError,
+        OSError,
+    ):
+        pass
+    try:
+        supervisor = json.loads(
+            (runtime_dir / "supervisor.json").read_text(encoding="utf-8")
+        )
+        supervisor_pid = int(supervisor.get("pid", 0))
+        if supervisor_pid > 1 and supervisor.get("running") is True:
+            os.kill(supervisor_pid, 0)
+            return args.action, True
+    except (
+        FileNotFoundError,
+        json.JSONDecodeError,
+        TypeError,
+        ValueError,
+        ProcessLookupError,
+        PermissionError,
+        OSError,
+    ):
+        pass
+    return args.action, False
+
+
 def run(argv: Sequence[str] | None = None) -> tuple[int, dict[str, Any]]:
     args = build_parser().parse_args(argv)
     try:
         config = load_config(args.config)
+        if args.action == "provision-browser":
+            from rappter_plays_pokemon.chrome_for_testing import (
+                default_cache_dir,
+                provision_chrome_for_testing,
+            )
+
+            cache = args.browser_cache or default_cache_dir()
+            try:
+                browser = provision_chrome_for_testing(cache)
+            except OSError as error:
+                raise RuntimeError(
+                    f"Cannot provision Chrome for Testing: {error}"
+                ) from error
+            result = {
+                "status": "success",
+                "message": "Chrome for Testing is ready",
+                "browser_path": str(browser),
+            }
+            return 0, result
         kwargs = agent_kwargs(args, config)
         from openrappter.agents.pokemon_agent import PokemonAgent
 
