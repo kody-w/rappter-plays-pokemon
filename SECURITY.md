@@ -143,5 +143,6 @@ TLS. Review changes before overriding `OPENRAPPTER_REF` or using
 `--openrappter-source`. Browser provisioning is separate and explicit. Its
 macOS helper accepts only the official stable Chrome-for-Testing manifest and
 canonical Google Storage URL, validates ZIP paths/shape/CRC/expansion, extracts
-atomically under a private lock, and verifies the Google code-signing team
-where `codesign` is available. Tests and CI never invoke that download.
+atomically under a private lock, and verifies either Google's code-signing team
+or the exact official CfT ad-hoc testing identity where `codesign` is
+available. Tests and CI never invoke that download.

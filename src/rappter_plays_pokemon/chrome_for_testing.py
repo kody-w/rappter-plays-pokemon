@@ -338,15 +338,6 @@ def validate_code_signature(
 ) -> None:
     if not codesign.is_file():
         return
-    verification = runner(
-        [str(codesign), "--verify", "--deep", "--strict", str(app)],
-        capture_output=True,
-        text=True,
-        timeout=60,
-        check=False,
-    )
-    if verification.returncode:
-        raise RuntimeError("Chrome-for-Testing code signature is invalid")
     details = runner(
         [str(codesign), "-dv", "--verbose=4", str(app)],
         capture_output=True,
@@ -355,8 +346,32 @@ def validate_code_signature(
         check=False,
     )
     output = f"{details.stdout}\n{details.stderr}"
-    if details.returncode or f"TeamIdentifier={GOOGLE_TEAM_ID}" not in output:
-        raise RuntimeError("Chrome-for-Testing signer is not Google")
+    if details.returncode:
+        raise RuntimeError("Chrome-for-Testing signature metadata is invalid")
+    if f"TeamIdentifier={GOOGLE_TEAM_ID}" in output:
+        verification = runner(
+            [str(codesign), "--verify", "--deep", "--strict", str(app)],
+            capture_output=True,
+            text=True,
+            timeout=60,
+            check=False,
+        )
+        if verification.returncode:
+            raise RuntimeError("Chrome-for-Testing code signature is invalid")
+        return
+    expected_adhoc = all(
+        marker in output
+        for marker in (
+            "Identifier=Google Chrome for Testing",
+            "Signature=adhoc",
+            "TeamIdentifier=not set",
+        )
+    )
+    if not expected_adhoc:
+        raise RuntimeError(
+            "Chrome-for-Testing signature is neither Google-signed nor "
+            "the expected official ad-hoc testing signature"
+        )
 
 
 def _installed_binary(

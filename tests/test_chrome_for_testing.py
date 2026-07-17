@@ -99,7 +99,7 @@ def test_archive_parser_rejects_traversal_and_accepts_expected_shape(tmp_path):
         validate_archive(archive, "mac-arm64")
 
 
-def test_code_signature_requires_valid_google_team(tmp_path):
+def test_code_signature_accepts_google_or_official_adhoc_identity(tmp_path):
     codesign = tmp_path / "codesign"
     codesign.write_text("synthetic")
     app = tmp_path / "Chrome.app"
@@ -111,22 +111,38 @@ def test_code_signature_requires_valid_google_team(tmp_path):
         del kwargs
         calls += 1
         output = (
-            ""
-            if "--verify" in args[0]
-            else "TeamIdentifier=EQHXZ8M8AV\n"
+            "TeamIdentifier=EQHXZ8M8AV\n"
+            if "-dv" in args[0]
+            else ""
         )
         return subprocess.CompletedProcess(args[0], 0, "", output)
 
     validate_code_signature(app, codesign=codesign, runner=valid_runner)
     assert calls == 2
 
-    def wrong_team(*args, **kwargs):
+    def adhoc_runner(*args, **kwargs):
         del kwargs
-        output = "" if "--verify" in args[0] else "TeamIdentifier=WRONG\n"
+        output = (
+            "Identifier=Google Chrome for Testing\n"
+            "Signature=adhoc\n"
+            "TeamIdentifier=not set\n"
+        )
         return subprocess.CompletedProcess(args[0], 0, "", output)
 
-    with pytest.raises(RuntimeError, match="not Google"):
-        validate_code_signature(app, codesign=codesign, runner=wrong_team)
+    validate_code_signature(app, codesign=codesign, runner=adhoc_runner)
+
+    def wrong_identity(*args, **kwargs):
+        del kwargs
+        return subprocess.CompletedProcess(
+            args[0],
+            0,
+            "",
+            "Identifier=Unexpected Browser\nSignature=adhoc\n"
+            "TeamIdentifier=not set\n",
+        )
+
+    with pytest.raises(RuntimeError, match="neither Google-signed"):
+        validate_code_signature(app, codesign=codesign, runner=wrong_identity)
 
 
 def test_provision_uses_private_locked_cache_and_atomic_version_install(tmp_path):

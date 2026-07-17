@@ -219,8 +219,9 @@ Use an installed browser override:
 `RPP_BROWSER_PATH` and `CHROME_PATH` are also supported. Without an override,
 standard Chrome for Testing, Google Chrome, and Chromium locations are checked.
 The deterministic macOS helper fetches the official stable Chrome-for-Testing
-manifest, validates the archive shape and Google code signature/team when
-`codesign` is available, and installs atomically under a private locked cache:
+manifest, validates the archive shape and either Google's signing team or the
+official CfT ad-hoc testing identity when `codesign` is available, and installs
+atomically under a private locked cache:
 
 ```bash
 ./launch.sh provision-browser
