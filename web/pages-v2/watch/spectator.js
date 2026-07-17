@@ -967,7 +967,16 @@ async function connectLegacy(epoch) {
     });
   });
   peer.on('disconnected', () => scheduleRetry('Signaling disconnected. Retrying…'));
-  peer.on('error', () => scheduleRetry('Peer connection failed. Retrying…'));
+  peer.on('error', error => {
+    const errorType = String(error && error.type || 'unknown');
+    if (errorType === 'peer-unavailable') {
+      scheduleRetry(
+        'The host is offline or restarted, so this link is no longer valid. Ask the host for a fresh link. Retrying…'
+      );
+    } else {
+      scheduleRetry(`Peer connection failed (${errorType}). Retrying…`);
+    }
+  });
 }
 
 function attachDirectStream(stream, hostPeer) {
