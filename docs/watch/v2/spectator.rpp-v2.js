@@ -23,7 +23,15 @@ const REVIEWED_RELAYS = Object.freeze([
 ]);
 const RTC_CONFIG = Object.freeze({
   iceServers: Object.freeze([
-    Object.freeze({urls: 'stun:stun.l.google.com:19302'})
+    Object.freeze({urls: 'stun:stun.l.google.com:19302'}),
+    Object.freeze({
+      urls: Object.freeze([
+        'turn:us-0.turn.peerjs.com:3478',
+        'turn:eu-0.turn.peerjs.com:3478'
+      ]),
+      username: 'peerjs',
+      credential: 'peerjsp'
+    })
   ])
 });
 const MAX_TELEMETRY_BYTES = 4096;
@@ -317,7 +325,7 @@ async function scheduleRetryAsync(message) {
       'offline',
       'Stream unavailable',
       capability.version === 2
-        ? 'Host authentication or direct media timed out. Ask for a fresh link, try Manual Share, or check NAT/firewall limits (there is no TURN).'
+        ? 'Host authentication or media timed out even with the TURN relay fallback. Ask for a fresh link or try Manual Share.'
         : 'Automatic retries ended. Ask the host for a fresh link.',
       {showRetry: true, loading: false}
     );
@@ -843,9 +851,10 @@ async function connectLegacy(epoch) {
       secure: true,
       debug: 0,
       config: {
-        iceServers: [
-          {urls: 'stun:stun.l.google.com:19302'}
-        ]
+        iceServers: RTC_CONFIG.iceServers.map(server => ({
+          ...server,
+          urls: Array.isArray(server.urls) ? [...server.urls] : server.urls
+        }))
       }
     });
     if (epoch !== attemptEpoch || terminal) {
@@ -1076,14 +1085,13 @@ async function viewerPeerHandshake(epoch, peerId, send, receive) {
 async function recordDirectPath(pc) {
   try {
     const type = await RppPairing.selectedCandidateType(pc);
-    if (type === 'relay') {
-      document.getElementById('direct-health').textContent = 'Rejected relay';
-      pc.close();
-      throw new Error('relay candidate rejected');
+    if (['host', 'srflx', 'prflx', 'relay'].includes(type)) {
+      candidateTypes.add(type);
     }
-    if (['host', 'srflx', 'prflx'].includes(type)) candidateTypes.add(type);
-    document.getElementById('direct-health').textContent =
-      type === 'unknown' ? 'Direct' : `Direct ${type}`;
+    document.getElementById('direct-health').textContent = (
+      type === 'relay' ? 'Relayed (TURN)' :
+      type === 'unknown' ? 'Direct' : `Direct ${type}`
+    );
   } catch (_error) {
     if (pc.connectionState !== 'closed') {
       document.getElementById('direct-health').textContent = 'Direct';
@@ -1210,9 +1218,7 @@ async function connectNostr(epoch) {
           warnOnRelayFailure: false
         },
         trickleIce: true,
-        rtcConfig: {
-          iceServers: [{urls: RTC_CONFIG.iceServers[0].urls}]
-        }
+        rtcConfig: RppPairing.cloneRtcConfig()
       },
       capability.room,
       {
@@ -1267,7 +1273,7 @@ async function connectNostr(epoch) {
       transportTimer = setTimeout(() => {
         if (epoch !== attemptEpoch || acceptedHost !== peerId) return;
         scheduleRetry(
-          'Host authenticated, but direct WebRTC transport timed out. Try a fresh link or Manual Share; restrictive NAT may require TURN, which is not used.'
+          'Host authenticated, but the WebRTC transport timed out even with the TURN relay fallback. Try a fresh link or Manual Share.'
         );
       }, TRANSPORT_DEADLINE_MILLISECONDS);
       mediaTimer = setTimeout(() => {

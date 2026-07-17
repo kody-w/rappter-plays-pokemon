@@ -260,12 +260,14 @@ def test_trystero_bundle_sources_licenses_and_policy_are_exact():
     assert "no SLA" in policy["service_level"]
 
 
-def test_nostr_and_manual_contracts_are_direct_stun_only():
+def test_nostr_and_manual_contracts_use_direct_preferred_ice():
     serialized_rtc = json.dumps(RTC_CONFIG).lower()
     assert serialized_rtc == (
-        '{"iceservers": [{"urls": "stun:stun.l.google.com:19302"}]}'
+        '{"iceservers": [{"urls": "stun:stun.l.google.com:19302"}, '
+        '{"urls": ["turn:us-0.turn.peerjs.com:3478", '
+        '"turn:eu-0.turn.peerjs.com:3478"], '
+        '"username": "peerjs", "credential": "peerjsp"}]}'
     )
-    assert "turn:" not in serialized_rtc
     assert "turns:" not in serialized_rtc
     assert "passive: true" in SPECTATOR_JS
     assert "target: peerId" in SPECTATOR_JS
@@ -279,6 +281,6 @@ def test_nostr_and_manual_contracts_are_direct_stun_only():
     assert "unsupported pairing compression" in PAIRING_JS
     assert "name: 'HKDF'" in PAIRING_JS
     assert "name: 'AES-GCM'" in PAIRING_JS
-    assert "relay ICE candidates are not permitted" in PAIRING_JS
+    assert "SDP exceeds the manual pairing limit" in PAIRING_JS
     assert "signHostTranscript" in PAIRING_JS
     assert "verifyHostTranscript" in PAIRING_JS

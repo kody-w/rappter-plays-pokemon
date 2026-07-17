@@ -35,7 +35,17 @@ class FakeChannel {
 class FakePeerConnection {
   constructor(config) {
     assert.deepEqual(config, {
-      iceServers: [{urls: 'stun:stun.l.google.com:19302'}]
+      iceServers: [
+        {urls: 'stun:stun.l.google.com:19302'},
+        {
+          urls: [
+            'turn:us-0.turn.peerjs.com:3478',
+            'turn:eu-0.turn.peerjs.com:3478'
+          ],
+          username: 'peerjs',
+          credential: 'peerjsp'
+        }
+      ]
     });
     this.iceGatheringState = 'complete';
     this.connectionState = 'new';
@@ -196,9 +206,20 @@ async function run() {
   const api = global.RppPairing;
   assert(api);
   assert.deepEqual(api.cloneRtcConfig(), {
-    iceServers: [{urls: 'stun:stun.l.google.com:19302'}]
+    iceServers: [
+      {urls: 'stun:stun.l.google.com:19302'},
+      {
+        urls: [
+          'turn:us-0.turn.peerjs.com:3478',
+          'turn:eu-0.turn.peerjs.com:3478'
+        ],
+        username: 'peerjs',
+        credential: 'peerjsp'
+      }
+    ]
   });
-  assert(!source.includes('turn:'));
+  assert(source.includes('turn:us-0.turn.peerjs.com:3478'));
+  assert(source.includes('turn:eu-0.turn.peerjs.com:3478'));
   assert(!source.includes('turns:'));
   assert(!source.includes('WebSocket'));
   assert(!source.includes('fetch('));
@@ -386,11 +407,14 @@ async function run() {
   );
   assert.equal(sequential.pending.used, true);
 
-  assert.throws(
-    () => api.assertDirectSdp(
+  api.assertDirectSdp(
+    'v=0\r\na=candidate:3 1 UDP 1 203.0.113.1 10002 typ relay\r\n'
+  );
+  assert.deepEqual(
+    api.candidateTypesFromSdp(
       'v=0\r\na=candidate:3 1 UDP 1 203.0.113.1 10002 typ relay\r\n'
     ),
-    /relay/
+    ['relay']
   );
   assert.equal(api.safeForQr('x'.repeat(api.QR_CAPACITY_BYTES)), true);
   assert.equal(api.safeForQr('x'.repeat(api.QR_CAPACITY_BYTES + 1)), false);

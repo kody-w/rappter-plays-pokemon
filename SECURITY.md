@@ -119,10 +119,15 @@ all retries; the documented derivative guarantees local deregistration even
 when leave signaling rejects and suspends all sockets/reconnect timers after
 the last room.
 
-Host and viewer explicitly pass one ICE server:
-Google `stun:stun.l.google.com:19302`, with no TURN URL or relay candidate
-configured. The STUN service observes candidate-discovery metadata, peers may
-learn network/IP candidates, and restrictive NAT/UDP policy can prevent media.
+Host and viewer explicitly pass two ICE entries: Google
+`stun:stun.l.google.com:19302` and the public PeerJS community TURN relays
+(`turn:us-0.turn.peerjs.com:3478`, `turn:eu-0.turn.peerjs.com:3478`, shared
+credentials `peerjs`/`peerjsp`). Direct candidates are preferred; when NAT
+blocks every direct pair, media flows through TURN still protected by
+DTLS-SRTP — the relay forwards encrypted packets it cannot read. The STUN and
+TURN services observe candidate-discovery and relay metadata, peers may learn
+network/IP candidates, and a network that blocks UDP and TURN can still
+prevent media.
 The mesh has linear host upload cost and is not suitable for untrusted or large
 audiences.
 

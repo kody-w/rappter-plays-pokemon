@@ -389,7 +389,17 @@ async function run() {
     room_id: roomId,
     room_key: roomKey,
     rtc_config: {
-      iceServers: [{urls: 'stun:stun.l.google.com:19302'}]
+      iceServers: [
+        {urls: 'stun:stun.l.google.com:19302'},
+        {
+          urls: [
+            'turn:us-0.turn.peerjs.com:3478',
+            'turn:eu-0.turn.peerjs.com:3478'
+          ],
+          username: 'peerjs',
+          credential: 'peerjsp'
+        }
+      ]
     },
     signaling: 'nostr',
     telemetry_version: 1

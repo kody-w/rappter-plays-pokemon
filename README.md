@@ -412,8 +412,10 @@ after repeated crashes.
   The Pages tab cannot command the string or access localhost.
 - **P2P boundary:** five allowlisted public Nostr relays redundantly carry only
   encrypted Trystero handshake SDP. Game media is protected with DTLS-SRTP;
-  dashboard telemetry is direct SCTP/DTLS. Both browsers explicitly pass only
-  Google `stun:stun.l.google.com:19302`, with no TURN relay. The brokerless
+  dashboard telemetry is direct SCTP/DTLS. Both browsers explicitly pass
+  Google `stun:stun.l.google.com:19302` plus the public PeerJS community TURN
+  relays (`turn:us-0.turn.peerjs.com:3478`, `turn:eu-0.turn.peerjs.com:3478`)
+  as an encrypted fallback path when a direct route is blocked. The brokerless
   manual fallback exchanges complete SDP through attended QR/copy steps.
 - **Dashboard minimization:** strict Python `project_dashboard_snapshot`
   produces the only telemetry accepted by the string. The host never receives
@@ -443,8 +445,9 @@ state. GitHub's Copilot service terms and privacy policy apply to that inference
 - WebRTC can reveal network metadata/IP candidates to peers. Use the link only
   with people you trust.
 - Symmetric NATs and restrictive firewalls may prevent a direct connection.
-  The explicit Google STUN server discovers candidates but is not a relay; this
-  release intentionally configures no TURN URLs.
+  The explicit Google STUN server discovers candidates; when a direct route
+  fails, the public PeerJS community TURN relays carry the still-encrypted
+  media as a fallback (cellular and cross-network viewers rely on this).
 - Nostr signaling redundancy is best effort, not a public relay SLA. If WSS is
   blocked by managed browser or network policy, use Manual Share pairing rather
   than attempting a policy bypass.
@@ -511,8 +514,10 @@ open it on the viewer, then share/open the answer link on the streamer Mac.
 The answer QR transfers that same return link; no host camera scanner is
 implemented. Raw copy/paste remains a fallback.
 Manual pairing is two-pass because the viewer's complete WebRTC answer cannot
-exist before it processes the offer. Neither automatic nor manual mode
-provisions TURN, so restrictive NAT/UDP policy can still prevent media.
+exist before it processes the offer. Both automatic and manual modes include
+the public PeerJS community TURN relays as a fallback, so most restrictive
+NAT setups can still connect; a network that blocks UDP and TURN entirely can
+still prevent media.
 
 Managed Edge or network policy may intentionally block public WSS origins.
 This project does not use iframes, injected code, workers, service workers, CDN

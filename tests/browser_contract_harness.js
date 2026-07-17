@@ -262,7 +262,17 @@ const config = {
     secure: true,
     debug: 0,
     config: {
-      iceServers: [{urls: "stun:stun.l.google.com:19302"}],
+      iceServers: [
+        {urls: "stun:stun.l.google.com:19302"},
+        {
+          urls: [
+            "turn:us-0.turn.peerjs.com:3478",
+            "turn:eu-0.turn.peerjs.com:3478",
+          ],
+          username: "peerjs",
+          credential: "peerjsp",
+        },
+      ],
     },
   },
 };
@@ -405,7 +415,8 @@ async function flush() {
   const host = peers[0];
   const ice = JSON.stringify(host.options.config).toLowerCase();
   assert(ice.includes("stun:stun.l.google.com:19302"));
-  assert(!ice.includes("turn:"));
+  assert(ice.includes("turn:us-0.turn.peerjs.com:3478"));
+  assert(ice.includes("turn:eu-0.turn.peerjs.com:3478"));
   assert(!ice.includes("turns:"));
 
   const first = new FakeConnection("spectator-first");

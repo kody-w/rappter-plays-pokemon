@@ -11,7 +11,15 @@ const QR_CAPACITY_BYTES = 2200;
 const ANSWER_PREFIX = 'rpp-answer-v2.';
 const RTC_CONFIG = Object.freeze({
   iceServers: Object.freeze([
-    Object.freeze({urls: 'stun:stun.l.google.com:19302'})
+    Object.freeze({urls: 'stun:stun.l.google.com:19302'}),
+    Object.freeze({
+      urls: Object.freeze([
+        'turn:us-0.turn.peerjs.com:3478',
+        'turn:eu-0.turn.peerjs.com:3478'
+      ]),
+      username: 'peerjs',
+      credential: 'peerjsp'
+    })
   ])
 });
 const encoder = new TextEncoder();
@@ -371,7 +379,12 @@ function parseAutoFragment(fragment) {
 }
 
 function cloneRtcConfig() {
-  return {iceServers: [{urls: RTC_CONFIG.iceServers[0].urls}]};
+  return {
+    iceServers: RTC_CONFIG.iceServers.map(server => ({
+      ...server,
+      urls: Array.isArray(server.urls) ? [...server.urls] : server.urls
+    }))
+  };
 }
 
 function candidateTypesFromSdp(sdp) {
@@ -387,9 +400,6 @@ function candidateTypesFromSdp(sdp) {
 function assertDirectSdp(sdp) {
   if (byteLength(String(sdp || '')) > MAX_SDP_BYTES) {
     throw new Error('SDP exceeds the manual pairing limit');
-  }
-  if (candidateTypesFromSdp(sdp).includes('relay')) {
-    throw new Error('relay ICE candidates are not permitted');
   }
 }
 

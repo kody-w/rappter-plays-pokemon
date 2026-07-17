@@ -164,11 +164,8 @@ async function recordCandidateType(pc) {
   if (!pc || typeof RppPairing !== 'object') return;
   try {
     const type = await RppPairing.selectedCandidateType(pc);
-    if (['host', 'srflx', 'prflx'].includes(type)) {
+    if (['host', 'srflx', 'prflx', 'relay'].includes(type)) {
       state.candidateTypes.add(type);
-    } else if (type === 'relay') {
-      state.error = 'relay-candidate-rejected';
-      try { pc.close(); } catch (_error) {}
     }
   } catch (_error) {
     // Candidate reporting is diagnostic and does not own the media session.
@@ -430,33 +427,43 @@ function validDashboardSnapshot(value) {
   );
 }
 
+function validIceServers(servers) {
+  if (!Array.isArray(servers) || servers.length !== 2) return false;
+  const stun = servers[0];
+  const turn = servers[1];
+  return Boolean(
+    exactKeys(stun, ['urls']) &&
+    stun.urls === 'stun:stun.l.google.com:19302' &&
+    exactKeys(turn, ['credential', 'urls', 'username']) &&
+    Array.isArray(turn.urls) &&
+    turn.urls.length === 2 &&
+    turn.urls[0] === 'turn:us-0.turn.peerjs.com:3478' &&
+    turn.urls[1] === 'turn:eu-0.turn.peerjs.com:3478' &&
+    turn.username === 'peerjs' &&
+    turn.credential === 'peerjsp'
+  );
+}
+
 function validPeerOptions(value) {
   if (!exactKeys(
     value,
     ['config', 'debug', 'host', 'path', 'port', 'secure']
   )) return false;
-  if (
-    value.host !== '0.peerjs.com' ||
-    value.port !== 443 ||
-    value.path !== '/' ||
-    value.secure !== true ||
-    value.debug !== 0 ||
-    !exactKeys(value.config, ['iceServers']) ||
-    !Array.isArray(value.config.iceServers) ||
-    value.config.iceServers.length !== 1
-  ) return false;
-  const server = value.config.iceServers[0];
-  return exactKeys(server, ['urls']) &&
-    server.urls === 'stun:stun.l.google.com:19302';
+  return (
+    value.host === '0.peerjs.com' &&
+    value.port === 443 &&
+    value.path === '/' &&
+    value.secure === true &&
+    value.debug === 0 &&
+    exactKeys(value.config, ['iceServers']) &&
+    validIceServers(value.config.iceServers)
+  );
 }
 
 function validRtcConfig(value) {
   return Boolean(
     exactKeys(value, ['iceServers']) &&
-    Array.isArray(value.iceServers) &&
-    value.iceServers.length === 1 &&
-    exactKeys(value.iceServers[0], ['urls']) &&
-    value.iceServers[0].urls === 'stun:stun.l.google.com:19302'
+    validIceServers(value.iceServers)
   );
 }
 
