@@ -29,9 +29,10 @@ Fame, but **it is not guaranteed to beat the game**.
 - **Local viewer and takeover:** authenticated browser session on
   `127.0.0.1`, strict same-origin controls, pause/resume, manual buttons, and
   return-to-autonomy.
-- **Optional P2P livestream:** the authenticated viewer becomes the video-only
-  host, renders the game through a nearest-neighbor canvas, and shares a QRious
-  QR code and bearer join link with up to five spectators by default.
+- **Optional P2P livestream:** the authenticated viewer hosts video plus a
+  tightly allowlisted run dashboard, shares a QRious bearer link with up to
+  five spectators by default, and supports host Picture in Picture. Emulator
+  audio is not captured.
 - **Bounded recording:** local, rotating H.264 MP4 clips with manifests,
   retention limits, a disk budget, and a free-space reserve.
 - **Local-only state:** ROM path, screenshots, saves, logs, and videos stay in a
@@ -136,26 +137,43 @@ The checked-in page at
 <https://kody-w.github.io/rappter-plays-pokemon/watch/> is only static
 spectator HTML, CSS, JavaScript, the pinned PeerJS 1.5.5 bundle, and license
 notices. It contains no invitation, host identity, capability, game frame,
-status, control, token, or ROM API. The private host ID and watch capability
-are added after `#` in the link produced by the host. Browsers do not send that
-fragment in HTTP requests, so it does not reach GitHub Pages or its HTTP access
-logs. Keep the complete link private.
+control, token, or ROM API. At runtime it receives video and safe full-snapshot
+run details over the already authenticated PeerJS connection: location,
+objective/mode, badges, Pokedex counts, party HP, play/session time, the
+sanitized last checkpoint, completion, and admitted viewer count. The private
+host ID and watch capability are added after `#` in the link produced by the
+host. Browsers do not send that fragment in HTTP requests, so it does not reach
+GitHub Pages or its HTTP access logs. Keep the complete link private.
 
-Keep the dedicated authenticated game viewer open and visible: that browser is
-the streamer. It automatically goes live, targets 10 canvas captures per
-second while visible, and shows **Go Live**, **End**, and **Retry** controls,
+Keep the dedicated authenticated game viewer open: that browser is the
+streamer. It automatically goes live, targets 10 canvas captures per second,
+and shows **Go Live**, **End**, **Retry**, and **Picture in Picture** controls,
 LIVE/reconnecting state, viewer count, the exact join link, and a locally
-rendered QRious QR code. Browsers may throttle minimized or background tabs, so
-10 fps is not guaranteed. No click is required for initial broadcast. Because
-the browser is the host, enabling livestreaming opens the viewer even if
-`--no-open-viewer` is also configured; that option applies to local-only
-sessions.
+rendered QRious QR code. Picture in Picture uses the existing canvas capture
+and requests no screen-capture permission. Browsers may reduce video cadence
+in background tabs, so 10 fps is not guaranteed, but the browser lease is
+tolerant of normal timer throttling. No click is required for initial
+broadcast. Because the browser is the host, enabling livestreaming opens the
+viewer even if `--no-open-viewer` is also configured; that option applies to
+local-only sessions.
 
 Before creating PeerJS, the page acquires a generation-scoped browser lease
-from the local runtime. Only one fresh viewer tab can own it. Heartbeats keep
-the lease and reported LIVE state current; runtime restart, lease loss, repeated
-backend failures, End/Stop, capture end, or closing the page tears down PeerJS,
-all peer connections, and canvas tracks. Stale browser reports become offline.
+from the local runtime. Only one fresh viewer tab can own it. A 15-second
+heartbeat maintains a 120-second lease and bounded LIVE report; returning to a
+visible host tab automatically attempts guarded reacquisition after lease loss.
+End/Stop, capture end, runtime restart, or closing the page still tears down
+PeerJS, all peer connections, and canvas tracks promptly. A crashed page can
+remain last-known LIVE only for the bounded stale window. If the host says
+OFFLINE after a close or long suspension, reopen the authenticated viewer and
+select **Go Live**; the same session link can then reconnect.
+Dashboard-only fetch failures never end video, but repeated loss of both the
+runtime status channel and lease heartbeat stops capture so a frozen canvas
+cannot continue to appear live.
+
+The dashboard's **Caught / owned** count is the Generation-I Pokédex Owned
+bitfield at WRAM `0xD2F7`, not a log of literal capture events. It may
+legitimately exceed Seen, and unavailable WRAM is displayed as unknown rather
+than as zero progress.
 
 The local spectator asset server still starts separately on the LAN, even when
 `--join-base` selects GitHub Pages for shared links. It remains an immediate
@@ -234,9 +252,9 @@ flowchart LR
     R --> P[PyBoy]
     R --> F[ffmpeg segment recorder]
     R --> V[127.0.0.1 authenticated viewer]
-    V -->|canvas capture target: 10 fps while visible| H[PeerJS host in same browser]
+    V -->|canvas capture target: 10 fps| H[PeerJS host in same browser]
     R -->|fixed GET/HEAD assets only| W[LAN spectator page]
-    H -->|WebRTC video, one connection each| W
+    H -->|WebRTC video + safe dashboard snapshots| W
     H -.->|signaling only| PJS[PeerJS Cloud]
     R --> B[CopilotBrain]
     B -->|PNG screenshot only| C[GitHub Copilot SDK<br/>gpt-5.6-sol / max]
@@ -270,15 +288,23 @@ after repeated crashes.
   livestreaming is enabled. It accepts GET/HEAD for fixed spectator assets and
   has no APIs. The checked-in GitHub Pages surface serves the same static
   spectator assets and nothing from the runtime. The spectator page contains
-  no emulator control code. Host and watch IDs are independent high-entropy
-  values in the URL fragment, so normal LAN and GitHub Pages HTTP requests and
-  access logs do not contain them.
+  no emulator control code or runtime API. After the exact watch hello, its
+  DataConnection is host-to-spectator only; any later spectator data closes
+  that viewer. Host and watch IDs are independent high-entropy values in the
+  URL fragment, so normal LAN and GitHub Pages HTTP requests and access logs do
+  not contain them.
 - **P2P boundary:** PeerJS Cloud performs signaling. Game media is a WebRTC
   video track protected in transit with DTLS-SRTP and sent directly between
   browsers where connectivity permits. The watch link is a bearer capability;
   anyone who receives it can attempt to watch until the host session ends.
   Both host and spectator pass the same explicit ICE configuration: Google
   `stun:stun.l.google.com:19302` only, with no TURN relay.
+- **Dashboard minimization:** the authenticated loopback `/api/dashboard`
+  endpoint returns only a versioned, bounded projector schema. The host never
+  forwards `/api/status`, paths, hashes, logs, errors, screen text, model
+  reasoning, or action history. Snapshots are at most 4096 UTF-8 bytes,
+  sequence checked, limited to one changed update per second, and sent with an
+  unchanged heartbeat around five seconds.
 - **Local secrets:** the short-lived viewer bootstrap token is written only to
   a mode-`0600` runtime file. Livestream credentials use a separate mode-`0600`
   file. Both are removed on clean shutdown. Never paste either private URL into
@@ -292,7 +318,9 @@ state. GitHub's Copilot service terms and privacy policy apply to that inference
 
 ### Livestream scope and limitations
 
-- v1 is video-only; emulator audio is not captured.
+- The media track carries game video; emulator audio is not captured.
+  Dashboard v1 travels separately over the authenticated PeerJS
+  DataConnection.
 - WebRTC can reveal network metadata/IP candidates to peers. Use the link only
   with people you trust.
 - Symmetric NATs and restrictive firewalls may prevent a direct connection.

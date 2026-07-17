@@ -70,9 +70,35 @@ HARD_MAX_NEGOTIATING = 16
 LIVESTREAM_PROTOCOL_VERSION = 1
 LIVESTREAM_FRAME_RATE = 10
 MAX_WATCH_HELLO_BYTES = 512
-LIVESTREAM_LEASE_TTL_SECONDS = 15
-LIVESTREAM_HEARTBEAT_SECONDS = 4
-LIVESTREAM_REPORT_STALE_SECONDS = 20
+TELEMETRY_VERSION = 1
+MAX_TELEMETRY_BYTES = 4096
+TELEMETRY_CHANGE_INTERVAL_SECONDS = 1
+TELEMETRY_HEARTBEAT_SECONDS = 5
+TELEMETRY_STALE_SECONDS = 12
+DASHBOARD_SNAPSHOT_KEYS = (
+    "location",
+    "objective",
+    "phase",
+    "badges",
+    "pokedex",
+    "party",
+    "completed",
+    "player",
+    "play_time",
+    "session_elapsed_seconds",
+    "checkpoint",
+    "viewers",
+)
+TELEMETRY_MESSAGE_KEYS = (
+    "v",
+    "type",
+    "telemetry_version",
+    "sequence",
+    "snapshot",
+)
+LIVESTREAM_LEASE_TTL_SECONDS = 120
+LIVESTREAM_HEARTBEAT_SECONDS = 15
+LIVESTREAM_REPORT_STALE_SECONDS = 120
 SPECTATOR_MAX_CONNECTIONS = 16
 SPECTATOR_SOCKET_TIMEOUT_SECONDS = 5
 PEERJS_VERSION = "1.5.5"
@@ -1409,25 +1435,28 @@ VIEWER_HTML = """<!doctype html>
     <h1>Copilot Plays Pokemon Red</h1>
     <p>Authenticated local host. Manual buttons temporarily take priority.</p>
   </div>
-  <span id="live-badge" class="badge offline" role="status" aria-live="polite" aria-atomic="true">OFFLINE</span>
+  <span id="live-badge" class="badge offline">OFFLINE</span>
 </header>
 <div class="grid">
   <section class="card">
     <canvas id="game" width="160" height="144" aria-label="Pokemon Red live frame"></canvas>
+    <video id="pip-video" autoplay muted playsinline aria-hidden="true"></video>
     <div class="controls">
       <button data-action="manual">Take Over</button>
       <button data-action="autonomy">Return to AI</button>
       <button class="alt" data-action="pause">Pause</button>
       <button class="alt" data-action="resume">Resume</button>
       <button data-action="checkpoint">Save + New Clip</button>
+      <button id="pip-toggle" class="alt" type="button" disabled>Picture in Picture</button>
       <button id="stop-runtime" class="warn" data-action="stop">Stop</button>
     </div>
+    <p id="pip-status" class="note" role="status" aria-live="polite">Picture in Picture is available while the livestream is active.</p>
   </section>
   <section class="card">
     <section id="livestream" hidden>
       <div class="stream-heading">
         <h2>Peer-to-peer livestream</h2>
-        <strong id="stream-state" role="status" aria-live="polite" aria-atomic="true">Offline</strong>
+        <strong id="stream-state">Offline</strong>
       </div>
       <p><span id="viewer-count">0</span> / <span id="viewer-limit">0</span> viewers</p>
       <div class="share">
@@ -1444,7 +1473,7 @@ VIEWER_HTML = """<!doctype html>
       </div>
       <p id="stream-message" class="note" role="status" aria-live="polite" aria-atomic="true">Livestream is offline.</p>
       <p class="note">Anyone with this bearer link can watch. Media is sent directly with WebRTC.</p>
-      <p class="note"><strong>Keep this dedicated stream window open and visible.</strong> Background or minimized tabs may be throttled, so the target frame rate is not guaranteed.</p>
+      <p class="note"><strong>Keep this stream window open.</strong> Background tabs are tolerated; use Picture in Picture to keep the game visible while working elsewhere.</p>
       <a class="note" href="/vendor/licenses.txt" target="_blank" rel="noopener">Third-party notices</a>
     </section>
     <div class="dpad">
@@ -1479,8 +1508,10 @@ h2 { margin: 0; font-size: 1rem; }
 .grid { display: grid; grid-template-columns: minmax(320px, 2fr) minmax(280px, 1fr); gap: 18px; }
 .card { background: #192235; border: 1px solid #34445f; border-radius: 12px; padding: 16px; }
 #game { width: 100%; max-width: 640px; image-rendering: pixelated; background: black; aspect-ratio: 10 / 9; }
+#pip-video { position: fixed; right: 0; bottom: 0; width: 2px; height: 2px; opacity: .01; pointer-events: none; }
 #status { white-space: pre-wrap; overflow-wrap: anywhere; min-height: 250px; }
 button { background: #2c6bed; color: white; border: 0; border-radius: 6px; padding: 10px 14px; margin: 3px; cursor: pointer; }
+button:focus-visible, a:focus-visible { outline: 3px solid #ffdf4d; outline-offset: 2px; }
 button:disabled { cursor: not-allowed; opacity: .45; }
 button.alt { background: #59677f; }
 button.warn { background: #bd3d45; }
@@ -1512,6 +1543,7 @@ const game = document.getElementById('game');
 const gameContext = game.getContext('2d', {alpha: false});
 gameContext.imageSmoothingEnabled = false;
 let frameLoading = false;
+let statusRefreshInFlight = false;
 
 function refreshFrame() {
   if (frameLoading) return;
@@ -1557,11 +1589,14 @@ document.querySelectorAll('[data-button]').forEach(
 );
 
 async function refreshStatus() {
+  if (statusRefreshInFlight) return;
+  statusRefreshInFlight = true;
   try {
     const response = await fetch('/api/status?t=' + Date.now());
     if (!response.ok) throw new Error(`status failed: ${response.status}`);
     const data = await response.json();
     noteBackendSuccess();
+    noteCoreControlSuccess('status');
     if (broadcast.config) {
       const reportedGeneration = data.livestream && data.livestream.generation;
       const generationChanged = (
@@ -1607,8 +1642,13 @@ async function refreshStatus() {
     }
     if (!clips.childElementCount) clips.textContent = 'No completed clips yet.';
   } catch (error) {
+    noteCoreControlFailure(
+      'status',
+      'The local runtime status channel is repeatedly unavailable.'
+    );
     document.getElementById('status').textContent = 'Viewer disconnected: ' + error;
-    noteBackendFailure('The authenticated viewer backend is unavailable.');
+  } finally {
+    statusRefreshInFlight = false;
   }
 }
 
@@ -1623,13 +1663,286 @@ const broadcast = {
   heartbeatTimer: null,
   heartbeatInFlight: false,
   reconnectTimer: null,
+  leaseRecoveryTimer: null,
+  leaseRecoveryInFlight: false,
+  leaseRecoveryAttempts: 0,
+  leaseRecoveryPending: false,
+  leaseRecoveryDeadlineAt: null,
   backendFailures: 0,
+  coreStatusFailures: 0,
+  coreLeaseFailures: 0,
   starting: false,
   pageEnding: false,
   manuallyStopped: false,
-  state: 'offline'
+  state: 'offline',
+  telemetrySequence: 0
 };
 let streamStateUpdate = Promise.resolve();
+const dashboardCache = {
+  snapshot: null,
+  serialized: '',
+  inFlight: false,
+  available: false,
+  lastSuccessAt: null
+};
+
+function monotonicNow() {
+  if (globalThis.performance && typeof globalThis.performance.now === 'function') {
+    return globalThis.performance.now();
+  }
+  return 0;
+}
+
+function hasExactKeys(value, keys) {
+  return (
+    value &&
+    typeof value === 'object' &&
+    !Array.isArray(value) &&
+    Object.keys(value).sort().join(',') === [...keys].sort().join(',')
+  );
+}
+
+function boundedInteger(value, minimum, maximum) {
+  return Number.isInteger(value) && value >= minimum && value <= maximum;
+}
+
+function boundedText(value, maximum) {
+  return value === null || (
+    typeof value === 'string' && Array.from(value).length <= maximum
+  );
+}
+
+function validDashboardSnapshot(value) {
+  if (!hasExactKeys(value, [
+    'location', 'objective', 'phase', 'badges', 'pokedex', 'party',
+    'completed', 'player', 'play_time', 'session_elapsed_seconds',
+    'checkpoint', 'viewers'
+  ])) return false;
+  if (
+    !boundedText(value.location, 80) ||
+    !boundedText(value.objective, 160) ||
+    !boundedText(value.phase, 40) ||
+    typeof value.completed !== 'boolean'
+  ) return false;
+  if (!hasExactKeys(value.badges, ['earned', 'count', 'total'])) return false;
+  const badgeNames = [
+    'Boulder', 'Cascade', 'Thunder', 'Rainbow',
+    'Soul', 'Marsh', 'Volcano', 'Earth'
+  ];
+  if (
+    !Array.isArray(value.badges.earned) ||
+    value.badges.earned.some(name => !badgeNames.includes(name)) ||
+    new Set(value.badges.earned).size !== value.badges.earned.length ||
+    !(
+      value.badges.count === null ||
+      value.badges.count === value.badges.earned.length
+    ) ||
+    (value.badges.count === null && value.badges.earned.length !== 0) ||
+    value.badges.total !== 8
+  ) return false;
+  if (!hasExactKeys(value.pokedex, ['caught', 'seen', 'total'])) return false;
+  if (
+    !(value.pokedex.caught === null ||
+      boundedInteger(value.pokedex.caught, 0, 151)) ||
+    !(value.pokedex.seen === null ||
+      boundedInteger(value.pokedex.seen, 0, 151)) ||
+    value.pokedex.total !== 151
+  ) return false;
+  if (!(value.party === null || (
+    Array.isArray(value.party) && value.party.length <= 6
+  ))) return false;
+  for (const member of value.party || []) {
+    if (!hasExactKeys(member, ['nickname', 'species_id', 'level', 'hp', 'max_hp'])) {
+      return false;
+    }
+    if (
+      !boundedText(member.nickname, 24) ||
+      !(member.species_id === null || boundedInteger(member.species_id, 1, 255)) ||
+      !(member.level === null || boundedInteger(member.level, 1, 100)) ||
+      !(member.hp === null || boundedInteger(member.hp, 0, 65535)) ||
+      !(member.max_hp === null || boundedInteger(member.max_hp, 1, 65535)) ||
+      (
+        member.hp !== null &&
+        member.max_hp !== null &&
+        member.hp > member.max_hp
+      )
+    ) return false;
+  }
+  if (!hasExactKeys(value.player, ['mode', 'paused'])) return false;
+  if (
+    !['ai', 'manual', 'paused', 'unknown'].includes(value.player.mode) ||
+    typeof value.player.paused !== 'boolean'
+  ) return false;
+  if (value.play_time !== null) {
+    if (!hasExactKeys(
+      value.play_time,
+      ['hours', 'minutes', 'seconds', 'frames', 'maxed']
+    )) return false;
+    if (
+      !boundedInteger(value.play_time.hours, 0, 255) ||
+      !boundedInteger(value.play_time.minutes, 0, 59) ||
+      !boundedInteger(value.play_time.seconds, 0, 59) ||
+      !boundedInteger(value.play_time.frames, 0, 59) ||
+      typeof value.play_time.maxed !== 'boolean'
+    ) return false;
+  }
+  if (
+    !(value.session_elapsed_seconds === null ||
+      boundedInteger(value.session_elapsed_seconds, 0, 316224000))
+  ) return false;
+  if (value.checkpoint !== null) {
+    if (!hasExactKeys(
+      value.checkpoint,
+      ['timestamp', 'kind', 'location', 'age_seconds']
+    )) return false;
+    if (
+      typeof value.checkpoint.timestamp !== 'string' ||
+      value.checkpoint.timestamp.length > 48 ||
+      !Number.isFinite(Date.parse(value.checkpoint.timestamp)) ||
+      ![
+        'manual', 'milestone', 'automatic', 'shutdown',
+        'recovery', 'progress', 'other'
+      ].includes(value.checkpoint.kind) ||
+      !boundedText(value.checkpoint.location, 80) ||
+      !(value.checkpoint.age_seconds === null ||
+        boundedInteger(value.checkpoint.age_seconds, 0, 316224000))
+    ) return false;
+  }
+  return (
+    hasExactKeys(value.viewers, ['count', 'capacity']) &&
+    boundedInteger(value.viewers.count, 0, 8) &&
+    boundedInteger(value.viewers.capacity, 0, 8) &&
+    value.viewers.count <= value.viewers.capacity
+  );
+}
+
+async function refreshDashboard() {
+  if (dashboardCache.inFlight) return;
+  dashboardCache.inFlight = true;
+  try {
+    const response = await fetch('/api/dashboard?t=' + Date.now());
+    if (!response.ok) throw new Error(`dashboard failed: ${response.status}`);
+    const snapshot = await response.json();
+    if (!validDashboardSnapshot(snapshot)) {
+      throw new Error('dashboard schema mismatch');
+    }
+    const serialized = JSON.stringify(snapshot);
+    const maximum = Math.min(4096, Math.max(
+      512,
+      Number(broadcast.config && broadcast.config.max_telemetry_bytes) || 4096
+    ));
+    if (new TextEncoder().encode(serialized).byteLength > maximum) {
+      throw new Error('dashboard snapshot too large');
+    }
+    dashboardCache.snapshot = snapshot;
+    dashboardCache.serialized = serialized;
+    dashboardCache.available = true;
+    dashboardCache.lastSuccessAt = monotonicNow();
+    fanoutTelemetry();
+  } catch (_error) {
+    dashboardCache.available = false;
+    // Dashboard details may become stale; video and gameplay continue.
+  } finally {
+    dashboardCache.inFlight = false;
+  }
+}
+
+function viewerDashboardSnapshot() {
+  if (!dashboardCache.snapshot || !broadcast.config) return null;
+  const snapshot = JSON.parse(dashboardCache.serialized);
+  snapshot.viewers = {
+    count: broadcast.viewers.size,
+    capacity: broadcast.config.max_viewers
+  };
+  return snapshot;
+}
+
+function connectionIsBackpressured(connection) {
+  const maximum = Math.min(4096, Math.max(
+    512,
+    Number(broadcast.config && broadcast.config.max_telemetry_bytes) || 4096
+  ));
+  const peerBuffer = Number(connection && connection.bufferSize) || 0;
+  const rtcBuffer = Number(
+    connection &&
+    connection.dataChannel &&
+    connection.dataChannel.bufferedAmount
+  ) || 0;
+  return Math.max(peerBuffer, rtcBuffer) > maximum * 2;
+}
+
+function sendTelemetryToViewer(peerId, force = false) {
+  const entry = broadcast.viewers.get(peerId);
+  if (!entry || !entry.connection || !entry.connection.open) return;
+  const now = monotonicNow();
+  const heartbeatSeconds = Math.max(
+    4,
+    Number(broadcast.config.telemetry_heartbeat_seconds) || 5
+  );
+  const staleSeconds = Math.min(
+    30,
+    Math.max(8, Number(broadcast.config.telemetry_stale_seconds) || 12)
+  );
+  if (
+    !dashboardCache.available ||
+    dashboardCache.lastSuccessAt === null ||
+    now - dashboardCache.lastSuccessAt > staleSeconds * 1000
+  ) return;
+  const snapshot = viewerDashboardSnapshot();
+  if (!snapshot) return;
+  const serialized = JSON.stringify(snapshot);
+  const changed = serialized !== entry.telemetryHash;
+  const changeSeconds = Math.max(
+    1,
+    Number(broadcast.config.telemetry_change_seconds) || 1
+  );
+  const elapsed = now - entry.telemetrySentAt;
+  if (!force && changed && elapsed < changeSeconds * 1000) {
+    entry.telemetryPending = true;
+    return;
+  }
+  if (!force && !changed && elapsed < heartbeatSeconds * 1000) return;
+  if (connectionIsBackpressured(entry.connection)) {
+    entry.telemetryPending = true;
+    return;
+  }
+  if (broadcast.telemetrySequence >= Number.MAX_SAFE_INTEGER) return;
+  const sequence = broadcast.telemetrySequence + 1;
+  const message = {
+    v: broadcast.config.protocol_version,
+    type: 'telemetry',
+    telemetry_version: broadcast.config.telemetry_version || 1,
+    sequence,
+    snapshot
+  };
+  let bytes;
+  try {
+    bytes = new TextEncoder().encode(JSON.stringify(message)).byteLength;
+  } catch (_error) {
+    return;
+  }
+  const maximum = Math.min(4096, Math.max(
+    512,
+    Number(broadcast.config.max_telemetry_bytes) || 4096
+  ));
+  if (bytes > maximum) return;
+  try {
+    entry.connection.send(message);
+  } catch (_error) {
+    closeViewer(peerId);
+    return;
+  }
+  broadcast.telemetrySequence = sequence;
+  entry.telemetryHash = serialized;
+  entry.telemetrySentAt = now;
+  entry.telemetryPending = false;
+}
+
+function fanoutTelemetry(force = false) {
+  for (const peerId of broadcast.viewers.keys()) {
+    sendTelemetryToViewer(peerId, force);
+  }
+}
 
 function createOwnerId() {
   if (globalThis.crypto && typeof globalThis.crypto.randomUUID === 'function') {
@@ -1658,16 +1971,352 @@ function streamElements() {
   };
 }
 
+const pipVideo = document.getElementById('pip-video');
+const pipButton = document.getElementById('pip-toggle');
+const pipStatus = document.getElementById('pip-status');
+let pipFailureMessage = '';
+let pipMetadataReady = false;
+
+function standardPiPSupported() {
+  return Boolean(
+    document.pictureInPictureEnabled &&
+    pipVideo &&
+    typeof pipVideo.requestPictureInPicture === 'function'
+  );
+}
+
+function safariPiPSupported() {
+  return Boolean(
+    pipVideo &&
+    typeof pipVideo.webkitSupportsPresentationMode === 'function' &&
+    pipVideo.webkitSupportsPresentationMode('picture-in-picture') &&
+    typeof pipVideo.webkitSetPresentationMode === 'function'
+  );
+}
+
+function pictureInPictureActive() {
+  return Boolean(
+    (standardPiPSupported() && document.pictureInPictureElement === pipVideo) ||
+    (
+      safariPiPSupported() &&
+      pipVideo.webkitPresentationMode === 'picture-in-picture'
+    )
+  );
+}
+
+function pictureInPictureStreamReady() {
+  const stream = broadcast.stream;
+  if (
+    !stream ||
+    pipVideo.srcObject !== stream ||
+    !pipMetadataReady ||
+    Number(pipVideo.readyState) < 1
+  ) {
+    return false;
+  }
+  const tracks = typeof stream.getVideoTracks === 'function'
+    ? stream.getVideoTracks()
+    : stream.getTracks().filter(track => track.kind === 'video');
+  return tracks.some(track => track.readyState === 'live');
+}
+
+function updatePictureInPicture() {
+  const supported = standardPiPSupported() || safariPiPSupported();
+  const active = pictureInPictureActive();
+  const available = pictureInPictureStreamReady();
+  pipButton.disabled = !supported || (!available && !active);
+  pipButton.textContent = active
+    ? 'Exit Picture in Picture'
+    : 'Picture in Picture';
+  if (!supported) {
+    pipStatus.textContent = 'Picture in Picture is not supported by this browser.';
+  } else if (active) {
+    pipStatus.textContent = 'Picture in Picture is active.';
+  } else if (pipFailureMessage && available) {
+    pipStatus.textContent = pipFailureMessage;
+  } else if (available) {
+    pipStatus.textContent = 'Picture in Picture is ready.';
+  } else {
+    pipStatus.textContent =
+      'Start the livestream to make Picture in Picture available.';
+  }
+}
+
+function attachPictureInPictureStream(stream) {
+  pipMetadataReady = false;
+  pipVideo.srcObject = stream;
+  for (const track of stream.getTracks()) {
+    track.addEventListener('ended', updatePictureInPicture);
+    track.addEventListener('mute', updatePictureInPicture);
+    track.addEventListener('unmute', updatePictureInPicture);
+  }
+  if (typeof pipVideo.play === 'function') {
+    try {
+      const playback = pipVideo.play();
+      if (playback && typeof playback.catch === 'function') {
+        playback.catch(() => {});
+      }
+    } catch (_error) {
+      // The button can retry playback through its user gesture.
+    }
+  }
+  updatePictureInPicture();
+}
+
+function cleanupPictureInPicture() {
+  if (
+    standardPiPSupported() &&
+    document.pictureInPictureElement === pipVideo &&
+    typeof document.exitPictureInPicture === 'function'
+  ) {
+    try {
+      const exit = document.exitPictureInPicture();
+      if (exit && typeof exit.catch === 'function') exit.catch(() => {});
+    } catch (_error) {
+      // Continue detaching the ended capture stream.
+    }
+  }
+  if (
+    safariPiPSupported() &&
+    pipVideo.webkitPresentationMode === 'picture-in-picture'
+  ) {
+    try {
+      pipVideo.webkitSetPresentationMode('inline');
+    } catch (_error) {
+      // Continue detaching the ended capture stream.
+    }
+  }
+  pipVideo.srcObject = null;
+  pipMetadataReady = false;
+  updatePictureInPicture();
+}
+
+function togglePictureInPicture() {
+  const active = pictureInPictureActive();
+  if (!active && !pictureInPictureStreamReady()) return;
+  if (!active && typeof pipVideo.play === 'function') {
+    try {
+      const playback = pipVideo.play();
+      if (playback && typeof playback.catch === 'function') {
+        playback.catch(() => {
+          if (!pictureInPictureActive()) {
+            pipFailureMessage =
+              'Picture in Picture could not start video playback. Try again.';
+            updatePictureInPicture();
+          }
+        });
+      }
+    } catch (_error) {
+      pipFailureMessage =
+        'Picture in Picture could not start video playback. Try again.';
+      updatePictureInPicture();
+      return;
+    }
+  }
+  if (standardPiPSupported()) {
+    try {
+      const request = active
+        ? document.exitPictureInPicture()
+        : pipVideo.requestPictureInPicture();
+      if (request && typeof request.then === 'function') {
+        request.then(() => {
+          if (!active) pipFailureMessage = '';
+          updatePictureInPicture();
+        }).catch(() => {
+          pipFailureMessage =
+            'Picture in Picture could not be opened. Try again.';
+          updatePictureInPicture();
+        });
+      } else {
+        if (!active) pipFailureMessage = '';
+        updatePictureInPicture();
+      }
+    } catch (_error) {
+      pipFailureMessage = 'Picture in Picture could not be opened. Try again.';
+      updatePictureInPicture();
+    }
+    return;
+  }
+  if (safariPiPSupported()) {
+    try {
+      pipVideo.webkitSetPresentationMode(
+        active ? 'inline' : 'picture-in-picture'
+      );
+      if (!active && pictureInPictureActive()) pipFailureMessage = '';
+      updatePictureInPicture();
+    } catch (_error) {
+      pipFailureMessage = 'Picture in Picture could not be opened. Try again.';
+      updatePictureInPicture();
+    }
+  }
+}
+
+pipButton.addEventListener('click', togglePictureInPicture);
+pipVideo.addEventListener('enterpictureinpicture', updatePictureInPicture);
+pipVideo.addEventListener('leavepictureinpicture', updatePictureInPicture);
+pipVideo.addEventListener('webkitpresentationmodechanged', updatePictureInPicture);
+for (const eventName of ['loadedmetadata', 'canplay', 'playing']) {
+  pipVideo.addEventListener(eventName, () => {
+    pipMetadataReady = true;
+    updatePictureInPicture();
+  });
+}
+pipVideo.addEventListener('emptied', () => {
+  pipMetadataReady = false;
+  updatePictureInPicture();
+});
+updatePictureInPicture();
+
 function noteBackendSuccess() {
   broadcast.backendFailures = 0;
+}
+
+function noteCoreControlSuccess(channel) {
+  if (channel === 'status') broadcast.coreStatusFailures = 0;
+  if (channel === 'lease') broadcast.coreLeaseFailures = 0;
+}
+
+function noteCoreControlFailure(channel, message) {
+  if (!broadcast.lease && !broadcast.peer && !broadcast.stream) return;
+  if (channel === 'status') broadcast.coreStatusFailures += 1;
+  if (channel === 'lease') broadcast.coreLeaseFailures += 1;
+  if (
+    broadcast.coreStatusFailures < 3 ||
+    broadcast.coreLeaseFailures < 3
+  ) return;
+  teardownBroadcast(
+    message + ' Broadcasting stopped to avoid a frozen stale stream.',
+    'error',
+    true,
+    true
+  );
 }
 
 function noteBackendFailure(message) {
   if (!broadcast.lease && !broadcast.peer && !broadcast.stream) return;
   broadcast.backendFailures += 1;
   if (broadcast.backendFailures >= 3) {
-    teardownBroadcast(message, 'error', false);
+    streamElements().message.textContent =
+      message + ' Video remains active; recovery is automatic when possible.';
   }
+}
+
+function clearLeaseRecovery() {
+  if (broadcast.leaseRecoveryTimer) clearTimeout(broadcast.leaseRecoveryTimer);
+  broadcast.leaseRecoveryTimer = null;
+}
+
+function cancelLeaseRecovery() {
+  clearLeaseRecovery();
+  broadcast.leaseRecoveryPending = false;
+  broadcast.leaseRecoveryAttempts = 0;
+  broadcast.leaseRecoveryDeadlineAt = null;
+}
+
+function beginLeaseRecovery(message, immediate = false) {
+  if (broadcast.pageEnding || broadcast.manuallyStopped) return;
+  const now = monotonicNow();
+  if (
+    broadcast.leaseRecoveryPending &&
+    broadcast.leaseRecoveryDeadlineAt !== null &&
+    broadcast.leaseRecoveryDeadlineAt <= now
+  ) {
+    cancelLeaseRecovery();
+    setStreamState(
+      'offline',
+      'Automatic lease recovery ended. Select Go Live to try again.',
+      false
+    );
+    return;
+  }
+  if (!broadcast.leaseRecoveryPending) {
+    const ttlSeconds = Math.max(
+      120,
+      Number(broadcast.config && broadcast.config.lease_ttl_seconds) || 120
+    );
+    broadcast.leaseRecoveryPending = true;
+    broadcast.leaseRecoveryAttempts = 0;
+    broadcast.leaseRecoveryDeadlineAt = now + (ttlSeconds + 15) * 1000;
+  }
+  if (message) streamElements().message.textContent = message;
+  scheduleLeaseRecovery(immediate);
+}
+
+function scheduleLeaseRecovery(immediate = false) {
+  if (
+    !broadcast.leaseRecoveryPending ||
+    broadcast.pageEnding ||
+    broadcast.manuallyStopped ||
+    document.hidden ||
+    broadcast.leaseRecoveryTimer ||
+    broadcast.leaseRecoveryInFlight ||
+    broadcast.peer ||
+    broadcast.starting
+  ) return;
+  const remaining = broadcast.leaseRecoveryDeadlineAt - monotonicNow();
+  if (remaining <= 0) {
+    cancelLeaseRecovery();
+    setStreamState(
+      'offline',
+      'Automatic lease recovery ended. Select Go Live to try again.',
+      false
+    );
+    return;
+  }
+  const delay = immediate
+    ? 0
+    : Math.min(
+      remaining,
+      15000,
+      1000 * (2 ** Math.min(broadcast.leaseRecoveryAttempts, 4))
+    );
+  broadcast.leaseRecoveryTimer = setTimeout(async () => {
+    broadcast.leaseRecoveryTimer = null;
+    if (
+      !broadcast.leaseRecoveryPending ||
+      broadcast.pageEnding ||
+      broadcast.manuallyStopped ||
+      document.hidden
+    ) return;
+    if (monotonicNow() >= broadcast.leaseRecoveryDeadlineAt) {
+      cancelLeaseRecovery();
+      setStreamState(
+        'offline',
+        'Automatic lease recovery ended. Select Go Live to try again.',
+        false
+      );
+      return;
+    }
+    broadcast.leaseRecoveryInFlight = true;
+    broadcast.leaseRecoveryAttempts += 1;
+    try {
+      await startBroadcast();
+      if (broadcast.lease && broadcast.peer) {
+        cancelLeaseRecovery();
+        streamElements().message.textContent =
+          'Livestream recovered after the browser lease was reacquired.';
+      }
+    } finally {
+      broadcast.leaseRecoveryInFlight = false;
+    }
+    if (broadcast.leaseRecoveryPending) {
+      scheduleLeaseRecovery();
+    }
+  }, delay);
+}
+
+function handleLeaseLoss() {
+  if (broadcast.pageEnding) return;
+  teardownBroadcast(
+    'Browser lease expired. Select Go Live, or return to this tab to recover.',
+    'offline',
+    false,
+    false
+  );
+  beginLeaseRecovery(
+    'Browser lease expired. Waiting to reacquire this stream window…',
+    true
+  );
 }
 
 async function leaseRequest(action, {keepalive = false} = {}) {
@@ -1718,9 +2367,18 @@ async function heartbeatLease() {
       throw new Error('generation-mismatch');
     }
     noteBackendSuccess();
-  } catch (_error) {
+    noteCoreControlSuccess('lease');
+  } catch (error) {
     if (broadcast.lease === expectedLease) {
-      teardownBroadcast('This stream window lost its browser lease.', 'offline', false);
+      if ([409, 410].includes(error.status)) {
+        handleLeaseLoss();
+      } else {
+        noteCoreControlFailure(
+          'lease',
+          'The local runtime and lease control channels are unavailable.'
+        );
+        noteBackendFailure('The local lease heartbeat is temporarily unavailable.');
+      }
     }
   } finally {
     broadcast.heartbeatInFlight = false;
@@ -1742,10 +2400,25 @@ async function acquireLease() {
     ) {
       throw new Error('Invalid lease response');
     }
+    if (
+      broadcast.pageEnding ||
+      broadcast.manuallyStopped ||
+      document.hidden
+    ) {
+      releaseGrantedLease(data);
+      if (document.hidden && !broadcast.pageEnding && !broadcast.manuallyStopped) {
+        beginLeaseRecovery(
+          'Livestream start paused while this stream window is hidden.'
+        );
+      }
+      return false;
+    }
     broadcast.lease = data.lease;
+    cancelLeaseRecovery();
     noteBackendSuccess();
+    noteCoreControlSuccess('lease');
     stopLeaseHeartbeat();
-    const heartbeatSeconds = Math.max(1, Number(data.heartbeat_seconds) || 4);
+    const heartbeatSeconds = Math.max(10, Number(data.heartbeat_seconds) || 15);
     broadcast.heartbeatTimer = setInterval(
       heartbeatLease,
       heartbeatSeconds * 1000
@@ -1757,11 +2430,31 @@ async function acquireLease() {
       activeOwner ? 'offline' : 'error',
       activeOwner
         ? 'Another stream window currently owns this runtime.'
-        : 'Could not acquire the browser stream lease.',
+        : 'Could not acquire the browser stream lease. Select Go Live to retry.',
       false
     );
+    if (activeOwner) {
+      beginLeaseRecovery(
+        'Another stream window owns this runtime. Waiting to take over safely…'
+      );
+    }
     return false;
   }
+}
+
+function releaseGrantedLease(data) {
+  const body = {
+    action: 'release',
+    owner: broadcast.owner,
+    generation: data.generation,
+    lease: data.lease
+  };
+  return fetch('/api/livestream/lease', {
+    method: 'POST',
+    headers: {'content-type': 'application/json'},
+    body: JSON.stringify(body),
+    keepalive: true
+  }).catch(() => {});
 }
 
 function releaseLease() {
@@ -1772,18 +2465,10 @@ function releaseLease() {
   const lease = broadcast.lease;
   stopLeaseHeartbeat();
   broadcast.lease = null;
-  const body = {
-    action: 'release',
-    owner: broadcast.owner,
+  return releaseGrantedLease({
     generation: broadcast.config.generation,
     lease
-  };
-  return fetch('/api/livestream/lease', {
-    method: 'POST',
-    headers: {'content-type': 'application/json'},
-    body: JSON.stringify(body),
-    keepalive: true
-  }).catch(() => {});
+  });
 }
 
 function publishStreamState(state) {
@@ -1810,7 +2495,7 @@ function publishStreamState(state) {
         broadcast.lease === snapshot.lease &&
         [401, 403, 409, 410].includes(response.status)
       ) {
-        teardownBroadcast('This stream window lost its browser lease.', 'offline', false);
+        handleLeaseLoss();
         return;
       }
       throw new Error(`state update failed: ${response.status}`);
@@ -1851,6 +2536,7 @@ function closeViewer(peerId) {
   const entry = broadcast.viewers.get(peerId);
   if (!entry) return;
   broadcast.viewers.delete(peerId);
+  if (entry.mediaTimer) clearTimeout(entry.mediaTimer);
   try {
     entry.call.close();
   } catch (_error) {
@@ -1863,6 +2549,7 @@ function closeViewer(peerId) {
   }
   streamElements().count.textContent = String(broadcast.viewers.size);
   publishStreamState(broadcast.state);
+  fanoutTelemetry();
 }
 
 function cleanupNegotiating(peerId, connection) {
@@ -1986,7 +2673,14 @@ function acceptDataConnection(connection) {
       rejectConnection(connection, 'media-failed');
       return;
     }
-    broadcast.viewers.set(peerId, {connection, call});
+    broadcast.viewers.set(peerId, {
+      connection,
+      call,
+      mediaTimer: null,
+      telemetryHash: '',
+      telemetrySentAt: -Infinity,
+      telemetryPending: false
+    });
     try {
       connection.send({v: broadcast.config.protocol_version, type: 'ready'});
     } catch (_error) {
@@ -1995,20 +2689,51 @@ function acceptDataConnection(connection) {
     }
     call.on('close', () => closeViewer(peerId));
     call.on('error', () => closeViewer(peerId));
+    const admitted = broadcast.viewers.get(peerId);
+    admitted.mediaTimer = setTimeout(() => {
+      const current = broadcast.viewers.get(peerId);
+      if (!current || current.call !== call) return;
+      current.mediaTimer = null;
+      if (!call.open) closeViewer(peerId);
+    }, 15000);
+    call.on('iceStateChanged', state => {
+      if (!['connected', 'completed'].includes(state)) return;
+      const current = broadcast.viewers.get(peerId);
+      if (!current || current.call !== call || !current.mediaTimer) return;
+      clearTimeout(current.mediaTimer);
+      current.mediaTimer = null;
+    });
     streamElements().count.textContent = String(broadcast.viewers.size);
     publishStreamState('live');
+    if (dashboardCache.snapshot) {
+      sendTelemetryToViewer(peerId, true);
+    }
+    const currentViewer = broadcast.viewers.get(peerId);
+    if (!currentViewer || !Number.isFinite(currentViewer.telemetrySentAt)) {
+      refreshDashboard().then(() => {
+        const current = broadcast.viewers.get(peerId);
+        if (current && !Number.isFinite(current.telemetrySentAt)) {
+          sendTelemetryToViewer(peerId, true);
+        }
+      });
+    }
   });
 }
 
 function teardownBroadcast(
   message = 'Livestream ended.',
   state = 'offline',
-  releaseToServer = true
+  releaseToServer = true,
+  manual = true
 ) {
-  broadcast.manuallyStopped = true;
+  broadcast.manuallyStopped = manual;
   broadcast.starting = false;
   if (broadcast.reconnectTimer) clearTimeout(broadcast.reconnectTimer);
   broadcast.reconnectTimer = null;
+  clearLeaseRecovery();
+  if (manual) {
+    cancelLeaseRecovery();
+  }
 
   const negotiating = [...broadcast.negotiating.values()];
   broadcast.negotiating.clear();
@@ -2023,6 +2748,7 @@ function teardownBroadcast(
   const viewers = [...broadcast.viewers.values()];
   broadcast.viewers.clear();
   for (const entry of viewers) {
+    if (entry.mediaTimer) clearTimeout(entry.mediaTimer);
     try {
       entry.call.close();
     } catch (_error) {
@@ -2045,6 +2771,7 @@ function teardownBroadcast(
   }
   const stream = broadcast.stream;
   broadcast.stream = null;
+  cleanupPictureInPicture();
   if (stream) {
     for (const track of stream.getTracks()) {
       try {
@@ -2061,12 +2788,71 @@ function teardownBroadcast(
     stopLeaseHeartbeat();
     broadcast.lease = null;
   }
+  broadcast.coreStatusFailures = 0;
+  broadcast.coreLeaseFailures = 0;
   setStreamState(state, message, false);
   return release;
 }
 
 function endBroadcast() {
   return teardownBroadcast('Livestream ended.', 'offline', true);
+}
+
+function peerErrorTarget(error) {
+  const direct = [
+    error && error.peer,
+    error && error.peerId,
+    error && error.remotePeer
+  ].find(value => typeof value === 'string');
+  if (direct) return direct;
+  const message = error && error.message;
+  if (typeof message !== 'string') return null;
+  for (const peerId of [
+    ...broadcast.viewers.keys(),
+    ...broadcast.negotiating.keys()
+  ]) {
+    if (message === `Could not connect to peer ${peerId}`) return peerId;
+  }
+  return null;
+}
+
+function closePeerErrorTarget(peerId) {
+  if (broadcast.viewers.has(peerId)) {
+    closeViewer(peerId);
+    return true;
+  }
+  const entry = broadcast.negotiating.get(peerId);
+  if (!entry) return false;
+  cleanupNegotiating(peerId, entry.connection);
+  rejectConnection(entry.connection, 'media-failed');
+  return true;
+}
+
+function handleHostPeerError(error, activePeer) {
+  if (broadcast.manuallyStopped || broadcast.peer !== activePeer) return;
+  const type = error && error.type;
+  if (['peer-unavailable', 'webrtc'].includes(type)) {
+    const target = peerErrorTarget(error);
+    if (target) closePeerErrorTarget(target);
+    return;
+  }
+  const hostFatal = new Set([
+    'browser-incompatible',
+    'invalid-id',
+    'invalid-key',
+    'network',
+    'ssl-unavailable',
+    'server-error',
+    'socket-error',
+    'socket-closed',
+    'unavailable-id'
+  ]);
+  if (!hostFatal.has(type)) return;
+  teardownBroadcast(
+    'Livestream connection failed. Select Retry.',
+    'error',
+    true
+  );
 }
 
 async function startBroadcast() {
@@ -2098,10 +2884,26 @@ async function startBroadcast() {
   setStreamState('connecting', 'Acquiring the browser stream lease…', false);
   if (!await acquireLease()) {
     broadcast.starting = false;
+    if (broadcast.leaseRecoveryPending) scheduleLeaseRecovery();
+    return;
+  }
+  if (
+    broadcast.pageEnding ||
+    broadcast.manuallyStopped ||
+    document.hidden
+  ) {
+    broadcast.starting = false;
+    await releaseLease();
+    if (document.hidden && !broadcast.pageEnding && !broadcast.manuallyStopped) {
+      beginLeaseRecovery(
+        'Livestream start paused while this stream window is hidden.'
+      );
+    }
     return;
   }
   try {
     broadcast.stream = game.captureStream(broadcast.config.frame_rate);
+    attachPictureInPictureStream(broadcast.stream);
     for (const track of broadcast.stream.getTracks()) {
       track.addEventListener('ended', () => {
         if (broadcast.stream) {
@@ -2154,15 +2956,7 @@ async function startBroadcast() {
       }
     }, 1000);
   });
-  activePeer.on('error', () => {
-    if (!broadcast.manuallyStopped && broadcast.peer === activePeer) {
-      teardownBroadcast(
-        'Livestream connection failed. Select Retry.',
-        'error',
-        true
-      );
-    }
-  });
+  activePeer.on('error', error => handleHostPeerError(error, activePeer));
   activePeer.on('close', () => {
     if (broadcast.peer !== activePeer) return;
     if (!broadcast.manuallyStopped) {
@@ -2229,8 +3023,11 @@ async function configureLivestream() {
 
 setInterval(refreshFrame, 100);
 setInterval(refreshStatus, 500);
+setInterval(refreshDashboard, 1000);
+setInterval(fanoutTelemetry, 250);
 refreshFrame();
 refreshStatus();
+refreshDashboard();
 configureLivestream();
 
 function handlePageExit() {
@@ -2242,9 +3039,19 @@ function handlePageExit() {
 window.addEventListener('pagehide', handlePageExit);
 window.addEventListener('beforeunload', handlePageExit);
 document.addEventListener('visibilitychange', () => {
-  if (document.hidden && broadcast.state === 'live') {
-    streamElements().message.textContent =
-      'Keep this stream window visible; background timers may be throttled.';
+  if (document.hidden) {
+    clearLeaseRecovery();
+    if (broadcast.state === 'live') {
+      streamElements().message.textContent =
+        'Live in the background. Picture in Picture can keep the game visible.';
+    }
+    return;
+  }
+  if (!document.hidden && broadcast.leaseRecoveryPending) {
+    scheduleLeaseRecovery(true);
+  } else if (!document.hidden && broadcast.lease) {
+    heartbeatLease();
+    publishStreamState(broadcast.state);
   }
 });
 """
@@ -2261,30 +3068,88 @@ SPECTATOR_HTML = """<!doctype html>
 <link rel="stylesheet" href="./spectator.css">
 </head>
 <body>
-<header>
+<header class="topbar">
   <div class="brand">RAPPTER <span>LIVE</span></div>
-  <div id="connection" class="connection" role="status" aria-live="polite" aria-atomic="true">CONNECTING</div>
+  <div id="connection" class="connection">CONNECTING</div>
 </header>
-<main>
-  <section class="stage">
-    <video id="stream" autoplay muted playsinline aria-label="Copilot Plays Pokemon Red livestream"></video>
-    <div id="overlay">
-      <div class="overlay-status" role="status" aria-live="polite" aria-atomic="true">
-        <div id="spinner" class="spinner"></div>
-        <strong id="headline">Joining livestream…</strong>
-        <p id="detail">Peer-to-peer video will appear here.</p>
+<main class="dashboard">
+  <section class="player-column" aria-labelledby="stream-title">
+    <div class="stage">
+      <video id="stream" autoplay muted playsinline aria-label="Copilot Plays Pokemon Red livestream"></video>
+      <div id="overlay">
+        <div class="overlay-status">
+          <div id="spinner" class="spinner"></div>
+          <strong id="headline">Joining livestream…</strong>
+          <p id="detail">Peer-to-peer video will appear here.</p>
+        </div>
+        <button id="play-stream" type="button" hidden>Play Stream</button>
+        <button id="retry-stream" type="button" hidden>Retry</button>
       </div>
-      <button id="play-stream" type="button" hidden>Play Stream</button>
-      <button id="retry-stream" type="button" hidden>Retry</button>
     </div>
+    <section class="stream-summary">
+      <div>
+        <h1 id="stream-title">Copilot Plays Pokemon Red</h1>
+        <p>Live browser stream with run details. Video has no audio.</p>
+      </div>
+      <span class="pill">P2P</span>
+    </section>
   </section>
-  <section class="about">
-    <div>
-      <h1>Copilot Plays Pokemon Red</h1>
-      <p>Live, video-only browser stream from the host.</p>
-    </div>
-    <span class="pill">P2P</span>
-  </section>
+  <aside class="side-rail" aria-label="Live run details">
+    <p id="details-banner" class="details-banner delayed">Waiting for live run details…</p>
+    <section class="panel" aria-labelledby="now-playing-heading">
+      <h2 id="now-playing-heading">Now Playing</h2>
+      <dl class="facts">
+        <div><dt>Location</dt><dd id="location">Unknown</dd></div>
+        <div><dt>Objective</dt><dd id="objective">Unknown</dd></div>
+        <div><dt>Player</dt><dd id="player-mode">Unknown</dd></div>
+      </dl>
+    </section>
+    <section class="panel" aria-labelledby="progress-heading">
+      <div class="panel-heading">
+        <h2 id="progress-heading">Run Progress</h2>
+        <strong id="badge-count">— / 8 badges</strong>
+      </div>
+      <ul id="badge-list" class="badge-list" aria-label="Pokemon League badges">
+        <li data-badge="Boulder">Boulder</li>
+        <li data-badge="Cascade">Cascade</li>
+        <li data-badge="Thunder">Thunder</li>
+        <li data-badge="Rainbow">Rainbow</li>
+        <li data-badge="Soul">Soul</li>
+        <li data-badge="Marsh">Marsh</li>
+        <li data-badge="Volcano">Volcano</li>
+        <li data-badge="Earth">Earth</li>
+      </ul>
+      <dl class="progress-grid">
+        <div><dt>Caught / owned</dt><dd><span id="caught-count">—</span> / 151</dd></div>
+        <div><dt>Seen</dt><dd><span id="seen-count">—</span> / 151</dd></div>
+        <div><dt>Hall of Fame</dt><dd id="completion">Unknown</dd></div>
+      </dl>
+    </section>
+    <section class="panel" aria-labelledby="party-heading">
+      <h2 id="party-heading">Current Party</h2>
+      <ol id="party-list" class="party-list">
+        <li class="empty">Party unavailable.</li>
+      </ol>
+    </section>
+    <section class="panel" aria-labelledby="details-heading">
+      <h2 id="details-heading">Run Details</h2>
+      <dl class="facts compact">
+        <div><dt>Pokemon time</dt><dd id="play-time">Unknown</dd></div>
+        <div><dt>Session time</dt><dd id="session-time">Unknown</dd></div>
+        <div><dt>Last checkpoint/save</dt><dd id="checkpoint">Unknown</dd></div>
+      </dl>
+    </section>
+    <section class="panel" aria-labelledby="health-heading">
+      <h2 id="health-heading">Stream Health</h2>
+      <dl class="facts compact">
+        <div><dt>Video</dt><dd id="video-health">Connecting</dd></div>
+        <div><dt>Run details</dt><dd id="details-health">Waiting</dd></div>
+        <div><dt>Viewers</dt><dd id="viewers">— / —</dd></div>
+      </dl>
+    </section>
+  </aside>
+  <p id="video-announcer" class="sr-only" aria-live="polite" aria-atomic="true"></p>
+  <p id="details-announcer" class="sr-only" aria-live="polite" aria-atomic="true"></p>
 </main>
 <footer>
   The join link is a bearer capability. Do not share it unintentionally.
@@ -2298,36 +3163,143 @@ SPECTATOR_HTML = """<!doctype html>
 
 
 SPECTATOR_CSS = """
-:root { color-scheme: dark; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
+:root {
+  color-scheme: dark;
+  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  --page: #0e0e10;
+  --surface: #18181b;
+  --raised: #202024;
+  --border: #34343b;
+  --muted: #adadb8;
+  --text: #efeff1;
+  --accent: #9147ff;
+  --live: #eb3349;
+  --good: #36b37e;
+  --warn: #e6a23c;
+}
 * { box-sizing: border-box; }
-body { margin: 0; min-height: 100vh; background: #0e0e10; color: #efeff1; }
-header { height: 56px; display: flex; align-items: center; justify-content: space-between; padding: 0 20px; background: #18181b; border-bottom: 1px solid #2f2f35; }
+html { min-width: 320px; background: var(--page); }
+body { margin: 0; min-width: 320px; min-height: 100vh; background: var(--page); color: var(--text); overflow-x: hidden; }
+.topbar {
+  position: sticky;
+  z-index: 5;
+  top: 0;
+  min-height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 20px;
+  background: rgba(24, 24, 27, .96);
+  border-bottom: 1px solid var(--border);
+}
 .brand { font-weight: 900; letter-spacing: .08em; }
-.brand span { background: #e91936; border-radius: 4px; font-size: .72rem; margin-left: 6px; padding: 4px 6px; }
-.connection { color: #adadb8; font-size: .76rem; font-weight: 800; }
-.connection.live { color: #ff4f64; }
-main { max-width: 1100px; margin: 0 auto; }
-.stage { position: relative; display: grid; place-items: center; width: 100%; aspect-ratio: 16 / 9; max-height: calc(100vh - 170px); background: #000; overflow: hidden; }
+.brand span { background: var(--live); border-radius: 4px; font-size: .72rem; margin-left: 6px; padding: 4px 6px; }
+.connection { color: var(--muted); font-size: .76rem; font-weight: 800; }
+.connection.live { color: #ff6577; }
+.dashboard {
+  width: min(1440px, 100%);
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 360px);
+  align-items: start;
+}
+.player-column { min-width: 0; }
+.stage {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  aspect-ratio: 10 / 9;
+  background: #000;
+  overflow: hidden;
+}
 video { width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; background: #000; }
-#overlay { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; text-align: center; padding: 24px; background: radial-gradient(circle, #24242a 0, #0e0e10 70%); }
+#overlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  text-align: center;
+  padding: 24px;
+  background: radial-gradient(circle, #24242a 0, #0e0e10 72%);
+}
 #overlay.ready { display: none; }
-#overlay p { color: #adadb8; margin-bottom: 0; }
+#overlay p { max-width: 38rem; color: var(--muted); margin: 8px 0 0; }
 .overlay-status { display: grid; justify-items: center; }
-#overlay button { margin-top: 16px; border: 0; border-radius: 6px; padding: 10px 16px; background: #9147ff; color: white; font: inherit; font-weight: 800; cursor: pointer; }
-#overlay button:focus-visible { outline: 3px solid white; outline-offset: 3px; }
-.spinner { width: 38px; height: 38px; margin-bottom: 18px; border: 4px solid #41414a; border-top-color: #9147ff; border-radius: 50%; animation: spin 1s linear infinite; }
+#overlay button {
+  margin-top: 16px;
+  border: 0;
+  border-radius: 6px;
+  padding: 10px 16px;
+  background: var(--accent);
+  color: white;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+button:focus-visible, a:focus-visible { outline: 3px solid white; outline-offset: 3px; }
+.spinner { width: 38px; height: 38px; margin-bottom: 18px; border: 4px solid #41414a; border-top-color: var(--accent); border-radius: 50%; animation: spin 1s linear infinite; }
 .spinner.hidden { display: none; }
-.about { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 20px; }
-.about h1 { font-size: 1.2rem; margin: 0 0 5px; }
-.about p { color: #adadb8; margin: 0; }
-.pill { background: #2f2f35; border-radius: 999px; font-size: .75rem; font-weight: 800; padding: 7px 10px; }
-footer { color: #777782; font-size: .75rem; padding: 10px 20px 24px; text-align: center; }
-footer a { color: #adadb8; margin-left: 6px; }
+.stream-summary { min-width: 0; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 18px 20px 22px; border-bottom: 1px solid var(--border); }
+.stream-summary h1 { font-size: 1.25rem; margin: 0 0 5px; overflow-wrap: anywhere; }
+.stream-summary p { color: var(--muted); margin: 0; }
+.pill { flex: 0 0 auto; background: #2f2f35; border-radius: 999px; font-size: .75rem; font-weight: 800; padding: 7px 10px; }
+.side-rail { min-width: 0; display: grid; gap: 10px; padding: 12px; background: #111113; border-left: 1px solid var(--border); }
+.details-banner { margin: 0; border: 1px solid var(--border); border-radius: 7px; padding: 9px 11px; font-size: .78rem; font-weight: 700; }
+.details-banner.fresh { border-color: var(--good); color: #8fe0bd; }
+.details-banner.delayed { border-color: var(--warn); color: #ffd18a; }
+.panel { min-width: 0; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 13px; }
+.panel h2 { margin: 0 0 11px; font-size: .88rem; letter-spacing: .02em; }
+.panel-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.panel-heading strong { color: var(--muted); font-size: .72rem; white-space: nowrap; }
+.facts { display: grid; gap: 10px; margin: 0; }
+.facts div { min-width: 0; }
+.facts dt, .progress-grid dt { color: var(--muted); font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+.facts dd, .progress-grid dd { margin: 3px 0 0; overflow-wrap: anywhere; }
+.facts.compact div { display: grid; grid-template-columns: minmax(100px, .8fr) minmax(0, 1.2fr); align-items: baseline; gap: 8px; }
+.facts.compact dd { text-align: right; }
+.badge-list { list-style: none; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin: 0 0 12px; padding: 0; }
+.badge-list li { min-width: 0; border: 1px solid var(--border); border-radius: 999px; color: #777782; font-size: .62rem; overflow: hidden; padding: 5px 3px; text-align: center; text-overflow: ellipsis; white-space: nowrap; }
+.badge-list li.earned { border-color: #c99b2e; background: #4b3914; color: #ffe29a; font-weight: 800; }
+.progress-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 0; }
+.progress-grid div { min-width: 0; border-radius: 6px; background: var(--raised); padding: 8px; }
+.progress-grid dd { font-weight: 800; }
+.party-list { list-style: none; display: grid; gap: 7px; margin: 0; padding: 0; }
+.party-member { min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 10px; border-radius: 6px; background: var(--raised); padding: 8px 9px; }
+.party-name { min-width: 0; font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.party-level, .party-hp-text { color: var(--muted); font-size: .72rem; white-space: nowrap; }
+.party-hp { grid-column: 1; width: 100%; height: 8px; accent-color: var(--good); }
+.party-hp.low { accent-color: var(--live); }
+.party-hp-text { grid-column: 2; align-self: center; }
+.party-list .empty { color: var(--muted); font-size: .8rem; }
+footer { color: #777782; font-size: .75rem; padding: 12px 20px 24px; text-align: center; }
+footer a { color: var(--muted); margin-left: 6px; }
+.sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 @keyframes spin { to { transform: rotate(360deg); } }
-@media (max-width: 700px) {
-  header { padding: 0 12px; }
-  .stage { aspect-ratio: 10 / 9; max-height: none; }
-  .about { padding: 16px 14px; }
+@media (max-width: 900px) {
+  .dashboard { grid-template-columns: 1fr; }
+  .side-rail { border-top: 1px solid var(--border); border-left: 0; }
+}
+@media (max-width: 480px) {
+  .topbar { padding: 10px 12px; }
+  .dashboard { width: 100%; }
+  #overlay { padding: 18px; }
+  .stream-summary { align-items: flex-start; padding: 15px 12px 18px; }
+  .stream-summary h1 { font-size: 1.05rem; }
+  .stream-summary p { font-size: .82rem; }
+  .side-rail { padding: 8px; }
+  .panel { padding: 11px; }
+  .badge-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .facts.compact div { grid-template-columns: minmax(92px, .9fr) minmax(0, 1.1fr); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .spinner { animation: none; border-top-color: #41414a; }
+}
+@media (forced-colors: active) {
+  .brand span, .badge-list li.earned, #overlay button { border: 1px solid ButtonText; }
+  .details-banner, .panel, .badge-list li { forced-color-adjust: auto; }
 }
 """
 
@@ -2341,13 +3313,32 @@ const connectionLabel = document.getElementById('connection');
 const spinner = document.getElementById('spinner');
 const playButton = document.getElementById('play-stream');
 const retryButton = document.getElementById('retry-stream');
+const detailsBanner = document.getElementById('details-banner');
+const detailsHealth = document.getElementById('details-health');
+const videoHealth = document.getElementById('video-health');
+const videoAnnouncer = document.getElementById('video-announcer');
+const detailsAnnouncer = document.getElementById('details-announcer');
 const MAX_AUTOMATIC_RETRIES = 6;
+const MAX_TELEMETRY_BYTES = 4096;
+const TELEMETRY_STALE_MILLISECONDS = 12000;
+const VIDEO_STALL_MILLISECONDS = 8000;
 let peer = null;
 let dataConnection = null;
 let mediaConnection = null;
 let retryTimer = null;
 let retries = 0;
 let reconnectAllowed = true;
+let telemetrySequence = -1;
+let telemetryReceivedAt = null;
+let detailState = 'waiting';
+let staleDetailContext = '';
+let videoState = 'connecting';
+let lastVideoTime = null;
+let lastVideoProgressAt = null;
+
+function monotonicNow() {
+  return globalThis.performance.now();
+}
 
 function showState(
   state,
@@ -2355,6 +3346,8 @@ function showState(
   message,
   {showPlay = false, showRetry = false, loading = true} = {}
 ) {
+  const changed = videoState !== state;
+  videoState = state;
   connectionLabel.textContent = state.toUpperCase();
   connectionLabel.className = 'connection' + (state === 'live' ? ' live' : '');
   headline.textContent = title;
@@ -2362,8 +3355,21 @@ function showState(
   playButton.hidden = !showPlay;
   retryButton.hidden = !showRetry;
   spinner.classList.toggle('hidden', !loading);
+  videoHealth.textContent = (
+    state === 'live' ? 'Live' :
+    state === 'ready' ? 'Ready' :
+    state === 'reconnecting' ? 'Reconnecting' :
+    state === 'offline' ? 'Offline' :
+    state === 'error' ? 'Unavailable' : 'Connecting'
+  );
   if (state === 'live') overlay.classList.add('ready');
   else overlay.classList.remove('ready');
+  if (changed) {
+    const announcement = `${title}. ${message}`;
+    if (videoAnnouncer.textContent !== announcement) {
+      videoAnnouncer.textContent = announcement;
+    }
+  }
 }
 
 function parseCapability() {
@@ -2384,18 +3390,84 @@ function parseCapability() {
 
 const capability = parseCapability();
 
+function setDetailState(state, message) {
+  const changed = detailState !== state;
+  detailState = state;
+  detailsBanner.textContent = message;
+  if (changed && detailsAnnouncer.textContent !== message) {
+    detailsAnnouncer.textContent = message;
+  }
+  detailsBanner.className = 'details-banner ' + (
+    state === 'fresh' ? 'fresh' : 'delayed'
+  );
+  detailsHealth.textContent = (
+    state === 'fresh' ? 'Live' :
+    state === 'stale' ? 'Last known' : 'Waiting'
+  );
+}
+
+function clearDashboard() {
+  document.getElementById('location').textContent = 'Unknown';
+  document.getElementById('objective').textContent = 'Unknown';
+  document.getElementById('player-mode').textContent = 'Unknown';
+  document.getElementById('badge-count').textContent = '— / 8 badges';
+  for (const badge of document.querySelectorAll('[data-badge]')) {
+    badge.classList.remove('earned');
+    badge.textContent = badge.dataset.badge;
+  }
+  document.getElementById('caught-count').textContent = '—';
+  document.getElementById('seen-count').textContent = '—';
+  document.getElementById('completion').textContent = 'Unknown';
+  renderParty(null);
+  document.getElementById('play-time').textContent = 'Unknown';
+  document.getElementById('session-time').textContent = 'Unknown';
+  document.getElementById('checkpoint').textContent = 'Unknown';
+  document.getElementById('viewers').textContent = '— / —';
+}
+
+function resetTelemetry(message = 'Waiting for live run details…') {
+  telemetrySequence = -1;
+  telemetryReceivedAt = null;
+  staleDetailContext = '';
+  clearDashboard();
+  setDetailState('waiting', message);
+}
+
+function markTelemetryStale(context) {
+  if (telemetryReceivedAt === null) {
+    resetTelemetry('Waiting for live run details…');
+    return;
+  }
+  staleDetailContext = context;
+  const ageSeconds = Math.max(
+    0,
+    Math.floor((monotonicNow() - telemetryReceivedAt) / 1000)
+  );
+  setDetailState(
+    'stale',
+    `Last known run details — updated ${ageSeconds}s ago. ${context}`
+  );
+  detailsHealth.textContent = `Last known (${ageSeconds}s)`;
+}
+
 function cleanup() {
   if (retryTimer) {
     clearTimeout(retryTimer);
     retryTimer = null;
   }
-  if (mediaConnection) mediaConnection.close();
-  if (dataConnection) dataConnection.close();
-  if (peer) peer.destroy();
+  const oldMediaConnection = mediaConnection;
+  const oldDataConnection = dataConnection;
+  const oldPeer = peer;
   mediaConnection = null;
   dataConnection = null;
   peer = null;
+  if (oldMediaConnection) oldMediaConnection.close();
+  if (oldDataConnection) oldDataConnection.close();
+  if (oldPeer) oldPeer.destroy();
   video.srcObject = null;
+  lastVideoTime = null;
+  lastVideoProgressAt = null;
+  resetTelemetry();
 }
 
 function scheduleRetry(message) {
@@ -2428,9 +3500,11 @@ async function attemptPlayback() {
   try {
     await video.play();
     retries = 0;
-    showState('live', 'Live', 'Receiving direct peer-to-peer video.', {
-      loading: false
-    });
+    if (video.readyState >= 2 && video.paused !== true) {
+      markVideoPlaying();
+    } else {
+      showState('connecting', 'Video received', 'Waiting for playback…');
+    }
   } catch (_error) {
     showState(
       'ready',
@@ -2440,6 +3514,366 @@ async function attemptPlayback() {
     );
     playButton.focus();
   }
+}
+
+function markVideoPlaying() {
+  lastVideoTime = Number(video.currentTime) || 0;
+  lastVideoProgressAt = monotonicNow();
+  retries = 0;
+  showState('live', 'Live', 'Receiving direct peer-to-peer video.', {
+    loading: false
+  });
+}
+
+function markVideoInterrupted(title, message, health = 'Buffering') {
+  if (!video.srcObject) return;
+  showState('reconnecting', title, message, {loading: false});
+  videoHealth.textContent = health;
+}
+
+function updateVideoHealth() {
+  if (!video.srcObject) return;
+  const currentTime = Number(video.currentTime);
+  if (
+    Number.isFinite(currentTime) &&
+    (lastVideoTime === null || currentTime > lastVideoTime + 0.01)
+  ) {
+    lastVideoTime = currentTime;
+    lastVideoProgressAt = monotonicNow();
+    return;
+  }
+  if (
+    videoState === 'live' &&
+    lastVideoProgressAt !== null &&
+    monotonicNow() - lastVideoProgressAt > VIDEO_STALL_MILLISECONDS
+  ) {
+    markVideoInterrupted(
+      'Video stalled',
+      'The video stopped advancing; waiting for fresh frames.',
+      'Stalled'
+    );
+  }
+}
+
+video.addEventListener('playing', markVideoPlaying);
+video.addEventListener('waiting', () => {
+  markVideoInterrupted('Video buffering', 'Waiting for more video frames.');
+});
+video.addEventListener('stalled', () => {
+  markVideoInterrupted(
+    'Video stalled',
+    'The browser is not receiving fresh video frames.',
+    'Stalled'
+  );
+});
+video.addEventListener('pause', () => {
+  if (!video.srcObject) return;
+  showState(
+    'ready',
+    'Video paused',
+    'Select Play Stream to resume playback.',
+    {showPlay: true, loading: false}
+  );
+  videoHealth.textContent = 'Paused';
+});
+video.addEventListener('error', () => {
+  if (video.srcObject) scheduleRetry('Video playback failed. Retrying…');
+});
+
+function hasExactKeys(value, keys) {
+  return (
+    value &&
+    typeof value === 'object' &&
+    !Array.isArray(value) &&
+    Object.keys(value).sort().join(',') === [...keys].sort().join(',')
+  );
+}
+
+function boundedInteger(value, minimum, maximum) {
+  return Number.isInteger(value) && value >= minimum && value <= maximum;
+}
+
+function boundedText(value, maximum) {
+  return value === null || (
+    typeof value === 'string' && Array.from(value).length <= maximum
+  );
+}
+
+function validSnapshot(value) {
+  if (!hasExactKeys(value, [
+    'location', 'objective', 'phase', 'badges', 'pokedex', 'party',
+    'completed', 'player', 'play_time', 'session_elapsed_seconds',
+    'checkpoint', 'viewers'
+  ])) return false;
+  if (
+    !boundedText(value.location, 80) ||
+    !boundedText(value.objective, 160) ||
+    !boundedText(value.phase, 40) ||
+    typeof value.completed !== 'boolean'
+  ) return false;
+  const badgeNames = [
+    'Boulder', 'Cascade', 'Thunder', 'Rainbow',
+    'Soul', 'Marsh', 'Volcano', 'Earth'
+  ];
+  if (
+    !hasExactKeys(value.badges, ['earned', 'count', 'total']) ||
+    !Array.isArray(value.badges.earned) ||
+    value.badges.earned.some(name => !badgeNames.includes(name)) ||
+    new Set(value.badges.earned).size !== value.badges.earned.length ||
+    !(
+      value.badges.count === null ||
+      value.badges.count === value.badges.earned.length
+    ) ||
+    (value.badges.count === null && value.badges.earned.length !== 0) ||
+    value.badges.total !== 8
+  ) return false;
+  if (
+    !hasExactKeys(value.pokedex, ['caught', 'seen', 'total']) ||
+    !(value.pokedex.caught === null ||
+      boundedInteger(value.pokedex.caught, 0, 151)) ||
+    !(value.pokedex.seen === null ||
+      boundedInteger(value.pokedex.seen, 0, 151)) ||
+    value.pokedex.total !== 151
+  ) return false;
+  if (!(value.party === null || (
+    Array.isArray(value.party) && value.party.length <= 6
+  ))) return false;
+  for (const member of value.party || []) {
+    if (!hasExactKeys(member, ['nickname', 'species_id', 'level', 'hp', 'max_hp'])) {
+      return false;
+    }
+    if (
+      !boundedText(member.nickname, 24) ||
+      !(member.species_id === null || boundedInteger(member.species_id, 1, 255)) ||
+      !(member.level === null || boundedInteger(member.level, 1, 100)) ||
+      !(member.hp === null || boundedInteger(member.hp, 0, 65535)) ||
+      !(member.max_hp === null || boundedInteger(member.max_hp, 1, 65535)) ||
+      (
+        member.hp !== null &&
+        member.max_hp !== null &&
+        member.hp > member.max_hp
+      )
+    ) return false;
+  }
+  if (
+    !hasExactKeys(value.player, ['mode', 'paused']) ||
+    !['ai', 'manual', 'paused', 'unknown'].includes(value.player.mode) ||
+    typeof value.player.paused !== 'boolean'
+  ) return false;
+  if (value.play_time !== null) {
+    if (!hasExactKeys(
+      value.play_time,
+      ['hours', 'minutes', 'seconds', 'frames', 'maxed']
+    )) return false;
+    if (
+      !boundedInteger(value.play_time.hours, 0, 255) ||
+      !boundedInteger(value.play_time.minutes, 0, 59) ||
+      !boundedInteger(value.play_time.seconds, 0, 59) ||
+      !boundedInteger(value.play_time.frames, 0, 59) ||
+      typeof value.play_time.maxed !== 'boolean'
+    ) return false;
+  }
+  if (
+    !(value.session_elapsed_seconds === null ||
+      boundedInteger(value.session_elapsed_seconds, 0, 316224000))
+  ) return false;
+  if (value.checkpoint !== null) {
+    if (!hasExactKeys(
+      value.checkpoint,
+      ['timestamp', 'kind', 'location', 'age_seconds']
+    )) return false;
+    if (
+      typeof value.checkpoint.timestamp !== 'string' ||
+      value.checkpoint.timestamp.length > 48 ||
+      !Number.isFinite(Date.parse(value.checkpoint.timestamp)) ||
+      ![
+        'manual', 'milestone', 'automatic', 'shutdown',
+        'recovery', 'progress', 'other'
+      ].includes(value.checkpoint.kind) ||
+      !boundedText(value.checkpoint.location, 80) ||
+      !(value.checkpoint.age_seconds === null ||
+        boundedInteger(value.checkpoint.age_seconds, 0, 316224000))
+    ) return false;
+  }
+  return (
+    hasExactKeys(value.viewers, ['count', 'capacity']) &&
+    boundedInteger(value.viewers.count, 0, 8) &&
+    boundedInteger(value.viewers.capacity, 0, 8) &&
+    value.viewers.count <= value.viewers.capacity
+  );
+}
+
+function validTelemetry(value) {
+  if (!hasExactKeys(
+    value,
+    ['v', 'type', 'telemetry_version', 'sequence', 'snapshot']
+  )) return false;
+  if (
+    value.v !== 1 ||
+    value.type !== 'telemetry' ||
+    value.telemetry_version !== 1 ||
+    !Number.isSafeInteger(value.sequence) ||
+    value.sequence < 0
+  ) return false;
+  let bytes;
+  try {
+    bytes = new TextEncoder().encode(JSON.stringify(value)).byteLength;
+  } catch (_error) {
+    return false;
+  }
+  return bytes <= MAX_TELEMETRY_BYTES && validSnapshot(value.snapshot);
+}
+
+function textOrUnknown(value) {
+  return typeof value === 'string' && value ? value : 'Unknown';
+}
+
+function formatElapsed(total) {
+  if (!boundedInteger(total, 0, 316224000)) return 'Unknown';
+  const days = Math.floor(total / 86400);
+  const hours = Math.floor((total % 86400) / 3600);
+  const minutes = Math.floor((total % 3600) / 60);
+  if (days) return `${days}d ${hours}h`;
+  if (hours) return `${hours}h ${minutes}m`;
+  return `${minutes}m`;
+}
+
+function formatAge(total) {
+  if (!boundedInteger(total, 0, 316224000)) return 'time unknown';
+  if (total < 60) return 'just now';
+  if (total < 3600) return `${Math.floor(total / 60)}m ago`;
+  if (total < 86400) return `${Math.floor(total / 3600)}h ago`;
+  return `${Math.floor(total / 86400)}d ago`;
+}
+
+function formatPlayTime(value) {
+  if (value === null) return 'Unknown';
+  const formatted = (
+    String(value.hours) + ':' +
+    String(value.minutes).padStart(2, '0') + ':' +
+    String(value.seconds).padStart(2, '0')
+  );
+  return value.maxed ? formatted + ' (maximum)' : formatted;
+}
+
+function renderParty(party) {
+  const list = document.getElementById('party-list');
+  list.replaceChildren();
+  if (party === null) {
+    const empty = document.createElement('li');
+    empty.className = 'empty';
+    empty.textContent = 'Party unavailable.';
+    list.appendChild(empty);
+    return;
+  }
+  if (!party.length) {
+    const empty = document.createElement('li');
+    empty.className = 'empty';
+    empty.textContent = 'No Pokemon in party.';
+    list.appendChild(empty);
+    return;
+  }
+  for (const member of party) {
+    const item = document.createElement('li');
+    item.className = 'party-member';
+    const name = document.createElement('span');
+    name.className = 'party-name';
+    name.textContent = (
+      member.nickname ||
+      (member.species_id === null ? 'Unknown Pokemon' : `Species #${member.species_id}`)
+    );
+    const level = document.createElement('span');
+    level.className = 'party-level';
+    level.textContent = member.level === null ? 'Lv. —' : `Lv. ${member.level}`;
+    const meter = document.createElement('progress');
+    meter.className = 'party-hp';
+    const hpKnown = member.hp !== null && member.max_hp !== null;
+    meter.max = hpKnown ? member.max_hp : 1;
+    meter.value = hpKnown ? member.hp : 0;
+    if (hpKnown && member.max_hp > 0 && member.hp / member.max_hp <= .25) {
+      meter.classList.add('low');
+    }
+    meter.setAttribute(
+      'aria-label',
+      hpKnown ? `${name.textContent} HP ${member.hp} of ${member.max_hp}` :
+        `${name.textContent} HP unknown`
+    );
+    const hp = document.createElement('span');
+    hp.className = 'party-hp-text';
+    hp.textContent = hpKnown ? `${member.hp} / ${member.max_hp} HP` : 'HP unknown';
+    item.appendChild(name);
+    item.appendChild(level);
+    item.appendChild(meter);
+    item.appendChild(hp);
+    list.appendChild(item);
+  }
+}
+
+function renderSnapshot(snapshot) {
+  document.getElementById('location').textContent = textOrUnknown(snapshot.location);
+  const objective = textOrUnknown(snapshot.objective);
+  document.getElementById('objective').textContent = snapshot.phase
+    ? `${objective} · ${snapshot.phase}`
+    : objective;
+  const modeLabels = {
+    ai: 'Copilot playing',
+    manual: 'Host takeover',
+    paused: 'Paused',
+    unknown: 'Unknown'
+  };
+  document.getElementById('player-mode').textContent = snapshot.player.paused
+    ? 'Paused'
+    : modeLabels[snapshot.player.mode];
+  const earned = new Set(snapshot.badges.earned);
+  for (const badge of document.querySelectorAll('[data-badge]')) {
+    const isEarned = earned.has(badge.dataset.badge);
+    badge.classList.toggle('earned', isEarned);
+    badge.textContent = badge.dataset.badge + (isEarned ? ' ✓' : '');
+  }
+  document.getElementById('badge-count').textContent =
+    `${snapshot.badges.count === null ? '—' : snapshot.badges.count} / 8 badges`;
+  document.getElementById('caught-count').textContent =
+    snapshot.pokedex.caught === null ? '—' : String(snapshot.pokedex.caught);
+  document.getElementById('seen-count').textContent =
+    snapshot.pokedex.seen === null ? '—' : String(snapshot.pokedex.seen);
+  document.getElementById('completion').textContent =
+    snapshot.completed ? 'Completed' : 'Not yet';
+  renderParty(snapshot.party);
+  document.getElementById('play-time').textContent =
+    formatPlayTime(snapshot.play_time);
+  document.getElementById('session-time').textContent =
+    formatElapsed(snapshot.session_elapsed_seconds);
+  if (snapshot.checkpoint === null) {
+    document.getElementById('checkpoint').textContent = 'None this session';
+  } else {
+    const kindLabels = {
+      manual: 'Manual',
+      milestone: 'Milestone',
+      automatic: 'Automatic',
+      shutdown: 'Shutdown save',
+      recovery: 'Recovered',
+      progress: 'Progress',
+      other: 'Checkpoint'
+    };
+    const parts = [
+      kindLabels[snapshot.checkpoint.kind],
+      snapshot.checkpoint.location,
+      formatAge(snapshot.checkpoint.age_seconds)
+    ].filter(Boolean);
+    document.getElementById('checkpoint').textContent = parts.join(' · ');
+  }
+  document.getElementById('viewers').textContent =
+    `${snapshot.viewers.count} / ${snapshot.viewers.capacity}`;
+}
+
+function acceptTelemetry(value) {
+  if (!validTelemetry(value) || value.sequence <= telemetrySequence) return false;
+  telemetrySequence = value.sequence;
+  telemetryReceivedAt = monotonicNow();
+  staleDetailContext = '';
+  renderSnapshot(value.snapshot);
+  setDetailState('fresh', 'Live run details are up to date.');
+  return true;
 }
 
 function retryNow() {
@@ -2492,8 +3926,9 @@ function connect() {
       showState('connecting', 'Host found', 'Waiting for authenticated video…');
     });
     dataConnection.on('data', value => {
-      if (!value || value.v !== capability.version || typeof value.type !== 'string') {
-        scheduleRetry('The host sent an invalid response. Retrying…');
+      if (!value || value.v !== capability.version || typeof value.type !== 'string') return;
+      if (value.type === 'telemetry') {
+        acceptTelemetry(value);
         return;
       }
       if (value.type === 'reject') {
@@ -2512,9 +3947,19 @@ function connect() {
       }
     });
     dataConnection.on('close', () => {
-      if (!video.srcObject) scheduleRetry('Host connection closed. Retrying…');
+      if (!video.srcObject) {
+        scheduleRetry('Host connection closed. Retrying…');
+      } else {
+        markTelemetryStale('Video is still live.');
+      }
     });
-    dataConnection.on('error', () => scheduleRetry('Host connection failed. Retrying…'));
+    dataConnection.on('error', () => {
+      if (!video.srcObject) {
+        scheduleRetry('Host connection failed. Retrying…');
+      } else {
+        markTelemetryStale('Video is still live.');
+      }
+    });
   });
   peer.on('connection', connection => connection.close());
   peer.on('call', call => {
@@ -2534,22 +3979,43 @@ function connect() {
     mediaConnection = call;
     call.answer();
     call.on('stream', stream => {
+      if (mediaConnection !== call) return;
       video.srcObject = stream;
+      lastVideoTime = null;
+      lastVideoProgressAt = monotonicNow();
       for (const track of stream.getTracks()) {
         track.addEventListener(
           'ended',
           () => scheduleRetry('The host ended the video. Retrying…'),
           {once: true}
         );
+        track.addEventListener('mute', () => {
+          markVideoInterrupted(
+            'Video interrupted',
+            'The host video track is temporarily muted.',
+            'Muted'
+          );
+        });
+        track.addEventListener('unmute', () => {
+          if (video.readyState >= 2 && video.paused !== true) {
+            markVideoPlaying();
+          } else {
+            showState('connecting', 'Video restored', 'Waiting for playback…');
+          }
+        });
       }
       showState('connecting', 'Video received', 'Starting playback…');
       attemptPlayback();
     });
     call.on('close', () => {
+      if (mediaConnection !== call) return;
+      mediaConnection = null;
       video.srcObject = null;
       scheduleRetry('The host ended or restarted the stream. Retrying…');
     });
     call.on('error', () => {
+      if (mediaConnection !== call) return;
+      mediaConnection = null;
       video.srcObject = null;
       scheduleRetry('Video connection failed. Retrying…');
     });
@@ -2557,6 +4023,18 @@ function connect() {
   peer.on('disconnected', () => scheduleRetry('Signaling disconnected. Retrying…'));
   peer.on('error', () => scheduleRetry('Peer connection failed. Retrying…'));
 }
+
+setInterval(() => {
+  if (
+    telemetryReceivedAt !== null &&
+    monotonicNow() - telemetryReceivedAt > TELEMETRY_STALE_MILLISECONDS
+  ) {
+    markTelemetryStale(
+      staleDetailContext || 'Video may still be live.'
+    );
+  }
+  updateVideoHealth();
+}, 1000);
 
 video.addEventListener('click', attemptPlayback);
 playButton.addEventListener('click', attemptPlayback);
@@ -3185,6 +4663,24 @@ def set_desired_running(runtime_dir: Path, running: bool) -> None:
     atomic_write_json(desired_path, desired)
 
 
+def wait_for_stopping_supervisor(
+    runtime_dir: Path,
+    timeout_seconds: float = 10,
+) -> bool:
+    """Wait briefly for a supervisor that has already accepted a stop."""
+    desired = read_json(runtime_dir / "desired.json")
+    supervisor = read_json(runtime_dir / "supervisor.json")
+    supervisor_pid = supervisor.get("pid")
+    if desired.get("running") is not False or not process_is_alive(supervisor_pid):
+        return True
+    deadline = time.monotonic() + max(0, timeout_seconds)
+    while process_is_alive(supervisor_pid):
+        if time.monotonic() >= deadline:
+            return False
+        time.sleep(0.1)
+    return True
+
+
 def seed_legacy_ram_provenance(runtime_dir: Path) -> None:
     legacy = runtime_dir / "pokemon-red.ram"
     provenance_path = runtime_dir / "legacy-ram-provenance.json"
@@ -3269,6 +4765,307 @@ def heartbeat_age_seconds(status: dict[str, Any]) -> Optional[float]:
         0.0,
         (datetime.now(timezone.utc) - updated.astimezone(timezone.utc)).total_seconds(),
     )
+
+
+_CHECKPOINT_KINDS = {
+    "manual",
+    "milestone",
+    "automatic",
+    "shutdown",
+    "recovery",
+    "progress",
+    "other",
+}
+_DASHBOARD_MAX_ELAPSED_SECONDS = 10 * 366 * 24 * 60 * 60
+
+
+def _dashboard_now(value: Optional[datetime]) -> datetime:
+    current = value or datetime.now(timezone.utc)
+    if current.tzinfo is None:
+        current = current.replace(tzinfo=timezone.utc)
+    return current.astimezone(timezone.utc)
+
+
+def _bounded_dashboard_text(value: Any, limit: int) -> Optional[str]:
+    if not isinstance(value, str):
+        return None
+    cleaned = " ".join(
+        "".join(
+            character if character.isprintable() else " "
+            for character in value[: limit * 8]
+        )
+        .strip()
+        .split()
+    )
+    return cleaned[:limit] or None
+
+
+def _bounded_dashboard_int(
+    value: Any,
+    minimum: int,
+    maximum: int,
+) -> Optional[int]:
+    if isinstance(value, bool) or not isinstance(value, int):
+        return None
+    return value if minimum <= value <= maximum else None
+
+
+def _dashboard_timestamp(value: Any) -> tuple[Optional[str], Optional[datetime]]:
+    if not isinstance(value, str) or not 1 <= len(value) <= 48:
+        return None, None
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None, None
+    if parsed.tzinfo is None or not 2000 <= parsed.year <= 2100:
+        return None, None
+    utc = parsed.astimezone(timezone.utc)
+    return utc.isoformat().replace("+00:00", "Z"), utc
+
+
+def checkpoint_kind(value: Any) -> str:
+    if isinstance(value, str) and value in _CHECKPOINT_KINDS:
+        return value
+    reason = value[:256].lower() if isinstance(value, str) else ""
+    if "manual" in reason:
+        return "manual"
+    if any(
+        marker in reason
+        for marker in ("badge", "hall of fame", "champion", "elite four")
+    ):
+        return "milestone"
+    if "automatic" in reason:
+        return "automatic"
+    if "recover" in reason or "interrupted" in reason:
+        return "recovery"
+    if "copilot checkpoint" in reason:
+        return "progress"
+    if any(
+        marker in reason
+        for marker in ("stopped", "shutdown", "window closed", "runtime stop")
+    ):
+        return "shutdown"
+    return "other"
+
+
+def sanitize_checkpoint_summary(
+    value: Any,
+    *,
+    now: Optional[datetime] = None,
+) -> Optional[dict[str, Any]]:
+    if not isinstance(value, dict):
+        return None
+    timestamp, parsed = _dashboard_timestamp(
+        value.get("timestamp") or value.get("created_at")
+    )
+    if timestamp is None or parsed is None:
+        return None
+    current = _dashboard_now(now)
+    age = (current - parsed).total_seconds()
+    age_seconds = (
+        int(max(0, age))
+        if -5 <= age <= _DASHBOARD_MAX_ELAPSED_SECONDS
+        else None
+    )
+    game_state = value.get("game_state")
+    manifest_location = (
+        game_state.get("location") if isinstance(game_state, dict) else None
+    )
+    return {
+        "timestamp": timestamp,
+        "kind": checkpoint_kind(value.get("kind") or value.get("reason")),
+        "location": _bounded_dashboard_text(
+            value.get("location") or manifest_location,
+            80,
+        ),
+        "age_seconds": age_seconds,
+    }
+
+
+def _dashboard_party(value: Any) -> Optional[list[dict[str, Any]]]:
+    if not isinstance(value, list):
+        return None
+    party: list[dict[str, Any]] = []
+    for raw in value[:6]:
+        if not isinstance(raw, dict):
+            continue
+        species_id = _bounded_dashboard_int(raw.get("species_id"), 1, 255)
+        level = _bounded_dashboard_int(raw.get("level"), 1, 100)
+        hp = _bounded_dashboard_int(raw.get("hp"), 0, 65535)
+        max_hp = _bounded_dashboard_int(raw.get("max_hp"), 1, 65535)
+        if hp is not None and max_hp is not None and hp > max_hp:
+            hp = None
+            max_hp = None
+        party.append(
+            {
+                "nickname": _bounded_dashboard_text(raw.get("nickname"), 24),
+                "species_id": species_id,
+                "level": level,
+                "hp": hp,
+                "max_hp": max_hp,
+            }
+        )
+    return party
+
+
+def _dashboard_play_time(value: Any) -> Optional[dict[str, Any]]:
+    if not isinstance(value, dict):
+        return None
+    hours = _bounded_dashboard_int(value.get("hours"), 0, 255)
+    minutes = _bounded_dashboard_int(value.get("minutes"), 0, 59)
+    seconds = _bounded_dashboard_int(value.get("seconds"), 0, 59)
+    frames = _bounded_dashboard_int(value.get("frames"), 0, 59)
+    maxed = value.get("maxed")
+    if (
+        hours is None
+        or minutes is None
+        or seconds is None
+        or frames is None
+        or not isinstance(maxed, bool)
+    ):
+        return None
+    return {
+        "hours": hours,
+        "minutes": minutes,
+        "seconds": seconds,
+        "frames": frames,
+        "maxed": maxed,
+    }
+
+
+def project_dashboard_snapshot(
+    status: dict[str, Any],
+    *,
+    now: Optional[datetime] = None,
+) -> dict[str, Any]:
+    """Project private runtime state into the exact public dashboard schema."""
+    current = _dashboard_now(now)
+    game_state = (
+        status.get("game_state")
+        if isinstance(status.get("game_state"), dict)
+        else {}
+    )
+
+    raw_badges = game_state.get("badges")
+    badge_set = (
+        {badge for badge in raw_badges[:64] if isinstance(badge, str)}
+        if isinstance(raw_badges, list)
+        else set()
+    )
+    earned_badges = [badge for badge in BADGE_NAMES if badge in badge_set]
+
+    raw_pokedex = game_state.get("pokedex")
+    pokedex = raw_pokedex if isinstance(raw_pokedex, dict) else {}
+    caught = _bounded_dashboard_int(pokedex.get("caught"), 0, 151)
+    seen = _bounded_dashboard_int(pokedex.get("seen"), 0, 151)
+    raw_started_at, started_at = _dashboard_timestamp(status.get("started_at"))
+    del raw_started_at
+    session_elapsed_seconds: Optional[int] = None
+    if started_at is not None:
+        elapsed = (current - started_at).total_seconds()
+        if -5 <= elapsed <= _DASHBOARD_MAX_ELAPSED_SECONDS:
+            session_elapsed_seconds = int(max(0, elapsed))
+
+    raw_livestream = status.get("livestream")
+    livestream = raw_livestream if isinstance(raw_livestream, dict) else {}
+    viewer_count = _bounded_dashboard_int(
+        livestream.get("viewer_count"),
+        0,
+        HARD_MAX_VIEWERS,
+    )
+    viewer_capacity = _bounded_dashboard_int(
+        livestream.get("max_viewers"),
+        0,
+        HARD_MAX_VIEWERS,
+    )
+    if viewer_capacity is None:
+        viewer_capacity = 0
+    if viewer_count is None or viewer_count > viewer_capacity:
+        viewer_count = 0
+
+    mode = status.get("control_mode")
+    if mode not in {"ai", "manual", "paused"}:
+        mode = "unknown"
+    paused = status.get("paused")
+    if not isinstance(paused, bool):
+        paused = mode == "paused"
+
+    badges_available = (
+        isinstance(raw_badges, list)
+        and game_state.get("badge_bits", 0) is not None
+    )
+    raw_party = game_state.get("party")
+    party_available = (
+        isinstance(raw_party, list)
+        and game_state.get("party_count", len(raw_party)) is not None
+    )
+
+    snapshot = {
+        "location": _bounded_dashboard_text(game_state.get("location"), 80),
+        "objective": _bounded_dashboard_text(status.get("objective"), 160),
+        "phase": _bounded_dashboard_text(status.get("phase"), 40),
+        "badges": {
+            "earned": earned_badges if badges_available else [],
+            "count": len(earned_badges) if badges_available else None,
+            "total": len(BADGE_NAMES),
+        },
+        "pokedex": {
+            "caught": caught,
+            "seen": seen,
+            "total": 151,
+        },
+        "party": _dashboard_party(raw_party) if party_available else None,
+        "completed": bool(
+            status.get("completed") is True
+            or game_state.get("hall_of_fame") is True
+        ),
+        "player": {
+            "mode": mode,
+            "paused": paused,
+        },
+        "play_time": _dashboard_play_time(game_state.get("play_time")),
+        "session_elapsed_seconds": session_elapsed_seconds,
+        "checkpoint": sanitize_checkpoint_summary(
+            status.get("last_checkpoint"),
+            now=current,
+        ),
+        "viewers": {
+            "count": viewer_count,
+            "capacity": viewer_capacity,
+        },
+    }
+    encoded = json.dumps(
+        snapshot,
+        ensure_ascii=False,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    if len(encoded) > MAX_TELEMETRY_BYTES:
+        raise RuntimeError("Dashboard snapshot exceeded its public size bound")
+    return snapshot
+
+
+def dashboard_snapshot(
+    runtime_dir: Path = DEFAULT_RUNTIME_DIR,
+    *,
+    now: Optional[datetime] = None,
+) -> dict[str, Any]:
+    current = _dashboard_now(now)
+    status = read_json(runtime_dir / "status.json", {"running": False})
+    raw_livestream = status.get("livestream")
+    if isinstance(raw_livestream, dict) and raw_livestream.get("enabled"):
+        livestream = dict(raw_livestream)
+        generation = livestream.get("generation")
+        livestream.update(
+            livestream_public_state(
+                runtime_dir,
+                expected_generation=(
+                    generation if isinstance(generation, str) else None
+                ),
+                now=current,
+            )
+        )
+        status["livestream"] = livestream
+    return project_dashboard_snapshot(status, now=current)
 
 
 def runtime_status(runtime_dir: Path = DEFAULT_RUNTIME_DIR) -> dict[str, Any]:
@@ -3617,6 +5414,24 @@ class PokemonAgent(BasicAgent):
                 {"status": "error", "message": f"Unknown Pokemon action: {action}"}
             )
 
+        stopping = (
+            read_json(runtime_dir / "desired.json").get("running") is False
+            and process_is_alive(
+                read_json(runtime_dir / "supervisor.json").get("pid")
+            )
+        )
+        if stopping and not wait_for_stopping_supervisor(runtime_dir):
+            return json.dumps(
+                {
+                    "status": "error",
+                    "message": (
+                        "Pokemon player is still stopping; start can be retried "
+                        "when shutdown completes"
+                    ),
+                    "retryable": True,
+                }
+            )
+
         existing = runtime_status(runtime_dir)
         if existing["running"]:
             return json.dumps(
@@ -3892,11 +5707,72 @@ class PokemonMemoryReader:
     def __init__(self, memory: Any):
         self.memory = memory
 
-    def _read(self, address: int, default: int = 0) -> int:
+    def _read_optional(self, address: int) -> Optional[int]:
         try:
-            return int(self.memory[address])
-        except (IndexError, TypeError, ValueError):
-            return default
+            raw = self.memory[address]
+            if isinstance(raw, bool):
+                return None
+            value = int(raw)
+            if raw != value or not 0 <= value <= 0xFF:
+                return None
+            return value
+        except (
+            IndexError,
+            KeyError,
+            TypeError,
+            ValueError,
+            OverflowError,
+            AttributeError,
+            RuntimeError,
+        ):
+            return None
+
+    def _read(self, address: int, default: int = 0) -> int:
+        value = self._read_optional(address)
+        return default if value is None else value
+
+    def _bitfield_count(self, start: int) -> Optional[int]:
+        values = [self._read_optional(start + offset) for offset in range(19)]
+        if any(value is None for value in values):
+            return None
+        bitfield = [int(value) for value in values if value is not None]
+        return sum(
+            1
+            for index in range(151)
+            if bitfield[index // 8] & (1 << (index % 8))
+        )
+
+    def pokedex_counts(self) -> dict[str, Optional[int]]:
+        return {
+            "caught": self._bitfield_count(0xD2F7),
+            "seen": self._bitfield_count(0xD30A),
+        }
+
+    def play_time(self) -> Optional[dict[str, Any]]:
+        values = [
+            self._read_optional(address)
+            for address in (0xDA41, 0xDA42, 0xDA43, 0xDA44, 0xDA45)
+        ]
+        if any(value is None for value in values):
+            return None
+        hours, max_flag, minutes, seconds, frames = values
+        if (
+            max_flag not in {0, 0xFF}
+            or minutes is None
+            or not 0 <= minutes <= 59
+            or seconds is None
+            or not 0 <= seconds <= 59
+            or frames is None
+            or not 0 <= frames <= 59
+        ):
+            return None
+        return {
+            "hours": hours,
+            "minutes": minutes,
+            "seconds": seconds,
+            "frames": frames,
+            "maxed": max_flag == 0xFF,
+        }
 
     def _text(self, start: int, length: int) -> str:
         output = []
@@ -3970,13 +5846,18 @@ class PokemonMemoryReader:
         return " | ".join(deduplicated[-8:])[:600]
 
     def snapshot(self) -> dict[str, Any]:
-        map_id = self._read(0xD35E)
-        badge_byte = self._read(0xD356)
-        party_count = min(self._read(0xD163), 6)
+        map_id = self._read_optional(0xD35E)
+        badge_byte = self._read_optional(0xD356)
+        raw_party_count = self._read_optional(0xD163)
+        party_count = (
+            raw_party_count
+            if raw_party_count is not None and 0 <= raw_party_count <= 6
+            else None
+        )
         party = []
         bases = (0xD16B, 0xD197, 0xD1C3, 0xD1EF, 0xD21B, 0xD247)
         nicknames = (0xD2B5, 0xD2C0, 0xD2CB, 0xD2D6, 0xD2E1, 0xD2EC)
-        for index in range(party_count):
+        for index in range(party_count or 0):
             base = bases[index]
             party.append(
                 {
@@ -3989,7 +5870,11 @@ class PokemonMemoryReader:
             )
         return {
             "map_id": map_id,
-            "location": MAP_NAMES.get(map_id, f"Map 0x{map_id:02X}"),
+            "location": (
+                MAP_NAMES.get(map_id, f"Map 0x{map_id:02X}")
+                if map_id is not None
+                else None
+            ),
             "coordinates": {
                 "x": self._read(0xD362),
                 "y": self._read(0xD361),
@@ -3997,13 +5882,20 @@ class PokemonMemoryReader:
             "player_name": self._text(0xD158, 11),
             "rival_name": self._text(0xD34A, 8),
             "badges": [
-                name for bit, name in enumerate(BADGE_NAMES) if badge_byte & (1 << bit)
+                name
+                for bit, name in enumerate(BADGE_NAMES)
+                if badge_byte is not None and badge_byte & (1 << bit)
             ],
             "badge_bits": badge_byte,
             "party_count": party_count,
             "party": party,
+            "pokedex": {
+                **self.pokedex_counts(),
+                "total": 151,
+            },
+            "play_time": self.play_time(),
             "screen_text": self._screen_text(),
-            "hall_of_fame": map_id == 0x76,
+            "hall_of_fame": map_id == 0x76 if map_id is not None else False,
         }
 
 
@@ -4885,6 +6777,24 @@ class ViewerServer:
             }
             self.livestream["peer_options"] = peer_options
             self.livestream.setdefault("generation", secrets.token_urlsafe(24))
+            self.livestream.setdefault("telemetry_version", TELEMETRY_VERSION)
+            self.livestream.setdefault("max_telemetry_bytes", MAX_TELEMETRY_BYTES)
+            self.livestream.setdefault(
+                "telemetry_change_seconds",
+                TELEMETRY_CHANGE_INTERVAL_SECONDS,
+            )
+            self.livestream.setdefault(
+                "telemetry_heartbeat_seconds",
+                TELEMETRY_HEARTBEAT_SECONDS,
+            )
+            self.livestream.setdefault(
+                "telemetry_stale_seconds",
+                TELEMETRY_STALE_SECONDS,
+            )
+            self.livestream.setdefault(
+                "lease_ttl_seconds",
+                LIVESTREAM_LEASE_TTL_SECONDS,
+            )
             self.livestream.setdefault(
                 "max_negotiating",
                 min(
@@ -5082,6 +6992,9 @@ class ViewerServer:
                     return
                 if parsed.path == "/api/status":
                     self._json(200, public_runtime_status(runtime_dir))
+                    return
+                if parsed.path == "/api/dashboard":
+                    self._json(200, dashboard_snapshot(runtime_dir))
                     return
                 if parsed.path == "/api/livestream":
                     self._json(200, livestream)
@@ -5516,6 +7429,12 @@ class PokemonRunner:
                     "generation": self.stream_generation,
                     "protocol_version": LIVESTREAM_PROTOCOL_VERSION,
                     "max_hello_bytes": MAX_WATCH_HELLO_BYTES,
+                    "telemetry_version": TELEMETRY_VERSION,
+                    "max_telemetry_bytes": MAX_TELEMETRY_BYTES,
+                    "telemetry_change_seconds": TELEMETRY_CHANGE_INTERVAL_SECONDS,
+                    "telemetry_heartbeat_seconds": TELEMETRY_HEARTBEAT_SECONDS,
+                    "telemetry_stale_seconds": TELEMETRY_STALE_SECONDS,
+                    "lease_ttl_seconds": LIVESTREAM_LEASE_TTL_SECONDS,
                     "max_viewers": self.max_viewers,
                     "max_negotiating": min(
                         HARD_MAX_NEGOTIATING,
@@ -5748,6 +7667,13 @@ class PokemonRunner:
                         "reason": pending.get(
                             "reason",
                             "recovered after interrupted checkpoint",
+                        ),
+                        "kind": checkpoint_kind(
+                            pending.get("kind")
+                            or pending.get(
+                                "reason",
+                                "recovered after interrupted checkpoint",
+                            )
                         ),
                         "rom_sha256": pending["rom_sha256"],
                         "sha256": file_sha256(state),
@@ -6016,6 +7942,7 @@ class PokemonRunner:
             self.brain_thread.join()
 
     def _load_latest_state(self) -> Optional[Path]:
+        self.status["last_checkpoint"] = None
         if not self.args.resume:
             return None
         state_errors: tuple[type[BaseException], ...] = (
@@ -6083,6 +8010,22 @@ class PokemonRunner:
                 self.pyboy.load_state(io.BytesIO(baseline_bytes))
                 continue
             self.player.release_and_flush(self.pyboy)
+            game_state = (
+                manifest.get("game_state")
+                if isinstance(manifest.get("game_state"), dict)
+                else {}
+            )
+            self.status["last_checkpoint"] = {
+                "path": str(state_path),
+                "reason": manifest.get("reason"),
+                "kind": checkpoint_kind(
+                    manifest.get("kind") or manifest.get("reason")
+                ),
+                "timestamp": manifest.get("created_at"),
+                "sha256": manifest.get("sha256"),
+                "location": game_state.get("location"),
+            }
+            self._restore_completed_state(game_state)
             return state_path
         return None
 
@@ -6103,6 +8046,7 @@ class PokemonRunner:
                 "state_name": state_path.name,
                 "created_at": created_at,
                 "reason": reason,
+                "kind": checkpoint_kind(reason),
                 "rom_sha256": self.status["rom_sha256"],
             },
         )
@@ -6126,6 +8070,7 @@ class PokemonRunner:
             "schema_version": 1,
             "created_at": created_at,
             "reason": reason,
+            "kind": checkpoint_kind(reason),
             "rom_sha256": self.status["rom_sha256"],
             "sha256": file_sha256(state_path),
             "bytes": state_path.stat().st_size,
@@ -6136,8 +8081,10 @@ class PokemonRunner:
         self.status["last_checkpoint"] = {
             "path": str(state_path),
             "reason": reason,
+            "kind": checkpoint_kind(reason),
             "timestamp": manifest["created_at"],
             "sha256": manifest["sha256"],
+            "location": game_state.get("location"),
         }
         return state_path
 
@@ -6686,6 +8633,14 @@ class PokemonRunner:
             self._rotate_clip("Pokemon Red completed: Hall of Fame")
             self._set_control_mode("paused")
 
+    def _restore_completed_state(self, game_state: dict[str, Any]) -> bool:
+        if game_state.get("hall_of_fame") is not True:
+            return False
+        self.status["completed"] = True
+        if getattr(self, "control_mode", None) != "paused":
+            self._set_control_mode("paused")
+        return True
+
     def _tick_emulator(self) -> bool:
         should_apply_input = self.control_mode != "paused" and not (
             self.control_mode == "ai" and self.decision_pending
@@ -6840,6 +8795,7 @@ class PokemonRunner:
         self.status["loaded_state"] = str(loaded_state) if loaded_state else None
         reader = PokemonMemoryReader(self.pyboy.memory)
         initial_state = reader.snapshot()
+        self._restore_completed_state(initial_state)
         self.last_badges = len(initial_state.get("badges", []))
         self.status["game_state"] = initial_state
         initial_image = self.pyboy.screen.image.copy()

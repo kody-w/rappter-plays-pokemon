@@ -44,35 +44,49 @@ URL fragments are processed by the spectator JavaScript and are not included
 in HTTP requests, so the private values do not reach the local asset server,
 GitHub Pages, or normal HTTP access logs.
 The host accepts one bounded, versioned data-channel hello, rejects extra or
-control-shaped fields, tracks every negotiating offer immediately, and enforces
-hard negotiating and viewer caps before initiating media. Spectators accept
-media only from the host ID in the fragment. Neither data channel direction
-maps to emulator controls.
+control-shaped fields, tracks every negotiating offer immediately, and
+enforces hard negotiating and viewer caps before initiating media. After
+admission the channel is host-to-spectator only; later spectator data closes
+that viewer and never maps to controls. Host messages carry independently
+versioned full dashboard snapshots built by a strict Python projector. The
+allowlist excludes paths, hashes, IDs, capabilities, logs, errors, screen text,
+model reasoning, raw actions, and arbitrary runtime dictionaries. Messages are
+sequence checked, at most 4096 UTF-8 bytes, rate limited, and rendered only
+through safe DOM text/properties. Spectators accept media only from the host ID
+in the fragment.
 
 PeerJS Cloud is used for signaling only. Video is sent browser-to-browser with
 WebRTC/DTLS-SRTP, but WebRTC peers may learn network metadata and IP candidates.
 Both constructors receive the same explicit ICE configuration containing only
 Google `stun:stun.l.google.com:19302`; there are no TURN URLs or relays. The
 STUN service observes metadata needed for candidate discovery. Direct
-connectivity can fail behind some NATs. The default mesh is video-only, has
-linear host upload cost, and is not suitable for untrusted or large audiences.
+connectivity can fail behind some NATs. Media contains video without emulator
+audio; allowlisted status uses the paired DataConnection. The mesh has linear
+host upload cost and is not suitable for untrusted or large audiences.
 
 Only one authenticated viewer tab may own a generation-scoped, server-issued
 broadcast lease. It heartbeats and signs state updates with its owner,
 generation, and lease token. Competing fresh owners and stale-generation
-updates are rejected. Reports expire to offline, and lifecycle termination,
-lease loss, repeated local backend failures, explicit Stop/End, page exit, or
-capture end destroys PeerJS, peer connections, and capture tracks. Browser
-background throttling can delay a heartbeat, so the dedicated host window must
-remain open and visible.
+updates are rejected. The 15-second heartbeat, 120-second lease, and bounded
+report freshness tolerate normal background timer throttling. An expired lease
+is reacquired with guarded retries when its configured host page becomes
+visible; an active competing owner remains authoritative. Explicit Stop/End,
+page exit, capture end, lifecycle termination, or an authoritative lease loss
+destroys PeerJS, peer connections, and capture tracks. Dashboard-only failures
+degrade details but do not stop video/gameplay. Repeated simultaneous loss of
+runtime status and lease heartbeat is a separate core-control failure that
+stops capture rather than broadcasting a frozen canvas. A closed page releases
+promptly; a crashed page can remain last-known only until the bounded stale
+interval.
 
 The checked-in `docs/watch/` GitHub Pages surface is static and read-only. It
 contains the same spectator HTML, CSS, JavaScript, pinned PeerJS 1.5.5 bundle,
 and notices as the local server, with no runtime APIs, controls, credentials,
 analytics, or service worker. PeerJS Cloud remains signaling-only; game video
-does not pass through GitHub Pages. The local LAN asset server still starts as
-a fallback/static source when an external join base is configured. Do not
-port-forward the authenticated control viewer.
+and dashboard data do not pass through GitHub Pages. The static JavaScript
+receives dashboard snapshots only from the authenticated host peer. The local
+LAN asset server still starts as a fallback/static source when an external join
+base is configured. Do not port-forward the authenticated control viewer.
 
 GitHub Pages does not let this repository configure the local server's custom
 HTTP response headers. The published spectator HTML therefore carries a strict

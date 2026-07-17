@@ -39,6 +39,7 @@ from openrappter.agents.pokemon_agent import (
     seed_legacy_ram_provenance,
     supervisor_main,
     terminate_isolated_process_group,
+    wait_for_stopping_supervisor,
     wait_for_supervised_child,
 )
 
@@ -1436,6 +1437,51 @@ def test_agent_can_stop_supervisor_between_child_retries(tmp_path):
 
     assert result["status"] == "success"
     assert json.loads((tmp_path / "desired.json").read_text())["running"] is False
+
+
+def test_start_reports_stopping_supervisor_as_retryable_not_running(
+    monkeypatch,
+    tmp_path,
+):
+    (tmp_path / "desired.json").write_text(json.dumps({"running": False}))
+    (tmp_path / "supervisor.json").write_text(
+        json.dumps({"running": True, "pid": 1234})
+    )
+    monkeypatch.setattr(pokemon_module, "process_is_alive", lambda _pid: True)
+    monkeypatch.setattr(
+        pokemon_module,
+        "wait_for_stopping_supervisor",
+        lambda _runtime_dir: False,
+    )
+
+    result = json.loads(
+        PokemonAgent().perform(action="start", runtime_dir=str(tmp_path))
+    )
+
+    assert result["status"] == "error"
+    assert result["retryable"] is True
+    assert "still stopping" in result["message"]
+    assert "already running" not in result["message"]
+
+
+def test_stopping_supervisor_wait_is_bounded_and_observes_exit(
+    monkeypatch,
+    tmp_path,
+):
+    (tmp_path / "desired.json").write_text(json.dumps({"running": False}))
+    (tmp_path / "supervisor.json").write_text(json.dumps({"pid": 1234}))
+    alive = iter([True, True, False])
+    sleeps: list[float] = []
+    monkeypatch.setattr(
+        pokemon_module,
+        "process_is_alive",
+        lambda _pid: next(alive),
+    )
+    monkeypatch.setattr(pokemon_module.time, "sleep", sleeps.append)
+    monkeypatch.setattr(pokemon_module.time, "monotonic", lambda: 0.0)
+
+    assert wait_for_stopping_supervisor(tmp_path, timeout_seconds=1) is True
+    assert sleeps == [0.1]
 
 
 def test_failed_child_termination_requests_restart(tmp_path):

@@ -95,7 +95,12 @@ first-party and vendored browser script to parse.
 
 Livestream changes require ROM-free tests for spectator route isolation,
 headers/CSP, capability redaction, bounded protocol admission, ephemeral port
-propagation, and clean server teardown. Tests must never connect to signaling.
+propagation, and clean server teardown. Dashboard changes must keep
+`/api/dashboard` as the sole strict public projector, enforce exact/versioned
+message keys and the 4096-byte bound, use inert DOM rendering, and cover
+sequence/cadence/staleness behavior with synthetic memory and fake browser
+clocks. PiP tests must cover standard and Safari presentation APIs without
+screen capture. Tests must never connect to signaling.
 
 ## Pull requests
 

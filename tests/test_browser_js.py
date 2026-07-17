@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 
 import pytest
-from openrappter.agents.pokemon_agent import VIEWER_JS
+from openrappter.agents.pokemon_agent import SPECTATOR_JS, VIEWER_JS
 
 ROOT = Path(__file__).resolve().parents[1]
 CHECKER = ROOT / "scripts" / "check_browser_js.py"
@@ -46,3 +46,15 @@ def test_node_parses_all_browser_javascript_and_runs_contracts():
         check=False,
     )
     assert contract.returncode == 0, contract.stderr or contract.stdout
+
+    spectator_contract = subprocess.run(
+        [node, str(ROOT / "tests" / "spectator_dashboard_harness.js")],
+        cwd=ROOT,
+        input=SPECTATOR_JS,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert spectator_contract.returncode == 0, (
+        spectator_contract.stderr or spectator_contract.stdout
+    )

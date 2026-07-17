@@ -305,6 +305,7 @@ def test_spectator_server_is_read_only_and_route_isolated():
 
         for private_path in (
             "/api/status",
+            "/api/dashboard",
             "/api/control",
             "/frame.png",
             "/viewer.js",
@@ -561,10 +562,15 @@ def test_browser_contract_has_explicit_ice_bounded_admission_and_teardown():
     assert "peer.destroy()" in VIEWER_JS
     assert "track.stop()" in VIEWER_JS
     assert "releaseLease()" in VIEWER_JS
+    assert "handleHostPeerError" in VIEWER_JS
+    assert "'peer-unavailable', 'webrtc'" in VIEWER_JS
+    assert "mediaTimer = setTimeout" in VIEWER_JS
+    assert "noteCoreControlFailure" in VIEWER_JS
+    assert "leaseRecoveryDeadlineAt" in VIEWER_JS
     assert 'id="stop-runtime"' in VIEWER_HTML
 
     assert 'id="play-stream" type="button"' in SPECTATOR_HTML
-    assert 'role="status"' in SPECTATOR_HTML
+    assert SPECTATOR_HTML.count('aria-live="polite"') == 2
     assert "await video.play()" in SPECTATOR_JS
     assert "MAX_AUTOMATIC_RETRIES = 6" in SPECTATOR_JS
     assert "Automatic retries ended. Ask the host for a fresh link." in SPECTATOR_JS

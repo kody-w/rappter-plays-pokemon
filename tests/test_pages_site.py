@@ -186,7 +186,6 @@ def test_pages_spectator_has_no_private_or_privileged_surface():
         "sessionstorage",
         "serviceworker",
         "analytics",
-        "telemetry",
         "data-action",
         "go live",
         "manual mode",
@@ -194,6 +193,8 @@ def test_pages_spectator_has_no_private_or_privileged_surface():
     ):
         assert forbidden not in first_party
     assert "fetch(" not in SPECTATOR_JS
+    assert SPECTATOR_JS.count("dataConnection.send(") == 1
+    assert "type: 'watch'" in SPECTATOR_JS
     assert "127.0.0.1" not in first_party
     assert "192.168." not in first_party
     assert "localhost" not in first_party
@@ -236,6 +237,39 @@ def test_pages_peerjs_pin_notices_and_fragment_only_join_contract():
     assert "new URLSearchParams(location.hash.slice(1))" in SPECTATOR_JS
     assert "location.search" not in SPECTATOR_JS
     assert "document.referrer" not in SPECTATOR_JS
+
+
+def test_pages_dashboard_is_semantic_responsive_and_status_only():
+    parser = ParsedHTML()
+    parser.feed(SPECTATOR_HTML)
+
+    assert parser.attributes("aside")
+    assert len(
+        [
+            attributes
+            for attributes in parser.attributes("li")
+            if "data-badge" in attributes
+        ]
+    ) == 8
+    assert all(
+        heading in SPECTATOR_HTML
+        for heading in (
+            "Now Playing",
+            "Run Progress",
+            "Current Party",
+            "Run Details",
+            "Stream Health",
+        )
+    )
+    assert "@media (max-width: 480px)" in SPECTATOR_CSS
+    assert "@media (prefers-reduced-motion: reduce)" in SPECTATOR_CSS
+    assert "@media (forced-colors: active)" in SPECTATOR_CSS
+    assert "min-width: 320px" in SPECTATOR_CSS
+    assert "innerHTML" not in SPECTATOR_JS
+    assert "Caught / owned" in SPECTATOR_HTML
+    assert 'id="badge-count">— / 8 badges' in SPECTATOR_HTML
+    assert 'id="completion">Unknown' in SPECTATOR_HTML
+    assert SPECTATOR_HTML.count('aria-live="polite"') == 2
 
 
 def test_pages_landing_is_static_and_does_not_claim_an_invitation():
