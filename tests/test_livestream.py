@@ -534,6 +534,8 @@ def test_browser_contract_has_explicit_ice_bounded_admission_and_teardown():
             "peer.on('open'"
         )
     ].lower()
+    assert "new peer(spectatorpeerid" in spectator_constructor
+    assert "new peer({" not in spectator_constructor
     assert "config:" in spectator_constructor
     assert "stun:stun.l.google.com:19302" in spectator_constructor
     assert "turn:" not in spectator_constructor

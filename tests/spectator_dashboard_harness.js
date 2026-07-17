@@ -80,6 +80,16 @@ global.location = {
   hash: "#v=1&host=rpp-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa&watch=" +
     "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
 };
+let generatedPeerIds = 0;
+Object.defineProperty(global, "crypto", {
+  value: {
+    randomUUID: () => {
+      generatedPeerIds += 1;
+      return `00000000-0000-4000-8000-${String(generatedPeerIds).padStart(12, "0")}`;
+    },
+  },
+  configurable: true,
+});
 
 let clock = 0;
 Object.defineProperty(global, "performance", {
@@ -158,7 +168,8 @@ class FakeCall {
 
 const peers = [];
 class FakePeer {
-  constructor(options) {
+  constructor(id, options) {
+    this.id = id;
     this.options = options;
     this.listeners = new Map();
     this.connections = [];
@@ -236,6 +247,9 @@ function telemetry(sequence, locationValue) {
 
   assert.strictEqual(peers.length, 1);
   const peer = peers[0];
+  assert.match(peer.id, /^rpp-viewer-[0-9a-f]{32}$/);
+  assert.strictEqual(peer.id, "rpp-viewer-00000000000040008000000000000001");
+  assert.strictEqual(peer.options.host, "0.peerjs.com");
   peer.emit("open");
   const data = peer.connections[0];
   data.emit("open");
@@ -333,6 +347,7 @@ function telemetry(sequence, locationValue) {
   assert(retry && retry.delay >= 750);
   retry.callback();
   assert.strictEqual(peers.length, 2, "media reconnect should create a fresh Peer");
+  assert.notStrictEqual(peers[1].id, peer.id, "retries use a fresh local peer ID");
 
   windowListeners.get("pagehide")();
   assert.strictEqual(peers[1].destroyed, true);

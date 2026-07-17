@@ -84,6 +84,27 @@ function parseCapability() {
 
 const capability = parseCapability();
 
+function createSpectatorPeerId() {
+  const prefix = 'rpp-viewer-';
+  if (
+    globalThis.crypto &&
+    typeof globalThis.crypto.randomUUID === 'function'
+  ) {
+    return prefix + globalThis.crypto.randomUUID().replaceAll('-', '');
+  }
+  if (
+    globalThis.crypto &&
+    typeof globalThis.crypto.getRandomValues === 'function'
+  ) {
+    const bytes = globalThis.crypto.getRandomValues(new Uint8Array(16));
+    return prefix + Array.from(
+      bytes,
+      value => value.toString(16).padStart(2, '0')
+    ).join('');
+  }
+  return null;
+}
+
 function setDetailState(state, message) {
   const changed = detailState !== state;
   detailState = state;
@@ -587,10 +608,20 @@ function connect() {
     );
     return;
   }
+  const spectatorPeerId = createSpectatorPeerId();
+  if (!spectatorPeerId) {
+    showState(
+      'error',
+      'Secure connection unavailable',
+      'This browser cannot create a private spectator identity.',
+      {loading: false}
+    );
+    return;
+  }
   reconnectAllowed = true;
   showState('connecting', 'Joining livestream…', 'Connecting through PeerJS signaling.');
   try {
-    peer = new Peer({
+    peer = new Peer(spectatorPeerId, {
       host: '0.peerjs.com',
       port: 443,
       path: '/',
