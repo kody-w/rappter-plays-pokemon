@@ -36,7 +36,8 @@ function parseArgs(argv) {
     rtmp: '',
     keyFile: '',
     testOutput: '',
-    duration: 0
+    duration: 0,
+    scale: 1.5
   };
   for (let index = 2; index < argv.length; index += 1) {
     const value = () => argv[++index];
@@ -47,6 +48,7 @@ function parseArgs(argv) {
       case '--key-file': args.keyFile = value(); break;
       case '--test-output': args.testOutput = value(); break;
       case '--duration': args.duration = Number(value()); break;
+      case '--scale': args.scale = Number(value()); break;
       default:
         console.error(`unknown argument: ${argv[index]}`);
         process.exit(2);
@@ -115,12 +117,17 @@ const server = createServer(async (request, response) => {
 await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
 const port = server.address().port;
 
+const width = Math.round(1280 * args.scale);
+const height = Math.round(720 * args.scale);
 const browser = await chromium.launch();
 const page = await browser.newPage({
-  viewport: {width: 1280, height: 720},
+  viewport: {width, height},
   deviceScaleFactor: 1
 });
-await page.goto(`http://127.0.0.1:${port}/`, {waitUntil: 'load'});
+await page.goto(
+  `http://127.0.0.1:${port}/?scale=${args.scale}`,
+  {waitUntil: 'load'}
+);
 await page.waitForTimeout(1500);
 
 const ffmpeg = spawn('ffmpeg', [
@@ -138,9 +145,9 @@ const ffmpeg = spawn('ffmpeg', [
   '-c:v', 'libx264',
   '-preset', 'veryfast',
   '-tune', 'zerolatency',
-  '-b:v', '2500k',
-  '-maxrate', '2500k',
-  '-bufsize', '5000k',
+  '-b:v', height > 720 ? '4500k' : '2500k',
+  '-maxrate', height > 720 ? '4500k' : '2500k',
+  '-bufsize', height > 720 ? '9000k' : '5000k',
   '-g', '60',
   '-c:a', 'aac',
   '-b:a', '128k',
@@ -160,8 +167,8 @@ cdp.on('Page.screencastFrame', event => {
 await cdp.send('Page.startScreencast', {
   format: 'png',
   everyNthFrame: 1,
-  maxWidth: 1280,
-  maxHeight: 720
+  maxWidth: width,
+  maxHeight: height
 });
 
 console.error(

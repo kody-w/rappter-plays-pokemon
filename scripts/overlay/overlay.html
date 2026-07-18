@@ -181,6 +181,8 @@
   </aside>
 </div>
 <script>
+const scale = Number(new URLSearchParams(location.search).get('scale')) || 1;
+if (scale !== 1) document.body.style.zoom = scale;
 const BADGES = [
   'Boulder', 'Cascade', 'Thunder', 'Rainbow',
   'Soul', 'Marsh', 'Volcano', 'Earth'
