@@ -2,12 +2,13 @@ import asyncio
 import json
 import os
 import queue
+import sys
 import threading
 import urllib.error
 import urllib.request
 from http.cookiejar import CookieJar
 from pathlib import Path
-from types import SimpleNamespace
+from types import ModuleType, SimpleNamespace
 
 import openrappter.agents.pokemon_agent as pokemon_module
 import pytest
@@ -925,7 +926,19 @@ def test_runner_stop_owns_brain_thread_until_exit():
     assert not runner.brain_thread.is_alive()
 
 
-def test_pending_ai_decision_free_runs_emulator_on_resume():
+def test_pending_ai_decision_free_runs_emulator_on_resume(monkeypatch):
+    pyboy_module = ModuleType("pyboy")
+    utils_module = ModuleType("pyboy.utils")
+
+    class WindowEvent:
+        PAUSE = "pause"
+        UNPAUSE = "unpause"
+
+    utils_module.WindowEvent = WindowEvent
+    pyboy_module.utils = utils_module
+    monkeypatch.setitem(sys.modules, "pyboy", pyboy_module)
+    monkeypatch.setitem(sys.modules, "pyboy.utils", utils_module)
+
     class PlayerSpy:
         def release(self, pyboy):
             del pyboy
