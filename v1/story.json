@@ -1,10 +1,10 @@
 {
   "coverage": {
     "continuous_source": false,
-    "event_count": 61,
+    "event_count": 63,
     "first_observed_at": "2026-07-17T04:22:13.529703Z",
     "incomplete_before": true,
-    "last_observed_at": "2026-07-18T21:41:23.242192Z"
+    "last_observed_at": "2026-07-18T21:57:41.761020Z"
   },
   "events": [
     {
@@ -437,6 +437,29 @@
       "sequence": 196,
       "summary": "The recorded party size increased from 1 to 3 while the run was in Map 0x47. The retained state shows 2 badges, 4 caught Pokémon, and a party of 3.",
       "title": "The party grows in Map 0x47",
+      "video": null
+    },
+    {
+      "badges": [
+        "Boulder",
+        "Cascade"
+      ],
+      "chapter": "Beyond the Cascade Badge",
+      "coverage_gap_before": true,
+      "highest_level": 30,
+      "id": "event-000198",
+      "kind": "party",
+      "location": "Route 5",
+      "observed_at": "2026-07-17T21:21:28.358840Z",
+      "party_size": 3,
+      "play_time_seconds": 12521,
+      "pokedex": {
+        "caught": 4,
+        "seen": 44
+      },
+      "sequence": 198,
+      "summary": "The recorded party size increased from 1 to 3 while the run was in Route 5. The retained state shows 2 badges, 4 caught Pokémon, and a party of 3.",
+      "title": "The party grows in Route 5",
       "video": null
     },
     {
@@ -1479,12 +1502,37 @@
       "summary": "The run had moved from Rocket Hideout B2F to Celadon City. The retained state shows 4 badges, 5 caught Pokémon, and a party of 3.",
       "title": "Reaching Celadon City",
       "video": null
+    },
+    {
+      "badges": [
+        "Boulder",
+        "Cascade",
+        "Thunder",
+        "Rainbow"
+      ],
+      "chapter": "Beyond the Rainbow Badge",
+      "coverage_gap_before": false,
+      "highest_level": 40,
+      "id": "event-000392",
+      "kind": "journey",
+      "location": "Rocket Hideout B1F",
+      "observed_at": "2026-07-18T21:57:41.761020Z",
+      "party_size": 3,
+      "play_time_seconds": 83871,
+      "pokedex": {
+        "caught": 5,
+        "seen": 59
+      },
+      "sequence": 392,
+      "summary": "The run had moved from Celadon City to Rocket Hideout B1F. The retained state shows 4 badges, 5 caught Pokémon, and a party of 3.",
+      "title": "Reaching Rocket Hideout B1F",
+      "video": null
     }
   ],
-  "revision": "sha256:738cd284375b88b201038dc6dcfb132396221366e67f6e71004c1d2b4c10cd18",
+  "revision": "sha256:b5b659687a0df24b921a961e587e1e4040ee56fbe9ebc41d99ab5536153bbe40",
   "schema_version": 1,
   "status": "in_progress",
   "story_id": "rappter-plays-pokemon-main-run",
-  "summary": "The archive starts with the earliest retained evidence in Pewter City and follows 61 verified key events. It currently records 4 badges. The latest published chapter reaches Celadon City.",
-  "updated_at": "2026-07-18T21:41:23.242192Z"
+  "summary": "The archive starts with the earliest retained evidence in Pewter City and follows 63 verified key events. It currently records 4 badges. The latest published chapter reaches Rocket Hideout B1F.",
+  "updated_at": "2026-07-18T21:57:41.761020Z"
 }
