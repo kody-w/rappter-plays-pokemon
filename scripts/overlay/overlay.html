@@ -1,0 +1,317 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Copilot Plays Pokemon — stream overlay</title>
+<style>
+  :root {
+    --bg: #0b1120;
+    --panel: #121b30;
+    --panel-edge: #24304d;
+    --ink: #e8eefc;
+    --ink-secondary: #9fb0cc;
+    --ink-muted: #64748b;
+    --accent: #9bbc0f;
+    --live: #ef4444;
+    --hp-good: #34d399;
+    --hp-warn: #fbbf24;
+    --hp-serious: #f87171;
+    --badge-earned: #fbbf24;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    width: 1280px; height: 720px; overflow: hidden;
+    background:
+      radial-gradient(1000px 600px at 18% 12%, #101c38 0%, var(--bg) 55%);
+    color: var(--ink);
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  .scene { display: flex; gap: 20px; padding: 20px; height: 100%; }
+
+  .game-panel {
+    flex: 0 0 656px; display: flex; flex-direction: column; gap: 12px;
+  }
+  .game-frame {
+    background: #0a0f1c; border: 1px solid var(--panel-edge);
+    border-radius: 10px; padding: 8px; line-height: 0;
+  }
+  #frame {
+    width: 640px; height: 576px; image-rendering: pixelated;
+    border-radius: 4px; background: #dfe8d0;
+  }
+  .marquee {
+    display: flex; align-items: center; gap: 10px;
+    background: var(--panel); border: 1px solid var(--panel-edge);
+    border-radius: 10px; padding: 10px 14px;
+    font-size: 15px; color: var(--ink-secondary);
+  }
+  .live-dot {
+    width: 10px; height: 10px; border-radius: 50%;
+    background: var(--live); flex: none;
+    animation: pulse 2s ease-in-out infinite;
+  }
+  @keyframes pulse { 50% { opacity: .45; } }
+  .marquee strong { color: var(--ink); letter-spacing: .04em; }
+  .marquee .repo { margin-left: auto; color: var(--ink-muted); font-size: 13px; }
+
+  .hud { flex: 1; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+  .masthead { display: flex; align-items: flex-start; justify-content: space-between; }
+  .masthead .eyebrow {
+    font-size: 14px; letter-spacing: .28em; color: var(--accent); font-weight: 700;
+  }
+  .masthead h1 { font-size: 30px; letter-spacing: .02em; margin-top: 2px; }
+  .live-pill {
+    background: var(--live); color: #fff; font-weight: 700; font-size: 14px;
+    letter-spacing: .12em; border-radius: 999px; padding: 6px 14px; margin-top: 6px;
+  }
+
+  .card {
+    background: var(--panel); border: 1px solid var(--panel-edge);
+    border-radius: 10px; padding: 12px 14px;
+  }
+  .label {
+    font-size: 12px; letter-spacing: .18em; color: var(--ink-muted);
+    font-weight: 700; margin-bottom: 6px;
+  }
+
+  .where { display: flex; align-items: baseline; gap: 12px; }
+  .where #location { font-size: 24px; font-weight: 700; }
+  .chip {
+    font-size: 13px; color: var(--ink-secondary);
+    border: 1px solid var(--panel-edge); border-radius: 999px; padding: 3px 10px;
+  }
+  #objective { font-size: 16px; line-height: 1.45; color: var(--ink-secondary); min-height: 44px; }
+
+  .party-row { display: flex; align-items: center; gap: 10px; padding: 5px 0; }
+  .party-row .name { width: 128px; font-size: 16px; font-weight: 700; }
+  .party-row .level { width: 58px; font-size: 14px; color: var(--ink-secondary); }
+  .meter {
+    flex: 1; height: 12px; border-radius: 6px; background: #1d2740; overflow: hidden;
+  }
+  .meter i { display: block; height: 100%; border-radius: 6px; background: var(--hp-good); }
+  .party-row .hp-text { width: 96px; text-align: right; font-size: 14px; color: var(--ink-secondary); }
+  .party-empty { color: var(--ink-muted); font-size: 15px; padding: 6px 0; }
+
+  .badge-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .badge {
+    font-size: 13px; text-align: center; padding: 7px 2px; border-radius: 8px;
+    border: 1px solid var(--panel-edge); color: var(--ink-muted);
+  }
+  .badge.earned {
+    border-color: var(--badge-earned); color: var(--badge-earned); font-weight: 700;
+    background: rgba(251, 191, 36, .1);
+  }
+
+  .tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .tile { text-align: left; }
+  .tile .value { font-size: 24px; font-weight: 700; margin-top: 2px; }
+  .tile .sub { font-size: 13px; color: var(--ink-muted); margin-top: 2px; }
+
+  .foot { margin-top: auto; display: flex; justify-content: space-between; align-items: center; }
+  .foot .checkpoint { font-size: 13px; color: var(--ink-muted); }
+  .foot .mode { font-size: 13px; color: var(--accent); font-weight: 700; letter-spacing: .1em; }
+</style>
+</head>
+<body>
+<div class="scene">
+  <section class="game-panel">
+    <div class="game-frame"><img id="frame" alt=""></div>
+    <div class="marquee">
+      <span class="live-dot"></span>
+      <strong>COPILOT PLAYS POKÉMON RED</strong>
+      <span id="playtime-inline"></span>
+      <span class="repo">github.com/kody-w/rappter-plays-pokemon</span>
+    </div>
+  </section>
+  <aside class="hud">
+    <div class="masthead">
+      <div>
+        <div class="eyebrow">GITHUB COPILOT PLAYS</div>
+        <h1>POKÉMON RED</h1>
+      </div>
+      <div class="live-pill">● LIVE</div>
+    </div>
+
+    <div class="card where-card">
+      <div class="label">LOCATION</div>
+      <div class="where">
+        <span id="location">—</span>
+        <span class="chip" id="phase">—</span>
+        <span class="chip" id="player-mode">—</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="label">CURRENT GOAL</div>
+      <div id="objective">Waiting for run details…</div>
+    </div>
+
+    <div class="card">
+      <div class="label">PARTY</div>
+      <div id="party"><div class="party-empty">No Pokémon yet.</div></div>
+    </div>
+
+    <div class="card">
+      <div class="label">GYM BADGES — <span id="badge-count">0</span> / 8</div>
+      <div class="badge-grid" id="badges"></div>
+    </div>
+
+    <div class="tiles">
+      <div class="card tile">
+        <div class="label">POKÉDEX</div>
+        <div class="value" id="dex-caught">—</div>
+        <div class="sub"><span id="dex-seen">—</span> seen · 151 total</div>
+      </div>
+      <div class="card tile">
+        <div class="label">PLAY TIME</div>
+        <div class="value" id="play-time">—</div>
+        <div class="sub">in-game clock</div>
+      </div>
+      <div class="card tile">
+        <div class="label">SESSION</div>
+        <div class="value" id="session-time">—</div>
+        <div class="sub">this broadcast run</div>
+      </div>
+    </div>
+
+    <div class="foot">
+      <span class="checkpoint" id="checkpoint">Checkpointing automatically</span>
+      <span class="mode">AI AUTONOMOUS</span>
+    </div>
+  </aside>
+</div>
+<script>
+const BADGES = [
+  'Boulder', 'Cascade', 'Thunder', 'Rainbow',
+  'Soul', 'Marsh', 'Volcano', 'Earth'
+];
+const badgeGrid = document.getElementById('badges');
+for (const name of BADGES) {
+  const el = document.createElement('div');
+  el.className = 'badge';
+  el.dataset.badge = name;
+  el.textContent = name;
+  badgeGrid.appendChild(el);
+}
+
+const frame = document.getElementById('frame');
+let frameBusy = false;
+async function refreshFrame() {
+  if (frameBusy) return;
+  frameBusy = true;
+  try {
+    const response = await fetch('/frame.png?t=' + Date.now(), {cache: 'no-store'});
+    if (response.ok) {
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      await new Promise(resolve => {
+        const probe = new Image();
+        probe.onload = () => { frame.src = url; resolve(); };
+        probe.onerror = resolve;
+        probe.src = url;
+      });
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }
+  } catch (_error) {}
+  frameBusy = false;
+}
+
+function formatPlayTime(pt) {
+  if (!pt) return '—';
+  return pt.hours + ':' + String(pt.minutes).padStart(2, '0') +
+    ':' + String(pt.seconds).padStart(2, '0');
+}
+function formatSession(total) {
+  if (!Number.isFinite(total)) return '—';
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  return h ? h + 'h ' + m + 'm' : m + 'm';
+}
+function hpClassColor(ratio) {
+  if (ratio <= .25) return 'var(--hp-serious)';
+  if (ratio <= .5) return 'var(--hp-warn)';
+  return 'var(--hp-good)';
+}
+
+function renderSnapshot(s) {
+  document.getElementById('location').textContent = s.location || 'Unknown';
+  document.getElementById('phase').textContent = s.phase || '—';
+  document.getElementById('player-mode').textContent =
+    s.player && s.player.paused ? 'paused'
+      : (s.player && s.player.mode === 'ai' ? 'Copilot at the controls' : (s.player ? s.player.mode : '—'));
+  document.getElementById('objective').textContent = s.objective || 'Exploring…';
+
+  const party = document.getElementById('party');
+  party.replaceChildren();
+  if (!s.party || !s.party.length) {
+    const empty = document.createElement('div');
+    empty.className = 'party-empty';
+    empty.textContent = 'No Pokémon yet.';
+    party.appendChild(empty);
+  } else {
+    for (const member of s.party) {
+      const row = document.createElement('div');
+      row.className = 'party-row';
+      const known = member.hp !== null && member.max_hp !== null;
+      const ratio = known ? member.hp / Math.max(1, member.max_hp) : 0;
+      const name = document.createElement('span');
+      name.className = 'name';
+      name.textContent = member.nickname || ('#' + member.species_id);
+      const level = document.createElement('span');
+      level.className = 'level';
+      level.textContent = member.level === null ? 'Lv —' : 'Lv ' + member.level;
+      const meter = document.createElement('span');
+      meter.className = 'meter';
+      const fill = document.createElement('i');
+      fill.style.width = (known ? Math.round(ratio * 100) : 0) + '%';
+      fill.style.background = hpClassColor(ratio);
+      meter.appendChild(fill);
+      const hp = document.createElement('span');
+      hp.className = 'hp-text';
+      hp.textContent = known ? member.hp + '/' + member.max_hp + ' HP' : '— HP';
+      row.append(name, level, meter, hp);
+      party.appendChild(row);
+    }
+  }
+
+  const earned = new Set((s.badges && s.badges.earned) || []);
+  document.getElementById('badge-count').textContent = earned.size;
+  for (const el of badgeGrid.children) {
+    const has = earned.has(el.dataset.badge);
+    el.classList.toggle('earned', has);
+    el.textContent = el.dataset.badge + (has ? ' ✓' : '');
+  }
+
+  document.getElementById('dex-caught').textContent =
+    s.pokedex && s.pokedex.caught !== null ? s.pokedex.caught + ' caught' : '—';
+  document.getElementById('dex-seen').textContent =
+    s.pokedex && s.pokedex.seen !== null ? s.pokedex.seen : '—';
+  const playTime = formatPlayTime(s.play_time);
+  document.getElementById('play-time').textContent = playTime;
+  document.getElementById('playtime-inline').textContent = playTime === '—' ? '' : playTime;
+  document.getElementById('session-time').textContent =
+    formatSession(s.session_elapsed_seconds);
+  document.getElementById('checkpoint').textContent = s.checkpoint
+    ? 'Checkpoint: ' + (s.checkpoint.location || '') + ' · ' +
+      (s.checkpoint.age_seconds < 90
+        ? 'just now'
+        : Math.round(s.checkpoint.age_seconds / 60) + 'm ago')
+    : 'Checkpointing automatically';
+}
+
+async function refreshData() {
+  try {
+    const response = await fetch('/api/overlay?t=' + Date.now(), {cache: 'no-store'});
+    if (!response.ok) return;
+    const data = await response.json();
+    if (data && data.snapshot) renderSnapshot(data.snapshot);
+  } catch (_error) {}
+}
+
+setInterval(refreshFrame, 100);
+setInterval(refreshData, 1000);
+refreshFrame();
+refreshData();
+</script>
+</body>
+</html>
