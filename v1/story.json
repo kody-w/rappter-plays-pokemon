@@ -1,10 +1,10 @@
 {
   "coverage": {
     "continuous_source": false,
-    "event_count": 52,
+    "event_count": 55,
     "first_observed_at": "2026-07-17T04:22:13.529703Z",
     "incomplete_before": true,
-    "last_observed_at": "2026-07-18T20:29:41.661820Z"
+    "last_observed_at": "2026-07-18T20:58:03.453407Z"
   },
   "events": [
     {
@@ -276,6 +276,52 @@
       "sequence": 187,
       "summary": "The recorded party size increased from 1 to 3 while the run was in Vermilion City. The retained state shows 2 badges, 4 caught Pokémon, and a party of 3.",
       "title": "The party grows in Vermilion City",
+      "video": null
+    },
+    {
+      "badges": [
+        "Boulder",
+        "Cascade"
+      ],
+      "chapter": "Beyond the Cascade Badge",
+      "coverage_gap_before": true,
+      "highest_level": 30,
+      "id": "event-000190",
+      "kind": "party",
+      "location": "Vermilion Gym",
+      "observed_at": "2026-07-17T20:46:36.055791Z",
+      "party_size": 3,
+      "play_time_seconds": 12259,
+      "pokedex": {
+        "caught": 4,
+        "seen": 44
+      },
+      "sequence": 190,
+      "summary": "The recorded party size increased from 1 to 3 while the run was in Vermilion Gym. The retained state shows 2 badges, 4 caught Pokémon, and a party of 3.",
+      "title": "The party grows in Vermilion Gym",
+      "video": null
+    },
+    {
+      "badges": [
+        "Boulder",
+        "Cascade"
+      ],
+      "chapter": "Beyond the Cascade Badge",
+      "coverage_gap_before": false,
+      "highest_level": 30,
+      "id": "event-000193",
+      "kind": "journey",
+      "location": "Vermilion City",
+      "observed_at": "2026-07-17T21:13:05.427909Z",
+      "party_size": 3,
+      "play_time_seconds": 12456,
+      "pokedex": {
+        "caught": 4,
+        "seen": 44
+      },
+      "sequence": 193,
+      "summary": "The run had moved from Vermilion Gym to Vermilion City. The retained state shows 2 badges, 4 caught Pokémon, and a party of 3.",
+      "title": "Reaching Vermilion City",
       "video": null
     },
     {
@@ -1268,12 +1314,37 @@
         "start_seconds": 12298,
         "youtube_id": "NBSKt_dou6o"
       }
+    },
+    {
+      "badges": [
+        "Boulder",
+        "Cascade",
+        "Thunder",
+        "Rainbow"
+      ],
+      "chapter": "Beyond the Rainbow Badge",
+      "coverage_gap_before": false,
+      "highest_level": 40,
+      "id": "event-000383",
+      "kind": "journey",
+      "location": "Rocket Hideout B2F",
+      "observed_at": "2026-07-18T20:58:03.453407Z",
+      "party_size": 3,
+      "play_time_seconds": 80294,
+      "pokedex": {
+        "caught": 5,
+        "seen": 59
+      },
+      "sequence": 383,
+      "summary": "The run had moved from Rocket Hideout B1F to Rocket Hideout B2F. The retained state shows 4 badges, 5 caught Pokémon, and a party of 3.",
+      "title": "Reaching Rocket Hideout B2F",
+      "video": null
     }
   ],
-  "revision": "sha256:9d861e7f16834290457fd98926262e244512d7bc918763807958a3178560e0ac",
+  "revision": "sha256:66d8af0493428c376decdd22de78c83214ea9d7662e31f26b618c5ed2394688b",
   "schema_version": 1,
   "status": "in_progress",
   "story_id": "rappter-plays-pokemon-main-run",
-  "summary": "The archive starts with the earliest retained evidence in Pewter City and follows 52 verified key events. It currently records 4 badges. The latest published chapter reaches Rocket Hideout B1F.",
-  "updated_at": "2026-07-18T20:29:41.661820Z"
+  "summary": "The archive starts with the earliest retained evidence in Pewter City and follows 55 verified key events. It currently records 4 badges. The latest published chapter reaches Rocket Hideout B2F.",
+  "updated_at": "2026-07-18T20:58:03.453407Z"
 }
