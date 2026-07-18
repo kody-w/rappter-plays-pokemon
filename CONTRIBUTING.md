@@ -15,6 +15,12 @@ Never commit, upload, paste, or link to:
 Issues and pull requests containing game content or secrets will be removed.
 Use synthetic byte arrays and mocks in tests.
 
+The public story archive is a narrow metadata-only exception. It may contain
+only the schema-validated projection produced by
+`rappter_plays_pokemon.story`; never commit source manifests, screenshots,
+audio, video, model prompts, or arbitrary runtime dictionaries. Public story
+updates belong on the isolated `story-archive` branch, not `main`.
+
 ## Development setup
 
 Python 3.11+ is required.
@@ -33,7 +39,7 @@ Run every check before submitting:
 .venv-dev/bin/python scripts/update_browser_assets.py --check
 .venv-dev/bin/python scripts/build_pages_site.py --check
 .venv-dev/bin/python scripts/check_browser_js.py
-bash -n bootstrap.sh launch.sh uninstall.sh
+bash -n bootstrap.sh launch.sh story.sh uninstall.sh
 ```
 
 No test may contact GitHub Copilot, PeerJS Cloud, a Nostr relay, STUN, the
@@ -81,6 +87,12 @@ self-contained. After changing any of these sources, rebuild and check them:
 .venv-dev/bin/python scripts/build_pages_site.py
 .venv-dev/bin/python scripts/build_pages_site.py --check
 ```
+
+The root `docs/index.html`, `docs/site.css`, and `docs/story/` files are
+hand-authored public entry points. They must remain separate from the generated
+host/watch protocol trees. The story page may connect only to the exact
+`raw.githubusercontent.com` story URL and must render every archive string via
+safe DOM text properties.
 
 The Pages trees must remain static: no gameplay controls, analytics, service
 workers, storage, CDN scripts, or Pages-to-localhost requests. The v2 static

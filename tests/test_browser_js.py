@@ -164,6 +164,18 @@ def test_node_parses_all_browser_javascript_and_runs_contracts():
         return_page_contract.stderr or return_page_contract.stdout
     )
 
+    story_player_contract = subprocess.run(
+        [node, str(ROOT / "tests" / "story_player_contract_harness.js")],
+        cwd=ROOT,
+        input=(ROOT / "docs" / "story" / "story.js").read_text(encoding="utf-8"),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert story_player_contract.returncode == 0, (
+        story_player_contract.stderr or story_player_contract.stdout
+    )
+
     trystero_cleanup_contract = subprocess.run(
         [node, str(ROOT / "tests" / "trystero_cleanup_harness.js")],
         cwd=ROOT,

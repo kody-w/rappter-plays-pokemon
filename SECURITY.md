@@ -190,6 +190,17 @@ not pass through GitHub Pages or those relays. Spectator JavaScript receives das
 snapshots only from the admitted host peer. Do not port-forward the
 authenticated control viewer or the CDP endpoint.
 
+The separate root landing page embeds the exact public YouTube broadcast
+through `youtube-nocookie.com`. Its `/story/` page fetches one schema-validated,
+metadata-only timeline from the repository's `story-archive` branch on
+`raw.githubusercontent.com`. The publisher constructs that projection from an
+explicit allowlist and excludes local paths, ROM/checkpoint hashes, names,
+screen text, coordinates, buttons, objectives, reasoning, logs, and
+credentials. Optional theater entries contain only a validated 11-character
+YouTube ID and bounded integer start/end offsets; the page constructs an exact
+`youtube-nocookie.com` embed. No gameplay recording or screenshot is published
+to GitHub.
+
 GitHub Pages does not let this repository configure the local server's custom
 HTTP response headers. The published spectator HTML therefore carries a strict
 meta CSP limited to self assets, media blobs, five exact reviewed Nostr WSS

@@ -30,7 +30,7 @@ jobs:
       - name: Compile
         run: python -m compileall -q pokemon_agent.py src tests
       - name: Shell syntax
-        run: bash -n bootstrap.sh launch.sh uninstall.sh
+        run: bash -n bootstrap.sh launch.sh story.sh uninstall.sh
       - name: Verify embedded browser assets
         run: python scripts/update_browser_assets.py --check
       - name: Verify GitHub Pages spectator site

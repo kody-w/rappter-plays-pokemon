@@ -41,6 +41,10 @@ def browser_scripts() -> dict[str, str]:
     scripts[str(return_page.relative_to(ROOT))] = return_page.read_text(
         encoding="utf-8"
     )
+    story_player = ROOT / "docs/story/story.js"
+    scripts[str(story_player.relative_to(ROOT))] = story_player.read_text(
+        encoding="utf-8"
+    )
     for path in sorted((ROOT / "vendor/browser").glob("*.js")):
         scripts[str(path.relative_to(ROOT))] = path.read_text(encoding="utf-8")
     return scripts

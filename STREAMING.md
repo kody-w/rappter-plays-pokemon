@@ -4,6 +4,8 @@ This runbook takes a fresh Mac from `git clone` to an unattended
 "Copilot Plays Pokémon Red" broadcast with the live overlay
 (game screen + current goal, party HP, badges, Pokédex, play time).
 
+**Public broadcast:** <https://www.youtube.com/watch?v=NBSKt_dou6o>
+
 Nothing secret lives in this repository. Two private inputs come from the
 stream operator directly:
 
@@ -95,5 +97,30 @@ let auto-start open a fresh one.
 ```bash
 ./launch.sh status                   # game, brain, livestream state
 tail -f nohup.out                    # encoder frame counter, if using nohup
-yt-dlp -g "https://www.youtube.com/channel/<CHANNEL-ID>/live"  # errors when not live
+yt-dlp -g "https://www.youtube.com/watch?v=NBSKt_dou6o"  # errors when not live
 ```
+
+## Publish the story so far
+
+The story curator runs independently from both the game and encoder. It
+publishes only a sanitized JSON timeline; local recordings, screenshots,
+runtime paths, ROM data, and raw model output remain private.
+
+```bash
+./story.sh build
+./story.sh publish \
+  --youtube-video-id NBSKt_dou6o \
+  --youtube-started-at 2026-07-18T17:02:43Z
+nohup ./story.sh watch --interval 600 \
+  --youtube-video-id NBSKt_dou6o \
+  --youtube-started-at 2026-07-18T17:02:43Z \
+  >> ~/.openrappter/pokemon-red/story-publisher.log 2>&1 &
+```
+
+The public player is
+<https://kody-w.github.io/rappter-plays-pokemon/story/>. The publisher merges
+new events with the existing `story-archive` branch so earlier chapters remain
+available after local clip retention rotates their source manifests away. The
+static theater reads its program from raw GitHub JSON and plays the
+corresponding bounded segments from YouTube. GitHub never serves the gameplay
+video bytes.

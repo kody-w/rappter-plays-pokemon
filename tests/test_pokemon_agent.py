@@ -777,7 +777,12 @@ def test_brain_worker_reports_base_sdk_exception_and_recovers(monkeypatch, tmp_p
 
     monkeypatch.setattr(pokemon_module, "CopilotBrain", FakeBrain)
     runner = PokemonRunner.__new__(PokemonRunner)
-    runner.args = SimpleNamespace(model="gpt-5.6-sol", decision_timeout=30)
+    runner.args = SimpleNamespace(
+        model="gpt-5.6-sol",
+        decision_timeout=30,
+        reasoning_effort="medium",
+    )
+    runner.reasoning_effort = "medium"
     runner.runtime_dir = tmp_path
     runner.stop_event = pokemon_module.threading.Event()
     runner.brain_ready = pokemon_module.threading.Event()
@@ -920,16 +925,20 @@ def test_runner_stop_owns_brain_thread_until_exit():
     assert not runner.brain_thread.is_alive()
 
 
-def test_pending_ai_decision_stays_emulator_paused_on_resume():
+def test_pending_ai_decision_free_runs_emulator_on_resume():
     class PlayerSpy:
         def release(self, pyboy):
             del pyboy
 
     class EmulatorSpy:
         events = []
+        speed = None
 
         def send_input(self, event):
             self.events.append(event)
+
+        def set_emulation_speed(self, speed):
+            self.speed = speed
 
     runner = PokemonRunner.__new__(PokemonRunner)
     runner.control_mode = "paused"
@@ -946,8 +955,9 @@ def test_pending_ai_decision_stays_emulator_paused_on_resume():
     runner._set_control_mode("ai")
 
     assert runner.control_mode == "ai"
-    assert runner.emulator_pause_requested is True
-    assert runner.pyboy.events == []
+    assert runner.emulator_pause_requested is False
+    assert len(runner.pyboy.events) == 1
+    assert runner.pyboy.speed == 0
 
 
 def test_shutdown_failures_do_not_skip_remaining_cleanup(tmp_path):

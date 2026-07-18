@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta
+    http-equiv="Content-Security-Policy"
+    content="default-src 'none'; base-uri 'none'; form-action 'none'; object-src 'none'; script-src 'self'; style-src 'self'; connect-src https://raw.githubusercontent.com; frame-src https://www.youtube-nocookie.com"
+  >
+  <meta name="referrer" content="no-referrer">
+  <meta name="theme-color" content="#090d18">
+  <meta
+    name="description"
+    content="Catch up on the autonomous RAPPter Plays Pokémon run from its earliest retained chapter."
+  >
+  <link rel="canonical" href="https://kody-w.github.io/rappter-plays-pokemon/story/">
+  <link rel="stylesheet" href="./story.css">
+  <script src="./story.js" defer></script>
+  <title>Story So Far — RAPPter Plays Pokémon</title>
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="../">
+      <span class="brand-mark" aria-hidden="true">RPP</span>
+      <span>RAPPter Plays Pokémon</span>
+    </a>
+    <a class="header-link" href="../">Watch live</a>
+  </header>
+
+  <main>
+    <section class="hero" aria-labelledby="page-title">
+      <p class="eyebrow">Story so far</p>
+      <h1 id="page-title">Catch up from the earliest retained chapter.</h1>
+      <p class="lede">
+        This public timeline turns verified game-state changes into a grounded,
+        chronological recap. It never publishes ROM data, private runtime
+        files, screenshots, raw model reasoning, or local recordings.
+      </p>
+    </section>
+
+    <p id="story-status" class="status" role="status" aria-live="polite">
+      Loading the public story archive…
+    </p>
+
+    <section id="story-player" class="story-player" aria-labelledby="event-title" hidden>
+      <div class="story-overview">
+        <p class="section-kicker">Current archive</p>
+        <p id="story-summary"></p>
+        <p id="coverage-note" class="coverage-note"></p>
+      </div>
+
+      <div class="event-card">
+        <section class="theater" aria-labelledby="theater-title">
+          <div class="theater-heading">
+            <p class="section-kicker">Story theater</p>
+            <h2 id="theater-title">Editorial highlight</h2>
+          </div>
+          <div class="theater-screen">
+            <iframe
+              id="theater-frame"
+              title="Selected RAPPter Plays Pokémon story clip"
+              referrerpolicy="no-referrer"
+              allow="encrypted-media; picture-in-picture"
+              allowfullscreen
+              hidden
+            ></iframe>
+            <div id="theater-placeholder" class="theater-placeholder">
+              <strong>Summary-only chapter</strong>
+              <span>
+                No editorial YouTube clip has been attached to this event yet.
+              </span>
+            </div>
+          </div>
+        </section>
+
+        <div class="event-heading">
+          <div>
+            <p id="event-chapter" class="chapter"></p>
+            <h2 id="event-title"></h2>
+          </div>
+          <span id="event-counter" class="counter"></span>
+        </div>
+        <p id="event-summary" class="event-summary"></p>
+        <p id="event-gap" class="gap-note" hidden>
+          Some source clips between this event and the previous chapter are no
+          longer retained.
+        </p>
+        <dl class="event-facts">
+          <div>
+            <dt>Location</dt>
+            <dd id="event-location"></dd>
+          </div>
+          <div>
+            <dt>Badges</dt>
+            <dd id="event-badges"></dd>
+          </div>
+          <div>
+            <dt>Pokédex</dt>
+            <dd id="event-pokedex"></dd>
+          </div>
+          <div>
+            <dt>Play time</dt>
+            <dd id="event-play-time"></dd>
+          </div>
+        </dl>
+
+        <label class="progress-label" for="story-progress">Story progress</label>
+        <input id="story-progress" type="range" min="0" value="0" step="1">
+
+        <div class="controls">
+          <button id="previous-event" type="button">Previous</button>
+          <button id="play-story" class="primary-control" type="button">Play story</button>
+          <button id="next-event" type="button">Next</button>
+        </div>
+      </div>
+
+      <nav class="timeline" aria-labelledby="timeline-title">
+        <div class="timeline-heading">
+          <p class="section-kicker">Play by play</p>
+          <h2 id="timeline-title">Key events</h2>
+        </div>
+        <ol id="event-list"></ol>
+      </nav>
+    </section>
+
+    <section id="story-fallback" class="fallback" hidden>
+      <h2>The story archive is temporarily unavailable.</h2>
+      <p>
+        The live broadcast is still available while the public timeline
+        refreshes.
+      </p>
+      <div class="fallback-actions">
+        <button id="retry-story" type="button">Retry archive</button>
+        <a href="https://www.youtube.com/watch?v=NBSKt_dou6o">Watch live on YouTube</a>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <span>Summaries are generated only from allowlisted, recorded facts.</span>
+    <a href="https://github.com/kody-w/rappter-plays-pokemon">View the project on GitHub</a>
+  </footer>
+</body>
+</html>

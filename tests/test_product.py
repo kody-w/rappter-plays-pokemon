@@ -75,6 +75,7 @@ def test_copilot_session_has_zero_tools_and_no_discovery(tmp_path):
 
     brain = CopilotBrain.__new__(CopilotBrain)
     brain.model = "gpt-5.6-sol"
+    brain.reasoning_effort = "medium"
     brain.client = Client()
     brain.session = None
     brain.session_decisions = 99
@@ -82,7 +83,7 @@ def test_copilot_session_has_zero_tools_and_no_discovery(tmp_path):
     asyncio.run(brain._create_sdk_session())
 
     assert captured["model"] == "gpt-5.6-sol"
-    assert captured["reasoning_effort"] == "max"
+    assert captured["reasoning_effort"] == "medium"
     assert captured["available_tools"] == []
     assert captured["skip_custom_instructions"] is True
     assert captured["enable_config_discovery"] is False
@@ -286,13 +287,16 @@ def test_cli_config_and_agent_dispatch(monkeypatch, tmp_path):
     assert captured["advertised_host"] == "pokemon.local"
     assert captured["max_viewers"] == 4
     assert captured["model"] == "gpt-5.6-sol"
+    assert captured["reasoning_effort"] == "medium"
 
 
 def test_launchers_preserve_rom_paths_as_single_arguments():
     launch = (ROOT / "launch.sh").read_text()
     bootstrap = (ROOT / "bootstrap.sh").read_text()
+    story = (ROOT / "story.sh").read_text()
 
     assert 'rappter_plays_pokemon.cli "$@"' in launch
+    assert 'rappter_plays_pokemon.story "$@"' in story
     assert '"${LAUNCH_ARGS[@]}"' in bootstrap
     assert 'if [[ "$ACTION" == "start" ]]' in launch
     assert launch.index('if [[ "$ACTION" == "start" ]]') < launch.index(

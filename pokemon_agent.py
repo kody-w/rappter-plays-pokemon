@@ -78,7 +78,7 @@ HARD_MAX_VIEWERS = 8
 HARD_MAX_NEGOTIATING = 16
 LEGACY_LIVESTREAM_PROTOCOL_VERSION = 1
 LIVESTREAM_PROTOCOL_VERSION = 2
-LIVESTREAM_FRAME_RATE = 10
+LIVESTREAM_FRAME_RATE = 20
 MAX_WATCH_HELLO_BYTES = 512
 TELEMETRY_VERSION = 1
 MAX_TELEMETRY_BYTES = 4096
@@ -152,6 +152,9 @@ PEERJS_ICE_CONFIG = {
 RTC_CONFIG = PEERJS_ICE_CONFIG
 MAX_BUTTONS_PER_DECISION = 16
 MAX_DECISIONS_PER_SESSION = 24
+REASONING_EFFORTS = ("low", "medium", "high", "max")
+DEFAULT_REASONING_EFFORT = "medium"
+DECISION_COOLDOWN_SECONDS = 0.25
 COPILOT_START_TIMEOUT_SECONDS = 90
 COPILOT_STOP_TIMEOUT_SECONDS = 15
 COPILOT_THREAD_SHUTDOWN_TIMEOUT_SECONDS = COPILOT_STOP_TIMEOUT_SECONDS * 3 + 5
@@ -7529,6 +7532,11 @@ class PokemonAgent(BasicAgent):
                         "type": "string",
                         "description": "Copilot model (defaults to gpt-5.6-sol)",
                     },
+                    "reasoning_effort": {
+                        "type": "string",
+                        "enum": list(REASONING_EFFORTS),
+                        "description": "Copilot reasoning depth; medium balances response speed and navigation",
+                    },
                     "decision_timeout": {
                         "type": "integer",
                         "description": "Maximum seconds for one Copilot decision",
@@ -7923,6 +7931,9 @@ class PokemonAgent(BasicAgent):
             max_storage_gb = float(kwargs.get("max_storage_gb", DEFAULT_MAX_STORAGE_GB))
             min_free_gb = float(kwargs.get("min_free_gb", DEFAULT_MIN_FREE_GB))
             decision_timeout = int(kwargs.get("decision_timeout", 180))
+            reasoning_effort = str(
+                kwargs.get("reasoning_effort", DEFAULT_REASONING_EFFORT)
+            )
         except (TypeError, ValueError) as error:
             return json.dumps(
                 {
@@ -7944,6 +7955,7 @@ class PokemonAgent(BasicAgent):
             or max_storage_gb <= 0
             or min_free_gb < 0
             or decision_timeout < 10
+            or reasoning_effort not in REASONING_EFFORTS
             or not 2 <= bridge_startup_timeout <= 120
         ):
             return json.dumps(
@@ -7996,6 +8008,8 @@ class PokemonAgent(BasicAgent):
             str(clip_minutes),
             "--model",
             str(kwargs.get("model", "gpt-5.6-sol")),
+            "--reasoning-effort",
+            reasoning_effort,
             "--decision-timeout",
             str(decision_timeout),
             "--instance-id",
@@ -8634,6 +8648,9 @@ Make progress deliberately:
   B1F (3,33) is not an exit; do not route there.
 - Do not issue more than {MAX_BUTTONS_PER_DECISION} buttons. Repeated directions
   are allowed, but avoid long blind walks.
+- Keep the broadcast moving. In safe overworld corridors, return enough inputs
+  to make meaningful progress, usually 6-12 buttons. Use short sequences only
+  for battles, menus, dialogue, uncertain terrain, or precision movement.
 - Set checkpoint true after a badge, major story event, new important location,
   or other moment worth ending the current recording clip.
 
@@ -8646,11 +8663,18 @@ class CopilotBrain:
         model: str,
         runtime_dir: Path,
         timeout_seconds: int = 180,
+        reasoning_effort: str = DEFAULT_REASONING_EFFORT,
         max_decisions_per_session: int = MAX_DECISIONS_PER_SESSION,
     ):
         self.model = model
         self.runtime_dir = runtime_dir
         self.timeout_seconds = timeout_seconds
+        if reasoning_effort not in REASONING_EFFORTS:
+            raise ValueError(
+                "reasoning_effort must be one of "
+                + ", ".join(REASONING_EFFORTS)
+            )
+        self.reasoning_effort = reasoning_effort
         self.max_decisions_per_session = max_decisions_per_session
         if sys.version_info < (3, 11) or importlib.util.find_spec("copilot") is None:
             raise RuntimeError(
@@ -8722,7 +8746,7 @@ class CopilotBrain:
     async def _create_sdk_session(self) -> None:
         self.session = await self.client.create_session(
             model=self.model,
-            reasoning_effort="max",
+            reasoning_effort=self.reasoning_effort,
             system_message={"mode": "replace", "content": GAME_SYSTEM_PROMPT},
             available_tools=[],
             skip_custom_instructions=True,
@@ -10159,6 +10183,14 @@ class ViewerServer:
 class PokemonRunner:
     def __init__(self, args: argparse.Namespace):
         self.args = args
+        self.reasoning_effort = str(
+            getattr(args, "reasoning_effort", DEFAULT_REASONING_EFFORT)
+        )
+        if self.reasoning_effort not in REASONING_EFFORTS:
+            raise StartupConfigurationError(
+                "reasoning_effort must be one of "
+                + ", ".join(REASONING_EFFORTS)
+            )
         self.run_id = uuid.uuid4().hex[:12]
         self.rom = Path(args.rom).expanduser().resolve()
         self.runtime_dir = Path(args.runtime_dir).expanduser().resolve()
@@ -10236,8 +10268,10 @@ class PokemonRunner:
             "control_mode": "ai",
             "brain_status": "starting",
             "model": args.model,
+            "reasoning_effort": self.reasoning_effort,
             "model_calls": 0,
             "actions_taken": 0,
+            "decision_latency_seconds": None,
             "observation": "",
             "phase": "other",
             "reason": "",
@@ -10682,6 +10716,13 @@ class PokemonRunner:
             )
 
     def _write_status(self) -> None:
+        # Serialized: called from the status thread (2s cadence) and from
+        # _rotate_clip on the tick thread; both write the same files.
+        lock = self.__dict__.setdefault("_status_write_lock", threading.Lock())
+        with lock:
+            self._write_status_locked()
+
+    def _write_status_locked(self) -> None:
         livestream = self.status.get("livestream")
         if isinstance(livestream, dict) and livestream.get("enabled"):
             generation = livestream.get("generation")
@@ -10998,6 +11039,7 @@ class PokemonRunner:
                 self.args.model,
                 self.runtime_dir,
                 self.args.decision_timeout,
+                self.reasoning_effort,
             )
             self.brain = brain
             brain.start()
@@ -11633,6 +11675,10 @@ class PokemonRunner:
 
         self.pyboy.send_input(WindowEvent.PAUSE if paused else WindowEvent.UNPAUSE)
         self.emulator_pause_requested = paused
+        if not paused:
+            # PyBoy's pause handler forces speed 1; restore unlimited so the
+            # run loop's own 60fps pacer stays the only clock.
+            self.pyboy.set_emulation_speed(0)
 
     def _sync_emulator_pause(self) -> None:
         # Free-running emulation: the world keeps ticking (music playing)
@@ -11768,6 +11814,12 @@ class PokemonRunner:
             self.pending_decision_id = None
             self._sync_emulator_pause()
         self.last_decision_finished = time.monotonic()
+        requested_at = getattr(self, "last_decision_requested", 0.0)
+        if requested_at > 0:
+            self.status["decision_latency_seconds"] = round(
+                self.last_decision_finished - requested_at,
+                3,
+            )
         if generation != self.control_generation or self.control_mode != "ai":
             self.status["last_discarded_decision"] = {
                 "decision_id": decision_id,
@@ -12046,7 +12098,10 @@ class PokemonRunner:
             except emulator_errors as retry_error:
                 raise retry_error from ram_error
             self._quarantine_ram(f"PyBoy rejected cartridge RAM: {ram_error}")
-        self.pyboy.set_emulation_speed(1)
+        # Unlimited: the run loop paces itself to 60fps wall with bounded
+        # catch-up, which PyBoy's own limiter cannot do (it forgives all
+        # backlog, bleeding real-time on every slow iteration).
+        self.pyboy.set_emulation_speed(0)
         for _ in range(90):
             if not self.pyboy.tick():
                 raise RuntimeError("PyBoy stopped during startup")
@@ -12108,7 +12163,6 @@ class PokemonRunner:
             self._shutdown_runtime("startup failed")
             raise
 
-        last_status_write = 0.0
         game_state = reader.snapshot()
 
         # Free-running loop: PyBoy's frame limiter paces to 60fps once the
@@ -12145,12 +12199,36 @@ class PokemonRunner:
             target=_retention_loop, name="retention", daemon=True
         ).start()
 
+        def _status_loop() -> None:
+            while not self.stop_event.wait(2.0):
+                try:
+                    self.status["actions_taken"] = self.total_decisions
+                    self._write_status()
+                except Exception:
+                    LOGGER.exception("Status write failed")
+
+        threading.Thread(
+            target=_status_loop, name="status-writer", daemon=True
+        ).start()
+
+        pace_epoch = time.monotonic()
+        speed_mark = (pace_epoch, 0)
         try:
             while not self.stop_event.is_set():
                 if self.frames % 6 == 0:
                     self._read_external_controls()
                 self._process_controls()
                 self._apply_brain_result()
+
+                # 60fps wall pacing with bounded catch-up: sleep when ahead;
+                # when behind, run flat-out to repay up to 200ms of backlog,
+                # forgiving anything larger (clip rotation, checkpoint saves)
+                # rather than fast-forwarding the world audibly.
+                delay = pace_epoch + (self.frames + 1) / 60.0 - time.monotonic()
+                if delay > 0:
+                    time.sleep(delay)
+                elif delay < -0.2:
+                    pace_epoch -= delay + 0.2
 
                 if not self._tick_emulator():
                     self.stop_event.set()
@@ -12159,15 +12237,26 @@ class PokemonRunner:
                 self.frames += 1
                 now = time.monotonic()
 
+                if self.frames % 300 == 0:
+                    mark_time, mark_frames = speed_mark
+                    if now > mark_time:
+                        self.status["emulation_speed"] = round(
+                            (self.frames - mark_frames) / 60.0 / (now - mark_time), 3
+                        )
+                    speed_mark = (now, self.frames)
+
                 decision_due = (
                     self.control_mode == "ai"
                     and self.brain_available.is_set()
                     and not self.decision_pending
                     and self.player.idle
-                    and now - self.last_decision_finished >= 2.0
+                    and (
+                        now - self.last_decision_finished
+                        >= DECISION_COOLDOWN_SECONDS
+                    )
                 )
                 need_image = (
-                    self.frames % 6 == 0
+                    self.frames % 3 == 0
                     or decision_due
                     or (
                         not self.status.get("recording_suspended")
@@ -12177,7 +12266,7 @@ class PokemonRunner:
                 image = self.pyboy.screen.image.copy() if need_image else None
                 if image is not None:
                     self._record_due_frames(image)
-                    if self.frames % 6 == 0:
+                    if self.frames % 3 == 0:
                         try:
                             frame_writes.put_nowait(image)
                         except queue.Full:
@@ -12197,14 +12286,6 @@ class PokemonRunner:
 
                 if now - self.clip_started >= self.args.clip_minutes * 60:
                     self._rotate_clip("automatic clip boundary")
-
-                if (
-                    self.frames % 30 == 0
-                    and now - last_status_write >= 2.0
-                ):
-                    self.status["actions_taken"] = self.total_decisions
-                    self._write_status()
-                    last_status_write = time.monotonic()
         finally:
             self._shutdown_runtime("session stopped")
 
@@ -12266,6 +12347,11 @@ def add_runtime_arguments(
     )
     parser.add_argument("--clip-minutes", type=float, default=10)
     parser.add_argument("--model", default="gpt-5.6-sol")
+    parser.add_argument(
+        "--reasoning-effort",
+        choices=REASONING_EFFORTS,
+        default=DEFAULT_REASONING_EFFORT,
+    )
     parser.add_argument("--decision-timeout", type=int, default=180)
     parser.add_argument("--instance-id", default=None)
     parser.add_argument("--max-clips", type=int, default=DEFAULT_MAX_CLIPS)
@@ -12314,6 +12400,8 @@ def runtime_command(args: argparse.Namespace, *, open_viewer: bool) -> list[str]
         str(args.clip_minutes),
         "--model",
         str(args.model),
+        "--reasoning-effort",
+        str(args.reasoning_effort),
         "--decision-timeout",
         str(args.decision_timeout),
         "--instance-id",

@@ -30,7 +30,7 @@ try {
 }
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
-const FRAME_RATE = 10;
+const FRAME_RATE = 20;
 const STALL_EXIT_MS = 60000;
 
 function parseArgs(argv) {
@@ -134,6 +134,12 @@ const server = createServer(async (request, response) => {
               }))
             : []
         };
+        try {
+          const agentStatus = JSON.parse(
+            await readFile(path.join(runtimeDir, 'status.json'), 'utf-8')
+          );
+          telemetry.host.emulation_speed = agentStatus.emulation_speed ?? null;
+        } catch (_error) {}
       } catch (_error) {}
       response.writeHead(200, {
         'Content-Type': 'application/json',

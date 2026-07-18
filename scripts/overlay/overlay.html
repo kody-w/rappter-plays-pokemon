@@ -241,6 +241,7 @@
       <span>🏅 <b id="mini-badges">0</b>/8</span>
       <span>DEX <b id="mini-dex">—</b></span>
       <span>⏱ <b id="mini-time">—</b></span>
+      <span>⚡ <b id="mini-speed">—</b></span>
       <span class="mode">AI AUTONOMOUS</span>
     </div>
     <div class="center-foot">github.com/kody-w/rappter-plays-pokemon</div>
@@ -486,6 +487,10 @@ function renderNonParty(s, host) {
       host.clips_count === null ? '—' : host.clips_count;
     document.getElementById('clip-loc').textContent = host.latest_clip_location || '—';
 
+    document.getElementById('mini-speed').textContent =
+      typeof host.emulation_speed === 'number'
+        ? host.emulation_speed.toFixed(2) + 'x' : '—';
+
     const recent = host.brain_recent || [];
     document.getElementById('thought').textContent =
       recent.length && recent[0].reason ? '💭 ' + recent[0].reason : '';
@@ -516,7 +521,7 @@ async function refreshData() {
   } catch (_error) {}
 }
 
-setInterval(refreshFrame, 100);
+setInterval(refreshFrame, 50);
 setInterval(refreshData, 1000);
 refreshFrame();
 refreshData();

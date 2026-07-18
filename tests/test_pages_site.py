@@ -436,21 +436,87 @@ def test_pages_dashboard_is_semantic_responsive_and_status_only():
     assert SPECTATOR_HTML.count('aria-live="polite"') == 3
 
 
-def test_pages_landing_is_static_and_does_not_claim_an_invitation():
+def test_pages_landing_features_public_stream_and_story_without_inline_code():
     landing = (DOCS / "index.html").read_text(encoding="utf-8")
     parser = ParsedHTML()
     parser.feed(landing)
 
-    assert "No livestream invitation is embedded on this page." in landing
-    assert "ask the host" in landing
     assert not parser.attributes("script")
     assert not any(
         meta.get("http-equiv", "").lower() == "refresh"
         for meta in parser.attributes("meta")
     )
+    csp = next(
+        meta["content"]
+        for meta in parser.attributes("meta")
+        if meta.get("http-equiv") == "Content-Security-Policy"
+    )
+    assert csp == (
+        "default-src 'none'; base-uri 'none'; form-action 'none'; "
+        "object-src 'none'; style-src 'self'; "
+        "frame-src https://www.youtube-nocookie.com; img-src 'self'; "
+        "connect-src 'none'; script-src 'none'"
+    )
     links = {anchor["href"] for anchor in parser.attributes("a")}
-    assert all(link.startswith("https://github.com/") for link in links)
-    assert any(link.endswith("#browser-livestream") for link in links)
+    assert "https://www.youtube.com/watch?v=NBSKt_dou6o" in links
+    assert "./story/" in links
+    assert {link["href"] for link in parser.attributes("link")} >= {
+        "./site.css"
+    }
+    assert {frame["src"] for frame in parser.attributes("iframe")} == {
+        "https://www.youtube-nocookie.com/embed/NBSKt_dou6o"
+    }
+    assert (DOCS / "site.css").is_file()
+
+
+def test_pages_story_player_has_a_strict_public_data_boundary():
+    story_dir = DOCS / "story"
+    html = (story_dir / "index.html").read_text(encoding="utf-8")
+    css = (story_dir / "story.css").read_text(encoding="utf-8")
+    javascript = (story_dir / "story.js").read_text(encoding="utf-8")
+    parser = ParsedHTML()
+    parser.feed(html)
+
+    csp = next(
+        meta["content"]
+        for meta in parser.attributes("meta")
+        if meta.get("http-equiv") == "Content-Security-Policy"
+    )
+    assert csp == (
+        "default-src 'none'; base-uri 'none'; form-action 'none'; "
+        "object-src 'none'; script-src 'self'; style-src 'self'; "
+        "connect-src https://raw.githubusercontent.com; "
+        "frame-src https://www.youtube-nocookie.com"
+    )
+    assert {script["src"] for script in parser.attributes("script")} == {
+        "./story.js"
+    }
+    assert {link["href"] for link in parser.attributes("link")} >= {
+        "./story.css"
+    }
+    assert (
+        "https://raw.githubusercontent.com/kody-w/rappter-plays-pokemon/"
+        "refs/heads/story-archive/v1/story.json"
+    ) in javascript
+    for forbidden in (
+        "innerHTML",
+        "eval(",
+        "localStorage",
+        "sessionStorage",
+        "document.cookie",
+        "serviceWorker",
+        "127.0.0.1",
+        "localhost",
+        "/api/",
+        "rom_path",
+        "screen_text",
+        "raw_manifest",
+    ):
+        assert forbidden not in javascript
+    assert "textContent" in javascript
+    assert "@media (prefers-reduced-motion: reduce)" in css
+    assert "@media (forced-colors: active)" in css
+    assert "min-width: 320px" in css
 
 
 def test_v1_rollback_and_v2_return_trees_are_cache_isolated():

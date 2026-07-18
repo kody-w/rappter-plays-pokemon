@@ -115,6 +115,10 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--clip-minutes", type=float)
     parser.add_argument("--model")
+    parser.add_argument(
+        "--reasoning-effort",
+        choices=("low", "medium", "high", "max"),
+    )
     parser.add_argument("--decision-timeout", type=int)
     parser.add_argument("--startup-timeout", type=float)
     parser.add_argument("--max-clips", type=int)
@@ -198,6 +202,12 @@ def agent_kwargs(args: argparse.Namespace, config: dict[str, Any]) -> dict[str, 
         "max_viewers": _configured(args, config, "max_viewers", 5),
         "clip_minutes": _configured(args, config, "clip_minutes", 10),
         "model": _configured(args, config, "model", "gpt-5.6-sol"),
+        "reasoning_effort": _configured(
+            args,
+            config,
+            "reasoning_effort",
+            "medium",
+        ),
         "decision_timeout": _configured(args, config, "decision_timeout", 180),
         "startup_timeout": _configured(args, config, "startup_timeout", 180),
         "max_clips": _configured(args, config, "max_clips", 200),

@@ -14,13 +14,28 @@ browser-to-browser, and hand control to you at any time.
 This is an experimental autonomous player. It attempts to reach the Hall of
 Fame, but **it is not guaranteed to beat the game**.
 
+## Watch the live run
+
+[![Watch RAPPter Plays Pokémon live on YouTube](https://img.youtube.com/vi/NBSKt_dou6o/maxresdefault.jpg)](https://www.youtube.com/watch?v=NBSKt_dou6o)
+
+**[Watch live on YouTube](https://www.youtube.com/watch?v=NBSKt_dou6o)** ·
+**[Open the dedicated GitHub Pages player](https://kody-w.github.io/rappter-plays-pokemon/)** ·
+**[Catch up from the beginning](https://kody-w.github.io/rappter-plays-pokemon/story/)**
+
+Follow the autonomous agent as it reads the game from screenshots, chooses its
+next actions with GitHub Copilot, and checkpoints its progress toward the
+Pokémon League. The public YouTube broadcast includes the game, game audio,
+current objective, party status, badges, Pokédex progress, and recent agent
+reasoning.
+
 ## What you get
 
 - **A RAPP agent, not a skill:** [`pokemon_agent.py`](pokemon_agent.py) contains
   the complete native `BasicAgent` contract, metadata, deterministic runtime,
   and `perform()` implementation.
 - **GitHub Copilot SDK brain:** defaults to `gpt-5.6-sol` with
-  `reasoning_effort="max"`.
+  `reasoning_effort="medium"` so live decisions return faster; low, high, and
+  max remain configurable.
 - **Tool isolation:** the SDK session has zero tools, no skill/config discovery,
   no memory/session store, and receives only PNG screenshots as attachments.
 - **Durable PyBoy runtime:** atomic checkpoints, cartridge RAM persistence,
@@ -33,6 +48,12 @@ Fame, but **it is not guaranteed to beat the game**.
   direct WebRTC video and a tightly allowlisted run dashboard. Encrypted Nostr
   relays perform handshake-only signaling; a local CDP string tethers the tab
   to private runtime frames without exposing localhost.
+- **Public YouTube broadcast:** a responsive stream overlay combines the live
+  game, audio, progress, current objective, and recent autonomous decisions.
+- **Public story player:** a grounded, chronological recap streams sanitized
+  key-event JSON from a dedicated public data branch. Its static theater can
+  play bounded YouTube highlight segments without publishing local gameplay
+  files or raw model output to GitHub.
 - **Bounded recording:** local, rotating H.264 MP4 clips with manifests,
   retention limits, a disk budget, and a free-space reserve.
 - **Local-only state:** ROM path, screenshots, saves, logs, and videos stay in a
@@ -105,6 +126,18 @@ All commands operate on the default private runtime directory,
 ./launch.sh provision-browser                              # optional stable macOS CfT
 ```
 
+Build or publish the public-safe story without stopping the game:
+
+```bash
+./story.sh build
+./story.sh publish \
+  --youtube-video-id NBSKt_dou6o \
+  --youtube-started-at 2026-07-18T17:02:43Z
+./story.sh watch --interval 600 \
+  --youtube-video-id NBSKt_dou6o \
+  --youtube-started-at 2026-07-18T17:02:43Z
+```
+
 `launch.sh` never replaces the registered single-file agent for status or
 control actions. After updating this checkout while a supervisor is live,
 migrate in this order:
@@ -129,6 +162,7 @@ Useful start options:
   --max-states 256 \
   --max-storage-gb 20 \
   --min-free-gb 2 \
+  --reasoning-effort medium \
   --port 8765
 ```
 
@@ -306,6 +340,25 @@ trees with immutable versioned script filenames, so a cached v1 HTML document
 cannot load a v2 protocol script. Deploy both trees before changing runner
 defaults.
 
+### Public catch-up story
+
+[`story.sh`](story.sh) runs the repository-native story curator separately
+from the gameplay agent. It validates finalized clip manifests, detects
+grounded milestones and state changes, removes private fields, and publishes
+only a bounded JSON timeline to the orphan `story-archive` branch:
+
+<https://raw.githubusercontent.com/kody-w/rappter-plays-pokemon/refs/heads/story-archive/v1/story.json>
+
+The [GitHub Pages story theater](https://kody-w.github.io/rappter-plays-pokemon/story/)
+plays those entries oldest-first, switches between bounded YouTube segments
+when a broadcast covers an event, and clearly marks gaps in retained source
+coverage. `--youtube-started-at` is the verified UTC start of that YouTube
+broadcast; later key events are mapped to short segments around their recorded
+timestamps. The earliest available local recording may begin after the
+original run started, so the curator never invents missing opening events.
+Gameplay MP4s, screenshots, ROM data, paths, hashes, names, screen text,
+objectives, buttons, and raw model reasoning remain private.
+
 To use a config file, copy the safe template outside version control, fill in
 your local ROM path, and pass it explicitly:
 
@@ -373,7 +426,9 @@ flowchart LR
     R --> L[Local private states, RAM, manifests]
 ```
 
-The emulator pauses while each model decision is pending. A generation counter
+The emulator free-runs at real time while each model decision is pending, and
+the default medium reasoning effort plus longer safe overworld sequences keeps
+the broadcast moving without removing model control. A generation counter
 discards stale AI decisions after manual takeover. The supervisor distinguishes
 intentional stops from failures, restarts failed children with exponential
 backoff, detects stale ready/startup heartbeats, and opens a restart circuit

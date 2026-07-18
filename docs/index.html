@@ -1,26 +1,152 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; base-uri 'none'; form-action 'none'; object-src 'none'">
-<meta name="referrer" content="no-referrer">
-<title>RAPPter Plays Pokémon — Spectator Access</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta
+    http-equiv="Content-Security-Policy"
+    content="default-src 'none'; base-uri 'none'; form-action 'none'; object-src 'none'; style-src 'self'; frame-src https://www.youtube-nocookie.com; img-src 'self'; connect-src 'none'; script-src 'none'"
+  >
+  <meta name="referrer" content="strict-origin-when-cross-origin">
+  <meta name="theme-color" content="#090d18">
+  <meta
+    name="description"
+    content="Watch a GitHub Copilot agent autonomously play Pokémon Red, live on YouTube."
+  >
+  <meta property="og:title" content="RAPPter Plays Pokémon — Live">
+  <meta
+    property="og:description"
+    content="An autonomous GitHub Copilot agent is attempting a complete Pokémon Red playthrough."
+  >
+  <meta property="og:type" content="website">
+  <meta
+    property="og:url"
+    content="https://kody-w.github.io/rappter-plays-pokemon/"
+  >
+  <link rel="canonical" href="https://kody-w.github.io/rappter-plays-pokemon/">
+  <link rel="stylesheet" href="./site.css">
+  <title>RAPPter Plays Pokémon — Live</title>
 </head>
 <body>
-<main>
-  <h1>RAPPter Plays Pokémon spectator access</h1>
-  <p>No livestream invitation is embedded on this page.</p>
-  <p>
-    To watch a private, browser-hosted stream, ask the host for its current QR
-    code or complete join link. Treat that link as a bearer secret.
-  </p>
-  <p>
-    Learn how spectator streaming works in the
-    <a href="https://github.com/kody-w/rappter-plays-pokemon#browser-livestream">repository documentation</a>
-    and review the
-    <a href="https://github.com/kody-w/rappter-plays-pokemon/blob/main/SECURITY.md">security model</a>.
-  </p>
-</main>
+  <header class="site-header">
+    <a class="brand" href="./" aria-label="RAPPter Plays Pokémon home">
+      <span class="brand-mark" aria-hidden="true">RPP</span>
+      <span>RAPPter Plays Pokémon</span>
+    </a>
+    <a
+      class="header-link"
+      href="https://github.com/kody-w/rappter-plays-pokemon"
+    >View on GitHub</a>
+  </header>
+
+  <main>
+    <section class="hero" aria-labelledby="page-title">
+      <p class="eyebrow"><span class="live-dot" aria-hidden="true"></span> Autonomous playthrough</p>
+      <h1 id="page-title">GitHub Copilot is playing Pokémon Red.</h1>
+      <p class="lede">
+        Watch a real RAPP agent observe the game, decide what to do next, and
+        work toward the Hall of Fame without a scripted walkthrough.
+      </p>
+      <div class="actions">
+        <a
+          class="button button-primary"
+          href="https://www.youtube.com/watch?v=NBSKt_dou6o"
+        >Watch on YouTube</a>
+        <a
+          class="button button-secondary"
+          href="https://github.com/kody-w/rappter-plays-pokemon#quickstart"
+        >Run the agent</a>
+      </div>
+    </section>
+
+    <section class="stream-section" aria-labelledby="stream-title">
+      <div class="section-heading">
+        <div>
+          <p class="section-kicker">Live broadcast</p>
+          <h2 id="stream-title">Follow the run</h2>
+        </div>
+        <a href="https://www.youtube.com/watch?v=NBSKt_dou6o">Open in YouTube</a>
+      </div>
+      <div class="player-shell">
+        <iframe
+          src="https://www.youtube-nocookie.com/embed/NBSKt_dou6o"
+          title="RAPPter Plays Pokémon live stream"
+          loading="eager"
+          referrerpolicy="strict-origin-when-cross-origin"
+          allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture; web-share"
+          allowfullscreen
+        ></iframe>
+      </div>
+      <p class="player-note">
+        If the embedded player is unavailable,
+        <a href="https://www.youtube.com/watch?v=NBSKt_dou6o">watch the stream directly on YouTube</a>.
+      </p>
+    </section>
+
+    <section class="catchup" aria-labelledby="catchup-title">
+      <div>
+        <p class="section-kicker">Missed the beginning?</p>
+        <h2 id="catchup-title">Enter the story theater.</h2>
+        <p>
+          A public, chronological recap turns verified checkpoints and key
+          game-state changes into a beginning-to-present story. The player
+          streams its sanitized timeline directly from this repository's
+          public story archive.
+        </p>
+      </div>
+      <a class="button button-primary" href="./story/">Enter the theater</a>
+    </section>
+
+    <section class="about" aria-labelledby="about-title">
+      <div class="about-copy">
+        <p class="section-kicker">How it works</p>
+        <h2 id="about-title">One agent. One continuous adventure.</h2>
+        <p>
+          The agent runs a legally supplied local Pokémon Red ROM in PyBoy.
+          GitHub Copilot receives screenshots, reasons about the current game
+          state, and returns controller inputs. Progress is checkpointed so the
+          playthrough can recover from restarts without beginning again.
+        </p>
+      </div>
+      <div class="feature-grid">
+        <article>
+          <span class="feature-number">01</span>
+          <h3>Observe</h3>
+          <p>The agent reads the same game screen viewers see.</p>
+        </article>
+        <article>
+          <span class="feature-number">02</span>
+          <h3>Decide</h3>
+          <p>Copilot chooses actions and updates its current objective.</p>
+        </article>
+        <article>
+          <span class="feature-number">03</span>
+          <h3>Persist</h3>
+          <p>Automatic checkpoints preserve the run across interruptions.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="project-note" aria-labelledby="project-title">
+      <div>
+        <p class="section-kicker">Open source</p>
+        <h2 id="project-title">Explore the complete RAPP agent</h2>
+        <p>
+          The repository contains the single-file agent, local runtime,
+          streaming overlay, security model, and setup instructions. No ROM or
+          game content is distributed by this project.
+        </p>
+      </div>
+      <a
+        class="button button-secondary"
+        href="https://github.com/kody-w/rappter-plays-pokemon"
+      >Browse the repository</a>
+    </section>
+  </main>
+
+  <footer>
+    <span>RAPPter Plays Pokémon</span>
+    <span>Experimental autonomous play — completion is not guaranteed.</span>
+  </footer>
 </body>
 </html>

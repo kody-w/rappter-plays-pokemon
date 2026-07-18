@@ -1,0 +1,171 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kody-w.github.io/rappter-plays-pokemon/schemas/story-v1.schema.json",
+  "title": "RAPPter Plays Pokemon public story",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "story_id",
+    "revision",
+    "updated_at",
+    "status",
+    "summary",
+    "coverage",
+    "events"
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "story_id": {"const": "rappter-plays-pokemon-main-run"},
+    "revision": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "updated_at": {"type": "string", "format": "date-time"},
+    "status": {"enum": ["in_progress", "completed"]},
+    "summary": {"type": "string", "minLength": 1, "maxLength": 1000},
+    "coverage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "first_observed_at",
+        "last_observed_at",
+        "incomplete_before",
+        "continuous_source",
+        "event_count"
+      ],
+      "properties": {
+        "first_observed_at": {"type": "string", "format": "date-time"},
+        "last_observed_at": {"type": "string", "format": "date-time"},
+        "incomplete_before": {"type": "boolean"},
+        "continuous_source": {"type": "boolean"},
+        "event_count": {"type": "integer", "minimum": 1, "maximum": 512}
+      }
+    },
+    "events": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 512,
+      "items": {"$ref": "#/$defs/event"}
+    }
+  },
+  "$defs": {
+    "nullableInteger": {
+      "type": ["integer", "null"]
+    },
+    "event": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "sequence",
+        "observed_at",
+        "kind",
+        "chapter",
+        "title",
+        "summary",
+        "location",
+        "badges",
+        "party_size",
+        "highest_level",
+        "pokedex",
+        "play_time_seconds",
+        "coverage_gap_before",
+        "video"
+      ],
+      "properties": {
+        "id": {"type": "string", "pattern": "^event-[0-9]{6,}$"},
+        "sequence": {"type": "integer", "minimum": 1},
+        "observed_at": {"type": "string", "format": "date-time"},
+        "kind": {
+          "enum": [
+            "opening",
+            "badge",
+            "completion",
+            "party",
+            "pokedex",
+            "journey",
+            "progress",
+            "continuity"
+          ]
+        },
+        "chapter": {"type": "string", "minLength": 1, "maxLength": 100},
+        "title": {"type": "string", "minLength": 1, "maxLength": 120},
+        "summary": {"type": "string", "minLength": 1, "maxLength": 800},
+        "location": {"type": "string", "minLength": 1, "maxLength": 80},
+        "badges": {
+          "type": "array",
+          "maxItems": 8,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "Boulder",
+              "Cascade",
+              "Thunder",
+              "Rainbow",
+              "Soul",
+              "Marsh",
+              "Volcano",
+              "Earth"
+            ]
+          }
+        },
+        "party_size": {
+          "allOf": [{"$ref": "#/$defs/nullableInteger"}],
+          "minimum": 0,
+          "maximum": 6
+        },
+        "highest_level": {
+          "allOf": [{"$ref": "#/$defs/nullableInteger"}],
+          "minimum": 1,
+          "maximum": 100
+        },
+        "pokedex": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["seen", "caught"],
+          "properties": {
+            "seen": {
+              "allOf": [{"$ref": "#/$defs/nullableInteger"}],
+              "minimum": 0,
+              "maximum": 151
+            },
+            "caught": {
+              "allOf": [{"$ref": "#/$defs/nullableInteger"}],
+              "minimum": 0,
+              "maximum": 151
+            }
+          }
+        },
+        "play_time_seconds": {
+          "allOf": [{"$ref": "#/$defs/nullableInteger"}],
+          "minimum": 0
+        },
+        "coverage_gap_before": {"type": "boolean"},
+        "video": {
+          "oneOf": [
+            {"type": "null"},
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["youtube_id", "start_seconds", "end_seconds"],
+              "properties": {
+                "youtube_id": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]{11}$"
+                },
+                "start_seconds": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 10000000
+                },
+                "end_seconds": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 10001200
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}
