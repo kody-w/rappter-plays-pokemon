@@ -50,6 +50,10 @@ it survives restarts, unlike per-session P2P links.
 
 ## Game audio
 
+Emulation free-runs at real time, TPP-style: the world keeps ticking (music
+playing, character idle) while the brain thinks, and heavy captures are
+decimated or run off the tick thread so the loop fits the 60fps frame budget.
+
 The agent emulates Game Boy sound (PyBoy `sound_emulated=True`) and writes
 s16le 48 kHz stereo PCM into `~/.openrappter/pokemon-red/audio.fifo`. The
 encoder paces that FIFO into ffmpeg against the wall clock and pads silence

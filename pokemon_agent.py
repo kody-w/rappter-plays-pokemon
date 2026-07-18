@@ -11635,10 +11635,9 @@ class PokemonRunner:
         self.emulator_pause_requested = paused
 
     def _sync_emulator_pause(self) -> None:
-        should_pause = self.control_mode == "paused" or (
-            self.control_mode == "ai" and self.decision_pending
-        )
-        self._set_emulator_paused(should_pause)
+        # Free-running emulation: the world keeps ticking (music playing)
+        # while the brain thinks; only an explicit pause freezes the game.
+        self._set_emulator_paused(self.control_mode == "paused")
 
     def _process_controls(self) -> None:
         while True:
@@ -11850,6 +11849,13 @@ class PokemonRunner:
         """
         if getattr(self, "_audio_disabled", False):
             return
+        # A paused emulator skips clear_buffer, leaving the previous tick's
+        # samples in place — only pump when the frame actually advanced.
+        frame_count = getattr(self.pyboy, "frame_count", None)
+        if frame_count is not None:
+            if frame_count == getattr(self, "_audio_last_frame", None):
+                return
+            self._audio_last_frame = frame_count
         try:
             import numpy as np
 
@@ -12103,10 +12109,46 @@ class PokemonRunner:
             raise
 
         last_status_write = 0.0
-        last_retention_check = 0.0
+        game_state = reader.snapshot()
+
+        # Free-running loop: PyBoy's frame limiter paces to 60fps once the
+        # per-iteration Python work fits the 16.7ms frame budget, so all the
+        # heavy captures below are decimated or moved off the tick thread.
+        frame_writes: "queue.Queue[Any]" = queue.Queue(maxsize=2)
+
+        def _frame_writer() -> None:
+            while not self.stop_event.is_set():
+                try:
+                    frame_image = frame_writes.get(timeout=1.0)
+                except queue.Empty:
+                    continue
+                try:
+                    self._save_latest_frame(frame_image)
+                except Exception:
+                    LOGGER.exception("Latest-frame write failed")
+
+        threading.Thread(
+            target=_frame_writer, name="frame-writer", daemon=True
+        ).start()
+
+        def _retention_loop() -> None:
+            while not self.stop_event.wait(60):
+                try:
+                    self._enforce_retention()
+                except OSError as error:
+                    self.status["last_error"] = (
+                        f"Artifact retention failed: {error}"
+                    )
+                    LOGGER.exception("Artifact retention failed")
+
+        threading.Thread(
+            target=_retention_loop, name="retention", daemon=True
+        ).start()
+
         try:
             while not self.stop_event.is_set():
-                self._read_external_controls()
+                if self.frames % 6 == 0:
+                    self._read_external_controls()
                 self._process_controls()
                 self._apply_brain_result()
 
@@ -12115,43 +12157,50 @@ class PokemonRunner:
                     break
 
                 self.frames += 1
-                image = self.pyboy.screen.image.copy()
-                self._record_due_frames(image)
-                if self.frames % 6 == 0:
-                    self._save_latest_frame(image)
+                now = time.monotonic()
 
-                game_state = reader.snapshot()
-                if self.frames % 30 == 0:
-                    self.status["game_state"] = game_state
-                    self._maybe_milestone(game_state)
-
-                if (
+                decision_due = (
                     self.control_mode == "ai"
                     and self.brain_available.is_set()
                     and not self.decision_pending
                     and self.player.idle
-                    and time.monotonic() - self.last_decision_finished >= 1.0
-                ):
+                    and now - self.last_decision_finished >= 2.0
+                )
+                need_image = (
+                    self.frames % 6 == 0
+                    or decision_due
+                    or (
+                        not self.status.get("recording_suspended")
+                        and (self.next_record_at <= 0 or now >= self.next_record_at)
+                    )
+                )
+                image = self.pyboy.screen.image.copy() if need_image else None
+                if image is not None:
+                    self._record_due_frames(image)
+                    if self.frames % 6 == 0:
+                        try:
+                            frame_writes.put_nowait(image)
+                        except queue.Full:
+                            pass
+                elif self.status.get("recording_suspended"):
+                    self.next_record_at = now + 1 / self.recorder.fps
+
+                if self.frames % 30 == 0:
+                    game_state = reader.snapshot()
+                    self.status["game_state"] = game_state
+                    self._maybe_milestone(game_state)
+
+                if decision_due and image is not None:
                     self._request_decision(
                         image, game_state, collision_ascii(self.pyboy)
                     )
 
-                if time.monotonic() - self.clip_started >= self.args.clip_minutes * 60:
+                if now - self.clip_started >= self.args.clip_minutes * 60:
                     self._rotate_clip("automatic clip boundary")
-
-                if time.monotonic() - last_retention_check >= 30:
-                    try:
-                        self._enforce_retention()
-                    except OSError as error:
-                        self.status["last_error"] = (
-                            f"Artifact retention failed: {error}"
-                        )
-                        LOGGER.exception("Artifact retention failed")
-                    last_retention_check = time.monotonic()
 
                 if (
                     self.frames % 30 == 0
-                    and time.monotonic() - last_status_write >= 0.5
+                    and now - last_status_write >= 2.0
                 ):
                     self.status["actions_taken"] = self.total_decisions
                     self._write_status()
