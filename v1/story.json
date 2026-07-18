@@ -1,7 +1,7 @@
 {
   "coverage": {
     "continuous_source": false,
-    "event_count": 60,
+    "event_count": 61,
     "first_observed_at": "2026-07-17T04:22:13.529703Z",
     "incomplete_before": true,
     "last_observed_at": "2026-07-18T21:41:23.242192Z"
@@ -414,6 +414,29 @@
       "sequence": 195,
       "summary": "The recorded party size increased from 1 to 3 while the run was in Map 0x77. The retained state shows 2 badges, 4 caught Pokémon, and a party of 3.",
       "title": "The party grows in Map 0x77",
+      "video": null
+    },
+    {
+      "badges": [
+        "Boulder",
+        "Cascade"
+      ],
+      "chapter": "Beyond the Cascade Badge",
+      "coverage_gap_before": true,
+      "highest_level": 30,
+      "id": "event-000196",
+      "kind": "party",
+      "location": "Map 0x47",
+      "observed_at": "2026-07-17T21:18:16.998031Z",
+      "party_size": 3,
+      "play_time_seconds": 12499,
+      "pokedex": {
+        "caught": 4,
+        "seen": 44
+      },
+      "sequence": 196,
+      "summary": "The recorded party size increased from 1 to 3 while the run was in Map 0x47. The retained state shows 2 badges, 4 caught Pokémon, and a party of 3.",
+      "title": "The party grows in Map 0x47",
       "video": null
     },
     {
@@ -1458,10 +1481,10 @@
       "video": null
     }
   ],
-  "revision": "sha256:354c5d05c87ec09c074681bb09b4ce9a1af073457c5f510ecf7876398090f234",
+  "revision": "sha256:738cd284375b88b201038dc6dcfb132396221366e67f6e71004c1d2b4c10cd18",
   "schema_version": 1,
   "status": "in_progress",
   "story_id": "rappter-plays-pokemon-main-run",
-  "summary": "The archive starts with the earliest retained evidence in Pewter City and follows 60 verified key events. It currently records 4 badges. The latest published chapter reaches Celadon City.",
+  "summary": "The archive starts with the earliest retained evidence in Pewter City and follows 61 verified key events. It currently records 4 badges. The latest published chapter reaches Celadon City.",
   "updated_at": "2026-07-18T21:41:23.242192Z"
 }
