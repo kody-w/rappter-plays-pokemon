@@ -14,8 +14,8 @@
 // directory (npm install playwright).
 
 import {createServer} from 'node:http';
-import {readFile} from 'node:fs/promises';
-import {readFileSync, existsSync} from 'node:fs';
+import {readFile, readdir} from 'node:fs/promises';
+import {readFileSync, existsSync, openSync, readSync, closeSync, constants as fsConstants} from 'node:fs';
 import {spawn} from 'node:child_process';
 import {homedir} from 'node:os';
 import path from 'node:path';
@@ -104,6 +104,37 @@ const server = createServer(async (request, response) => {
       const telemetry = JSON.parse(
         await readFile(path.join(runtimeDir, 'kite-telemetry.json'), 'utf-8')
       );
+      try {
+        const brain = JSON.parse(
+          await readFile(path.join(runtimeDir, 'brain.json'), 'utf-8')
+        );
+        const metas = (await readdir(path.join(runtimeDir, 'clips')))
+          .filter(name => name.endsWith('.json')).sort();
+        const newest = metas[metas.length - 1];
+        const latest = newest
+          ? JSON.parse(
+              await readFile(path.join(runtimeDir, 'clips', newest), 'utf-8')
+            )
+          : null;
+        telemetry.host = {
+          brain_status:
+            brain.updated_at &&
+            Date.now() - Date.parse(brain.updated_at) < 120000
+              ? 'active' : 'idle',
+          actions_taken: brain.total_decisions ?? null,
+          clips_count: newest
+            ? Number((newest.match(/^clip-0*(\d+)/) || [])[1]) || metas.length
+            : null,
+          latest_clip_location:
+            latest && latest.game_state ? latest.game_state.location ?? null : null,
+          brain_recent: Array.isArray(brain.history)
+            ? brain.history.slice(-3).reverse().map(entry => ({
+                reason: entry.reason || '',
+                at: entry.timestamp || null
+              }))
+            : []
+        };
+      } catch (_error) {}
       response.writeHead(200, {
         'Content-Type': 'application/json',
         'Cache-Control': 'no-store'
@@ -142,9 +173,12 @@ const ffmpeg = spawn('ffmpeg', [
   '-f', 'image2pipe',
   '-framerate', String(FRAME_RATE),
   '-i', '-',
-  '-f', 'lavfi',
-  '-i', 'anullsrc=r=44100:cl=stereo',
+  '-f', 's16le',
+  '-ar', '48000',
+  '-ac', '2',
+  '-i', 'pipe:3',
   '-vf', 'format=yuv420p',
+  '-af', 'highpass=f=10,aresample=async=1:first_pts=0,adelay=200|200',
   '-r', '30',
   '-c:v', 'libx264',
   '-preset', 'veryfast',
@@ -158,7 +192,54 @@ const ffmpeg = spawn('ffmpeg', [
   '-shortest',
   '-f', 'flv',
   target
-], {stdio: ['pipe', 'inherit', 'inherit']});
+], {stdio: ['pipe', 'inherit', 'inherit', 'pipe']});
+
+// Audio pacer: the encoder is the audio clock master. Wall-clock time decides
+// exactly how many PCM bytes ffmpeg gets; whatever the agent's FIFO can't
+// supply is padded with silence, so agent stalls and restarts never stall the
+// mux — the stream just goes quiet, like the anullsrc it replaced.
+const AUDIO_BYTES_PER_SECOND = 48000 * 2 * 2;
+const audioFifoPath = path.join(runtimeDir, 'audio.fifo');
+let audioFifoFd = null;
+let audioFifoRetryAt = 0;
+let audioSent = 0;
+const audioStartedAt = Date.now();
+const audioChunk = Buffer.alloc(AUDIO_BYTES_PER_SECOND / 10);
+const audioTimer = setInterval(() => {
+  const due = Math.floor((Date.now() - audioStartedAt) / 1000 * AUDIO_BYTES_PER_SECOND) & ~3;
+  let deficit = due - audioSent;
+  if (deficit <= 0 || !ffmpeg.stdio[3] || ffmpeg.exitCode !== null) return;
+  while (deficit > 0) {
+    const want = Math.min(deficit, audioChunk.length);
+    let got = 0;
+    if (audioFifoFd === null && Date.now() >= audioFifoRetryAt) {
+      try {
+        audioFifoFd = openSync(audioFifoPath, fsConstants.O_RDONLY | fsConstants.O_NONBLOCK);
+      } catch (_error) {
+        audioFifoRetryAt = Date.now() + 3000;
+      }
+    }
+    if (audioFifoFd !== null) {
+      try {
+        got = readSync(audioFifoFd, audioChunk, 0, want, null);
+      } catch (error) {
+        if (error.code !== 'EAGAIN') {
+          try { closeSync(audioFifoFd); } catch (_error) {}
+          audioFifoFd = null;
+          audioFifoRetryAt = Date.now() + 3000;
+        }
+      }
+    }
+    if (got < want) audioChunk.fill(0, got, want);
+    try {
+      ffmpeg.stdio[3].write(Buffer.from(audioChunk.subarray(0, want)));
+    } catch (_error) {
+      return;
+    }
+    audioSent += want;
+    deficit -= want;
+  }
+}, 50);
 
 let latestShot = null;
 let lastShotAt = Date.now();
@@ -212,6 +293,9 @@ await new Promise(resolve => {
   }, 1000 / FRAME_RATE);
 });
 
+clearInterval(audioTimer);
+if (audioFifoFd !== null) { try { closeSync(audioFifoFd); } catch (_error) {} }
+try { ffmpeg.stdio[3].end(); } catch (_error) {}
 try { ffmpeg.stdin.end(); } catch (_error) {}
 await new Promise(resolve => {
   const kill = setTimeout(() => { ffmpeg.kill('SIGKILL'); resolve(); }, 10000);

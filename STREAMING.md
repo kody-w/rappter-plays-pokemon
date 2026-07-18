@@ -48,6 +48,19 @@ restarts the encoder if it ever exits. The permanent share link is the
 channel's live URL (`https://www.youtube.com/channel/<CHANNEL-ID>/live`);
 it survives restarts, unlike per-session P2P links.
 
+## Game audio
+
+The agent emulates Game Boy sound (PyBoy `sound_emulated=True`) and writes
+s16le 48 kHz stereo PCM into `~/.openrappter/pokemon-red/audio.fifo`. The
+encoder paces that FIFO into ffmpeg against the wall clock and pads silence
+for any gap, so agent stalls or restarts only mute the stream — they never
+break it.
+
+One quirk: save-states recorded by builds without sound carry a suspended
+audio counter. The first session resumed from such a state stays silent for
+roughly eight minutes, then sound starts and the next checkpoint saves clean
+values. This happens once per upgrade, not per restart.
+
 ## What survives a restart
 
 - **Game progress** — the agent checkpoints PyBoy save-states

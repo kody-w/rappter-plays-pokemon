@@ -11837,7 +11837,58 @@ class PokemonRunner:
         )
         if should_apply_input:
             self.player.tick(self.pyboy)
-        return bool(self.pyboy.tick())
+        alive = bool(self.pyboy.tick())
+        self._pump_audio()
+        return alive
+
+    def _pump_audio(self) -> None:
+        """Forward this tick's PCM (s16le 48k stereo) to the encoder FIFO.
+
+        The encoder is the audio clock master and pads silence for anything
+        dropped here, so every failure mode is "drop and move on" — the game
+        loop must never block or die on audio.
+        """
+        if getattr(self, "_audio_disabled", False):
+            return
+        try:
+            import numpy as np
+
+            samples = self.pyboy.sound.ndarray
+            if samples is None or not len(samples):
+                return
+            pcm = (samples.astype(np.int16) << 8).tobytes()
+        except Exception:
+            self._audio_disabled = True
+            return
+        now = time.monotonic()
+        fd = getattr(self, "_audio_fd", None)
+        if fd is None:
+            if now < getattr(self, "_audio_retry_at", 0.0):
+                return
+            fifo = self.runtime_dir / "audio.fifo"
+            try:
+                if not fifo.is_fifo():
+                    fifo.unlink(missing_ok=True)
+                    os.mkfifo(fifo)
+                fd = os.open(fifo, os.O_WRONLY | os.O_NONBLOCK)
+            except OSError:
+                # ENXIO: no reader yet (encoder down) — retry soon, drop.
+                self._audio_retry_at = now + 1.0
+                return
+            self._audio_fd = fd
+        view = memoryview(pcm)
+        try:
+            while view:
+                view = view[os.write(fd, view):]
+        except BlockingIOError:
+            pass  # FIFO full — drop the remainder
+        except OSError:
+            try:
+                os.close(fd)
+            except OSError:
+                pass
+            self._audio_fd = None
+            self._audio_retry_at = now + 1.0
 
     def _shutdown_runtime(self, reason: str) -> None:
         cleanup_errors: list[str] = []
@@ -11971,7 +12022,7 @@ class PokemonRunner:
                         window=window,
                         scale=4,
                         sound_volume=0,
-                        sound_emulated=False,
+                        sound_emulated=True,
                         ram_file=ram_input,
                     )
             finally:

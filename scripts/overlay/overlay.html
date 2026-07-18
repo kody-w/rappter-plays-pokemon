@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Copilot Plays Pokemon — stream overlay</title>
+<title>Rappter Plays Pokemon — stream overlay</title>
 <style>
   :root {
     --bg: #0b1120;
@@ -22,79 +22,118 @@
   body {
     width: 1280px; height: 720px; overflow: hidden;
     background:
-      radial-gradient(1000px 600px at 18% 12%, #101c38 0%, var(--bg) 55%);
+      radial-gradient(1000px 600px at 50% 10%, #101c38 0%, var(--bg) 60%);
     color: var(--ink);
     font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   }
-  .scene { display: flex; gap: 20px; padding: 20px; height: 100%; }
-
-  .game-panel {
-    flex: 0 0 656px; display: flex; flex-direction: column; gap: 12px;
+  /* Center column sits exactly on the 9:16 band YouTube's Dual-stream
+     vertical crop keeps (x 437.5–842.5 at 1280 wide) — everything a
+     Shorts viewer needs must live inside it. */
+  .scene {
+    display: grid; grid-template-columns: 1fr 405px 1fr;
+    gap: 16px; padding: 16px; height: 100%;
   }
+  .col { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+  .col.center { gap: 8px; padding: 0 6px; align-items: center; }
+
+  .masthead { text-align: center; }
+  .masthead .eyebrow {
+    font-size: 12px; letter-spacing: .3em; color: var(--accent); font-weight: 700;
+  }
+  .masthead .title-row {
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+  }
+  .masthead h1 { font-size: 26px; letter-spacing: .02em; }
+  .live-pill {
+    background: var(--live); color: #fff; font-weight: 700; font-size: 11px;
+    letter-spacing: .12em; border-radius: 999px; padding: 4px 10px;
+  }
+
   .game-frame {
     background: #0a0f1c; border: 1px solid var(--panel-edge);
-    border-radius: 10px; padding: 8px; line-height: 0;
+    border-radius: 10px; padding: 6px; line-height: 0;
   }
   #frame {
-    width: 640px; height: 576px; image-rendering: pixelated;
+    width: 380px; height: 342px; image-rendering: pixelated;
     border-radius: 4px; background: #dfe8d0;
-  }
-  .marquee {
-    display: flex; align-items: center; gap: 10px;
-    background: var(--panel); border: 1px solid var(--panel-edge);
-    border-radius: 10px; padding: 10px 14px;
-    font-size: 15px; color: var(--ink-secondary);
-  }
-  .live-dot {
-    width: 10px; height: 10px; border-radius: 50%;
-    background: var(--live); flex: none;
-    animation: pulse 2s ease-in-out infinite;
-  }
-  @keyframes pulse { 50% { opacity: .45; } }
-  .marquee strong { color: var(--ink); letter-spacing: .04em; }
-  .marquee .repo { margin-left: auto; color: var(--ink-muted); font-size: 13px; }
-
-  .hud { flex: 1; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
-  .masthead { display: flex; align-items: flex-start; justify-content: space-between; }
-  .masthead .eyebrow {
-    font-size: 14px; letter-spacing: .28em; color: var(--accent); font-weight: 700;
-  }
-  .masthead h1 { font-size: 30px; letter-spacing: .02em; margin-top: 2px; }
-  .live-pill {
-    background: var(--live); color: #fff; font-weight: 700; font-size: 14px;
-    letter-spacing: .12em; border-radius: 999px; padding: 6px 14px; margin-top: 6px;
   }
 
   .card {
     background: var(--panel); border: 1px solid var(--panel-edge);
-    border-radius: 10px; padding: 12px 14px;
+    border-radius: 10px; padding: 10px 12px; width: 100%;
   }
   .label {
-    font-size: 12px; letter-spacing: .18em; color: var(--ink-muted);
-    font-weight: 700; margin-bottom: 6px;
+    font-size: 11px; letter-spacing: .18em; color: var(--ink-muted);
+    font-weight: 700; margin-bottom: 5px;
   }
 
-  .where { display: flex; align-items: baseline; gap: 12px; }
-  .where #location { font-size: 24px; font-weight: 700; }
+  .goal-card .where {
+    display: flex; align-items: baseline; gap: 8px; margin-bottom: 4px;
+    white-space: nowrap; overflow: hidden;
+  }
+  .goal-card #location { font-size: 16px; font-weight: 700; flex: none; }
   .chip {
-    font-size: 13px; color: var(--ink-secondary);
-    border: 1px solid var(--panel-edge); border-radius: 999px; padding: 3px 10px;
+    font-size: 11px; color: var(--ink-secondary);
+    border: 1px solid var(--panel-edge); border-radius: 999px; padding: 2px 8px;
+    white-space: nowrap;
   }
-  #objective { font-size: 16px; line-height: 1.45; color: var(--ink-secondary); min-height: 44px; }
+  #objective {
+    font-size: 14px; line-height: 1.4; color: var(--ink-secondary);
+    min-height: 39px; max-height: 59px; overflow: hidden;
+  }
 
-  .party-row { display: flex; align-items: center; gap: 10px; padding: 5px 0; }
-  .party-row .name { width: 128px; font-size: 16px; font-weight: 700; }
-  .party-row .level { width: 58px; font-size: 14px; color: var(--ink-secondary); }
+  .mini-party { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 12px; }
+  .mini-mon { display: flex; align-items: center; gap: 5px; font-size: 11px; }
+  .mini-mon .sprite {
+    width: 22px; height: 22px; object-fit: contain;
+    image-rendering: pixelated; flex: none;
+  }
+  .mini-mon .name {
+    width: 58px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    font-weight: 700;
+  }
+  .mini-mon .lv { color: var(--ink-muted); flex: none; }
+  .mini-meter {
+    flex: 1; height: 7px; border-radius: 4px; background: #1d2740; overflow: hidden;
+  }
+  .mini-meter i { display: block; height: 100%; border-radius: 4px; background: var(--hp-good); }
+
+  .mini-stats {
+    display: flex; justify-content: center; gap: 14px;
+    font-size: 12px; color: var(--ink-secondary); width: 100%;
+  }
+  .mini-stats b { color: var(--ink); }
+  .mini-stats .mode { color: var(--accent); font-weight: 700; letter-spacing: .08em; }
+  .center-foot {
+    margin-top: auto; text-align: center;
+    font-size: 12px; color: var(--ink-muted); letter-spacing: .04em;
+  }
+  .about { font-size: 13px; line-height: 1.5; color: var(--ink-secondary); }
+  .agent-line { font-size: 13px; color: var(--ink-secondary); line-height: 1.7; }
+  .agent-line b { color: var(--ink); }
+  .checkpoint-card .value { font-size: 16px; font-weight: 700; }
+  .checkpoint-card .sub { font-size: 12px; color: var(--ink-muted); margin-top: 3px; }
+
+  .party-row { display: flex; align-items: center; gap: 8px; padding: 5px 0; }
+  .party-row .sprite {
+    width: 42px; height: 42px; object-fit: contain;
+    image-rendering: pixelated; flex: none;
+  }
+  .party-row .name {
+    width: 92px; font-size: 15px; font-weight: 700;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .party-row .level { width: 48px; font-size: 13px; color: var(--ink-secondary); }
   .meter {
     flex: 1; height: 12px; border-radius: 6px; background: #1d2740; overflow: hidden;
   }
   .meter i { display: block; height: 100%; border-radius: 6px; background: var(--hp-good); }
-  .party-row .hp-text { width: 96px; text-align: right; font-size: 14px; color: var(--ink-secondary); }
-  .party-empty { color: var(--ink-muted); font-size: 15px; padding: 6px 0; }
+  .party-row .hp-text { width: 84px; text-align: right; font-size: 13px; color: var(--ink-secondary); }
+  .party-empty { color: var(--ink-muted); font-size: 14px; padding: 6px 0; }
 
-  .badge-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .badge-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 7px; }
   .badge {
-    font-size: 13px; text-align: center; padding: 7px 2px; border-radius: 8px;
+    font-size: 13px; text-align: center; padding: 8px 2px; border-radius: 8px;
     border: 1px solid var(--panel-edge); color: var(--ink-muted);
   }
   .badge.earned {
@@ -102,60 +141,120 @@
     background: rgba(251, 191, 36, .1);
   }
 
-  .tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
-  .tile { text-align: left; }
-  .tile .value { font-size: 24px; font-weight: 700; margin-top: 2px; }
-  .tile .sub { font-size: 13px; color: var(--ink-muted); margin-top: 2px; }
+  .tiles { display: grid; grid-template-columns: 1fr; gap: 12px; }
+  .tile { display: flex; align-items: baseline; justify-content: space-between; }
+  .tile .label { margin-bottom: 0; }
+  .tile .value { font-size: 24px; font-weight: 700; }
+  .tile .sub { font-size: 11px; color: var(--ink-muted); }
+  .brain-item { padding: 6px 0; border-top: 1px solid #1a2440; }
+  .brain-item:first-child { border-top: 0; padding-top: 2px; }
+  .brain-item .reason {
+    font-size: 12px; line-height: 1.45; color: var(--ink-secondary);
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .brain-item .when { font-size: 10px; color: var(--ink-muted); margin-top: 2px; }
+  .thought {
+    width: 100%; font-size: 13px; line-height: 1.4; color: var(--ink-secondary);
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+    overflow: hidden; min-height: 18px;
+  }
 
-  .foot { margin-top: auto; display: flex; justify-content: space-between; align-items: center; }
-  .foot .checkpoint { font-size: 13px; color: var(--ink-muted); }
-  .foot .mode { font-size: 13px; color: var(--accent); font-weight: 700; letter-spacing: .1em; }
+  .where-big #location-big { font-size: 22px; font-weight: 700; }
+  .where-big .chips { display: flex; gap: 8px; margin-top: 6px; flex-wrap: wrap; }
+
+  .marquee {
+    margin-top: auto; display: flex; align-items: center; gap: 8px;
+    background: var(--panel); border: 1px solid var(--panel-edge);
+    border-radius: 10px; padding: 9px 12px;
+    font-size: 12px; color: var(--ink-secondary);
+  }
+  .live-dot {
+    width: 9px; height: 9px; border-radius: 50%;
+    background: var(--live); flex: none;
+    animation: pulse 2s ease-in-out infinite;
+  }
+  @keyframes pulse { 50% { opacity: .45; } }
+  .marquee strong { color: var(--ink); letter-spacing: .03em; }
+  .marquee .repo { margin-left: auto; color: var(--ink-muted); font-size: 11px; }
+
+  .foot {
+    margin-top: auto; display: flex; justify-content: space-between; align-items: center;
+  }
+  .foot .checkpoint { font-size: 12px; color: var(--ink-muted); }
+  .foot .mode { font-size: 12px; color: var(--accent); font-weight: 700; letter-spacing: .1em; }
 </style>
 </head>
 <body>
 <div class="scene">
-  <section class="game-panel">
-    <div class="game-frame"><img id="frame" alt=""></div>
+  <div class="col left">
+    <div class="card">
+      <div class="label">PARTY</div>
+      <div id="party"><div class="party-empty">No Pokémon yet.</div></div>
+    </div>
+    <div class="card">
+      <div class="label">GYM BADGES — <span id="badge-count">0</span> / 8</div>
+      <div class="badge-grid" id="badges"></div>
+    </div>
+    <div class="card">
+      <div class="label">AGENT</div>
+      <div class="agent-line">Brain <b id="brain-status">—</b> · <b id="actions-taken">—</b> decisions this run</div>
+      <div class="agent-line"><b id="clips-count">—</b> clips recorded · latest: <span id="clip-loc">—</span></div>
+    </div>
+    <div class="card">
+      <div class="label">ABOUT THIS STREAM</div>
+      <div class="about">
+        An AI agent plays Pokémon Red fully autonomously, 24/7 — reading the
+        screen, choosing goals, battling, and checkpointing its own progress.
+        No human input.
+      </div>
+    </div>
     <div class="marquee">
       <span class="live-dot"></span>
-      <strong>COPILOT PLAYS POKÉMON RED</strong>
-      <span id="playtime-inline"></span>
+      <strong>RAPPTER PLAYS POKÉMON RED</strong>
       <span class="repo">github.com/kody-w/rappter-plays-pokemon</span>
     </div>
-  </section>
-  <aside class="hud">
-    <div class="masthead">
-      <div>
-        <div class="eyebrow">GITHUB COPILOT PLAYS</div>
-        <h1>POKÉMON RED</h1>
-      </div>
-      <div class="live-pill">● LIVE</div>
-    </div>
+  </div>
 
-    <div class="card where-card">
-      <div class="label">LOCATION</div>
+  <div class="col center">
+    <div class="masthead">
+      <div class="eyebrow">RAPPTER PLAYS</div>
+      <div class="title-row">
+        <h1>POKÉMON RED</h1>
+        <span class="live-pill">● LIVE</span>
+      </div>
+    </div>
+    <div class="game-frame"><img id="frame" alt=""></div>
+    <div class="card goal-card">
       <div class="where">
         <span id="location">—</span>
         <span class="chip" id="phase">—</span>
         <span class="chip" id="player-mode">—</span>
       </div>
-    </div>
-
-    <div class="card">
-      <div class="label">CURRENT GOAL</div>
       <div id="objective">Waiting for run details…</div>
     </div>
-
+    <div class="thought" id="thought"></div>
     <div class="card">
-      <div class="label">PARTY</div>
-      <div id="party"><div class="party-empty">No Pokémon yet.</div></div>
+      <div class="mini-party" id="mini-party"></div>
     </div>
-
-    <div class="card">
-      <div class="label">GYM BADGES — <span id="badge-count">0</span> / 8</div>
-      <div class="badge-grid" id="badges"></div>
+    <div class="mini-stats">
+      <span>🏅 <b id="mini-badges">0</b>/8</span>
+      <span>DEX <b id="mini-dex">—</b></span>
+      <span>⏱ <b id="mini-time">—</b></span>
+      <span class="mode">AI AUTONOMOUS</span>
     </div>
+    <div class="center-foot">github.com/kody-w/rappter-plays-pokemon</div>
+  </div>
 
+  <div class="col right">
+    <div class="card where-big">
+      <div class="label">LOCATION</div>
+      <div id="location-big">—</div>
+      <div class="chips">
+        <span class="chip" id="phase-big">—</span>
+        <span class="chip" id="player-mode-big">—</span>
+      </div>
+    </div>
     <div class="tiles">
       <div class="card tile">
         <div class="label">POKÉDEX</div>
@@ -173,16 +272,47 @@
         <div class="sub">this broadcast run</div>
       </div>
     </div>
-
+    <div class="card checkpoint-card">
+      <div class="label">CHECKPOINT</div>
+      <div class="value" id="checkpoint-loc">—</div>
+      <div class="sub" id="checkpoint-age">saves automatically · resumes on restart</div>
+    </div>
+    <div class="card">
+      <div class="label">BRAIN ACTIVITY</div>
+      <div id="brain-feed"></div>
+    </div>
     <div class="foot">
-      <span class="checkpoint" id="checkpoint">Checkpointing automatically</span>
+      <span class="checkpoint">brain: GitHub Copilot</span>
       <span class="mode">AI AUTONOMOUS</span>
     </div>
-  </aside>
+  </div>
 </div>
 <script>
 const scale = Number(new URLSearchParams(location.search).get('scale')) || 1;
 if (scale !== 1) document.body.style.zoom = scale;
+// Gen-1 internal species index → National Dex number, generated from
+// pret/pokered data/pokemon/dex_order.asm; gaps are MissingNo slots.
+const GEN1_DEX = {1:112,2:115,3:32,4:35,5:21,6:100,7:34,8:80,9:2,10:103,11:108,12:102,13:88,14:94,15:29,16:31,17:104,18:111,19:131,20:59,21:151,22:130,23:90,24:72,25:92,26:123,27:120,28:9,29:127,30:114,33:58,34:95,35:22,36:16,37:79,38:64,39:75,40:113,41:67,42:122,43:106,44:107,45:24,46:47,47:54,48:96,49:76,51:126,53:125,54:82,55:109,57:56,58:86,59:50,60:128,64:83,65:48,66:149,70:84,71:60,72:124,73:146,74:144,75:145,76:132,77:52,78:98,82:37,83:38,84:25,85:26,88:147,89:148,90:140,91:141,92:116,93:117,96:27,97:28,98:138,99:139,100:39,101:40,102:133,103:136,104:135,105:134,106:66,107:41,108:23,109:46,110:61,111:62,112:13,113:14,114:15,116:85,117:57,118:51,119:49,120:87,123:10,124:11,125:12,126:68,128:55,129:97,130:42,131:150,132:143,133:129,136:89,138:99,139:91,141:101,142:36,143:110,144:53,145:105,147:93,148:63,149:65,150:17,151:18,152:121,153:1,154:3,155:73,157:118,158:119,163:77,164:78,165:19,166:20,167:33,168:30,169:74,170:137,171:142,173:81,176:4,177:7,178:5,179:8,180:6,185:43,186:44,187:45,188:69,189:70,190:71};
+const SPRITES = 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/';
+function makeSprite(speciesId, className) {
+  const dex = GEN1_DEX[speciesId];
+  if (!dex) return null;
+  const img = document.createElement('img');
+  img.className = className;
+  img.alt = '';
+  img.src = SPRITES + 'versions/generation-v/black-white/animated/' + dex + '.gif';
+  img.onerror = () => {
+    img.onerror = () => { img.style.visibility = 'hidden'; };
+    img.src = SPRITES + dex + '.png';
+  };
+  return img;
+}
+function relativeAge(iso) {
+  if (!iso) return '';
+  const seconds = Math.max(0, (Date.now() - Date.parse(iso)) / 1000);
+  if (seconds < 90) return Math.round(seconds) + 's ago';
+  return Math.round(seconds / 60) + 'm ago';
+}
 const BADGES = [
   'Boulder', 'Cascade', 'Thunder', 'Rainbow',
   'Soul', 'Marsh', 'Volcano', 'Earth'
@@ -235,16 +365,19 @@ function hpClassColor(ratio) {
   return 'var(--hp-good)';
 }
 
-function renderSnapshot(s) {
-  document.getElementById('location').textContent = s.location || 'Unknown';
-  document.getElementById('phase').textContent = s.phase || '—';
-  document.getElementById('player-mode').textContent =
-    s.player && s.player.paused ? 'paused'
-      : (s.player && s.player.mode === 'ai' ? 'Copilot at the controls' : (s.player ? s.player.mode : '—'));
-  document.getElementById('objective').textContent = s.objective || 'Exploring…';
-
+function renderSnapshot(s, host) {
+  // Rebuild party DOM only when its data changes, so animated sprite GIFs
+  // aren't restarted from frame 0 on every refresh.
+  const partySig = JSON.stringify(s.party || []);
+  if (partySig === renderSnapshot.lastPartySig) {
+    renderNonParty(s, host);
+    return;
+  }
+  renderSnapshot.lastPartySig = partySig;
   const party = document.getElementById('party');
+  const miniParty = document.getElementById('mini-party');
   party.replaceChildren();
+  miniParty.replaceChildren();
   if (!s.party || !s.party.length) {
     const empty = document.createElement('div');
     empty.className = 'party-empty';
@@ -252,13 +385,17 @@ function renderSnapshot(s) {
     party.appendChild(empty);
   } else {
     for (const member of s.party) {
-      const row = document.createElement('div');
-      row.className = 'party-row';
       const known = member.hp !== null && member.max_hp !== null;
       const ratio = known ? member.hp / Math.max(1, member.max_hp) : 0;
+      const displayName = member.nickname || ('#' + member.species_id);
+
+      const row = document.createElement('div');
+      row.className = 'party-row';
+      const sprite = makeSprite(member.species_id, 'sprite');
+      if (sprite) row.appendChild(sprite);
       const name = document.createElement('span');
       name.className = 'name';
-      name.textContent = member.nickname || ('#' + member.species_id);
+      name.textContent = displayName;
       const level = document.createElement('span');
       level.className = 'level';
       level.textContent = member.level === null ? 'Lv —' : 'Lv ' + member.level;
@@ -273,11 +410,48 @@ function renderSnapshot(s) {
       hp.textContent = known ? member.hp + '/' + member.max_hp + ' HP' : '— HP';
       row.append(name, level, meter, hp);
       party.appendChild(row);
+
+      const mini = document.createElement('div');
+      mini.className = 'mini-mon';
+      const miniSprite = makeSprite(member.species_id, 'sprite');
+      if (miniSprite) mini.appendChild(miniSprite);
+      const miniName = document.createElement('span');
+      miniName.className = 'name';
+      miniName.textContent = displayName;
+      const miniLv = document.createElement('span');
+      miniLv.className = 'lv';
+      miniLv.textContent = member.level === null ? '' : 'L' + member.level;
+      const miniMeter = document.createElement('span');
+      miniMeter.className = 'mini-meter';
+      const miniFill = document.createElement('i');
+      miniFill.style.width = (known ? Math.round(ratio * 100) : 0) + '%';
+      miniFill.style.background = hpClassColor(ratio);
+      miniMeter.appendChild(miniFill);
+      mini.append(miniName, miniLv, miniMeter);
+      miniParty.appendChild(mini);
     }
   }
 
+  renderNonParty(s, host);
+}
+
+function renderNonParty(s, host) {
+  const modeText =
+    s.player && s.player.paused ? 'paused'
+      : (s.player && s.player.mode === 'ai' ? 'Copilot at the controls' : (s.player ? s.player.mode : '—'));
+  document.getElementById('location').textContent = s.location || 'Unknown';
+  document.getElementById('phase').textContent = s.phase || '—';
+  document.getElementById('player-mode').textContent =
+    s.player && s.player.paused ? 'paused'
+      : (s.player && s.player.mode === 'ai' ? 'Copilot' : (s.player ? s.player.mode : '—'));
+  document.getElementById('location-big').textContent = s.location || 'Unknown';
+  document.getElementById('phase-big').textContent = s.phase || '—';
+  document.getElementById('player-mode-big').textContent = modeText;
+  document.getElementById('objective').textContent = s.objective || 'Exploring…';
+
   const earned = new Set((s.badges && s.badges.earned) || []);
   document.getElementById('badge-count').textContent = earned.size;
+  document.getElementById('mini-badges').textContent = earned.size;
   for (const el of badgeGrid.children) {
     const has = earned.has(el.dataset.badge);
     el.classList.toggle('earned', has);
@@ -288,17 +462,49 @@ function renderSnapshot(s) {
     s.pokedex && s.pokedex.caught !== null ? s.pokedex.caught + ' caught' : '—';
   document.getElementById('dex-seen').textContent =
     s.pokedex && s.pokedex.seen !== null ? s.pokedex.seen : '—';
+  document.getElementById('mini-dex').textContent =
+    s.pokedex && s.pokedex.caught !== null ? s.pokedex.caught : '—';
   const playTime = formatPlayTime(s.play_time);
   document.getElementById('play-time').textContent = playTime;
-  document.getElementById('playtime-inline').textContent = playTime === '—' ? '' : playTime;
+  document.getElementById('mini-time').textContent = playTime;
   document.getElementById('session-time').textContent =
     formatSession(s.session_elapsed_seconds);
-  document.getElementById('checkpoint').textContent = s.checkpoint
-    ? 'Checkpoint: ' + (s.checkpoint.location || '') + ' · ' +
-      (s.checkpoint.age_seconds < 90
+  document.getElementById('checkpoint-loc').textContent =
+    s.checkpoint ? s.checkpoint.location || '—' : '—';
+  document.getElementById('checkpoint-age').textContent = s.checkpoint
+    ? 'saved ' + (s.checkpoint.age_seconds < 90
         ? 'just now'
-        : Math.round(s.checkpoint.age_seconds / 60) + 'm ago')
-    : 'Checkpointing automatically';
+        : Math.round(s.checkpoint.age_seconds / 60) + 'm ago') +
+      ' · resumes on restart'
+    : 'saves automatically · resumes on restart';
+
+  if (host) {
+    document.getElementById('brain-status').textContent = host.brain_status || '—';
+    document.getElementById('actions-taken').textContent =
+      host.actions_taken === null ? '—' : Number(host.actions_taken).toLocaleString('en-US');
+    document.getElementById('clips-count').textContent =
+      host.clips_count === null ? '—' : host.clips_count;
+    document.getElementById('clip-loc').textContent = host.latest_clip_location || '—';
+
+    const recent = host.brain_recent || [];
+    document.getElementById('thought').textContent =
+      recent.length && recent[0].reason ? '💭 ' + recent[0].reason : '';
+    const feed = document.getElementById('brain-feed');
+    feed.replaceChildren();
+    for (const entry of recent) {
+      if (!entry.reason) continue;
+      const item = document.createElement('div');
+      item.className = 'brain-item';
+      const reason = document.createElement('div');
+      reason.className = 'reason';
+      reason.textContent = entry.reason;
+      const when = document.createElement('div');
+      when.className = 'when';
+      when.textContent = relativeAge(entry.at);
+      item.append(reason, when);
+      feed.appendChild(item);
+    }
+  }
 }
 
 async function refreshData() {
@@ -306,7 +512,7 @@ async function refreshData() {
     const response = await fetch('/api/overlay?t=' + Date.now(), {cache: 'no-store'});
     if (!response.ok) return;
     const data = await response.json();
-    if (data && data.snapshot) renderSnapshot(data.snapshot);
+    if (data && data.snapshot) renderSnapshot(data.snapshot, data.host);
   } catch (_error) {}
 }
 
