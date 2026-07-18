@@ -1,7 +1,7 @@
 {
   "coverage": {
     "continuous_source": false,
-    "event_count": 56,
+    "event_count": 58,
     "first_observed_at": "2026-07-17T04:22:13.529703Z",
     "incomplete_before": true,
     "last_observed_at": "2026-07-18T20:58:03.453407Z"
@@ -330,6 +330,29 @@
         "Cascade"
       ],
       "chapter": "Beyond the Cascade Badge",
+      "coverage_gap_before": true,
+      "highest_level": 30,
+      "id": "event-000192",
+      "kind": "party",
+      "location": "Vermilion City",
+      "observed_at": "2026-07-17T21:06:36.241450Z",
+      "party_size": 3,
+      "play_time_seconds": 12408,
+      "pokedex": {
+        "caught": 4,
+        "seen": 44
+      },
+      "sequence": 192,
+      "summary": "The recorded party size increased from 1 to 3 while the run was in Vermilion City. The retained state shows 2 badges, 4 caught Pokémon, and a party of 3.",
+      "title": "The party grows in Vermilion City",
+      "video": null
+    },
+    {
+      "badges": [
+        "Boulder",
+        "Cascade"
+      ],
+      "chapter": "Beyond the Cascade Badge",
       "coverage_gap_before": false,
       "highest_level": 30,
       "id": "event-000193",
@@ -368,6 +391,29 @@
       "sequence": 194,
       "summary": "The run had moved from Vermilion City to Route 6. The retained state shows 2 badges, 4 caught Pokémon, and a party of 3.",
       "title": "Reaching Route 6",
+      "video": null
+    },
+    {
+      "badges": [
+        "Boulder",
+        "Cascade"
+      ],
+      "chapter": "Beyond the Cascade Badge",
+      "coverage_gap_before": false,
+      "highest_level": 30,
+      "id": "event-000199",
+      "kind": "journey",
+      "location": "Route 5",
+      "observed_at": "2026-07-17T21:21:56.418302Z",
+      "party_size": 3,
+      "play_time_seconds": 12524,
+      "pokedex": {
+        "caught": 4,
+        "seen": 44
+      },
+      "sequence": 199,
+      "summary": "The run had moved from Vermilion City to Route 5. The retained state shows 2 badges, 4 caught Pokémon, and a party of 3.",
+      "title": "Reaching Route 5",
       "video": null
     },
     {
@@ -1364,10 +1410,10 @@
       "video": null
     }
   ],
-  "revision": "sha256:426b9956a01382926bd0301934feb0fb8b74b96fdca0d923189e50a5fdfe1b15",
+  "revision": "sha256:69aae68f6c0a43db9c40cde61aab710ccb0583a90e76dda26d03a7e0dfe38d60",
   "schema_version": 1,
   "status": "in_progress",
   "story_id": "rappter-plays-pokemon-main-run",
-  "summary": "The archive starts with the earliest retained evidence in Pewter City and follows 56 verified key events. It currently records 4 badges. The latest published chapter reaches Rocket Hideout B2F.",
+  "summary": "The archive starts with the earliest retained evidence in Pewter City and follows 58 verified key events. It currently records 4 badges. The latest published chapter reaches Rocket Hideout B2F.",
   "updated_at": "2026-07-18T20:58:03.453407Z"
 }
