@@ -1,7 +1,7 @@
 {
   "coverage": {
     "continuous_source": false,
-    "event_count": 55,
+    "event_count": 56,
     "first_observed_at": "2026-07-17T04:22:13.529703Z",
     "incomplete_before": true,
     "last_observed_at": "2026-07-18T20:58:03.453407Z"
@@ -299,6 +299,29 @@
       "sequence": 190,
       "summary": "The recorded party size increased from 1 to 3 while the run was in Vermilion Gym. The retained state shows 2 badges, 4 caught Pokémon, and a party of 3.",
       "title": "The party grows in Vermilion Gym",
+      "video": null
+    },
+    {
+      "badges": [
+        "Boulder",
+        "Cascade"
+      ],
+      "chapter": "Beyond the Cascade Badge",
+      "coverage_gap_before": true,
+      "highest_level": 30,
+      "id": "event-000191",
+      "kind": "party",
+      "location": "Vermilion City",
+      "observed_at": "2026-07-17T20:56:36.152807Z",
+      "party_size": 3,
+      "play_time_seconds": 12342,
+      "pokedex": {
+        "caught": 4,
+        "seen": 44
+      },
+      "sequence": 191,
+      "summary": "The recorded party size increased from 1 to 3 while the run was in Vermilion City. The retained state shows 2 badges, 4 caught Pokémon, and a party of 3.",
+      "title": "The party grows in Vermilion City",
       "video": null
     },
     {
@@ -1341,10 +1364,10 @@
       "video": null
     }
   ],
-  "revision": "sha256:66d8af0493428c376decdd22de78c83214ea9d7662e31f26b618c5ed2394688b",
+  "revision": "sha256:426b9956a01382926bd0301934feb0fb8b74b96fdca0d923189e50a5fdfe1b15",
   "schema_version": 1,
   "status": "in_progress",
   "story_id": "rappter-plays-pokemon-main-run",
-  "summary": "The archive starts with the earliest retained evidence in Pewter City and follows 55 verified key events. It currently records 4 badges. The latest published chapter reaches Rocket Hideout B2F.",
+  "summary": "The archive starts with the earliest retained evidence in Pewter City and follows 56 verified key events. It currently records 4 badges. The latest published chapter reaches Rocket Hideout B2F.",
   "updated_at": "2026-07-18T20:58:03.453407Z"
 }
