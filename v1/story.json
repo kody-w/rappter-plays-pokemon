@@ -1,7 +1,7 @@
 {
   "coverage": {
     "continuous_source": false,
-    "event_count": 64,
+    "event_count": 65,
     "first_observed_at": "2026-07-17T04:22:13.529703Z",
     "incomplete_before": true,
     "last_observed_at": "2026-07-18T21:57:41.761020Z"
@@ -506,6 +506,29 @@
       "sequence": 200,
       "summary": "The recorded party size increased from 1 to 3 while the run was in Route 5. The retained state shows 2 badges, 4 caught Pokémon, and a party of 3.",
       "title": "The party grows in Route 5",
+      "video": null
+    },
+    {
+      "badges": [
+        "Boulder",
+        "Cascade"
+      ],
+      "chapter": "Beyond the Cascade Badge",
+      "coverage_gap_before": true,
+      "highest_level": 30,
+      "id": "event-000201",
+      "kind": "party",
+      "location": "Cerulean City",
+      "observed_at": "2026-07-17T21:22:48.918777Z",
+      "party_size": 3,
+      "play_time_seconds": 12527,
+      "pokedex": {
+        "caught": 4,
+        "seen": 44
+      },
+      "sequence": 201,
+      "summary": "The recorded party size increased from 1 to 3 while the run was in Cerulean City. The retained state shows 2 badges, 4 caught Pokémon, and a party of 3.",
+      "title": "The party grows in Cerulean City",
       "video": null
     },
     {
@@ -1552,10 +1575,10 @@
       "video": null
     }
   ],
-  "revision": "sha256:ce5d74f7a4cf832a781810be28e32631b0f4326bb4598503cfff411f3534d0c3",
+  "revision": "sha256:4148db4d08091cb479fd32da0c51335b46daf6d1ecce4be0ce4efdbb64608c0d",
   "schema_version": 1,
   "status": "in_progress",
   "story_id": "rappter-plays-pokemon-main-run",
-  "summary": "The archive starts with the earliest retained evidence in Pewter City and follows 64 verified key events. It currently records 4 badges. The latest published chapter reaches Rocket Hideout B1F.",
+  "summary": "The archive starts with the earliest retained evidence in Pewter City and follows 65 verified key events. It currently records 4 badges. The latest published chapter reaches Rocket Hideout B1F.",
   "updated_at": "2026-07-18T21:57:41.761020Z"
 }
