@@ -122,7 +122,7 @@ function buildIssueUrl(snapshot) {
     '## Stream snapshot',
     '',
     `- Captured at: ${captured}`,
-    '- Broadcast: https://www.youtube.com/watch?v=NBSKt_dou6o',
+    '- Broadcast: https://www.youtube.com/channel/UCz0Tfe07OAwnQR-fd3E1y4Q/live',
     `- A/V clock drift: ${value(snapshot && snapshot.sync, ' ms')}`,
     `- Configured audio delay: ${value(snapshot && snapshot.delay, ' ms')}`,
     `- Real audio fill: ${value(snapshot && snapshot.audio, '%')}`,

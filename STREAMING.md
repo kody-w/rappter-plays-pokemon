@@ -4,7 +4,7 @@ This runbook takes a fresh Mac from `git clone` to an unattended
 "Copilot Plays Pokémon Red" broadcast with the live overlay
 (game screen + current goal, party HP, badges, Pokédex, play time).
 
-**Public broadcast:** <https://www.youtube.com/watch?v=NBSKt_dou6o>
+**Permanent live URL:** <https://www.youtube.com/channel/UCz0Tfe07OAwnQR-fd3E1y4Q/live>
 
 Nothing secret lives in this repository. Two private inputs come from the
 stream operator directly:
@@ -132,7 +132,7 @@ Run the bridge independently:
 ```bash
 mkdir -p ~/.openrappter/youtube-chat
 chmod 700 ~/.openrappter/youtube-chat
-nohup ./chat.sh watch --video-id NBSKt_dou6o \
+nohup ./chat.sh watch --video-id CURRENT_VIDEO_ID \
   >> ~/.openrappter/youtube-chat/bridge.log 2>&1 &
 ```
 
@@ -200,7 +200,7 @@ let auto-start open a fresh one.
 ```bash
 ./launch.sh status                   # game, brain, livestream state
 tail -f nohup.out                    # encoder frame counter, if using nohup
-yt-dlp -g "https://www.youtube.com/watch?v=NBSKt_dou6o"  # errors when not live
+yt-dlp -g "https://www.youtube.com/channel/UCz0Tfe07OAwnQR-fd3E1y4Q/live"  # errors when not live
 ```
 
 ## Publish the story so far
@@ -212,11 +212,11 @@ runtime paths, ROM data, and raw model output remain private.
 ```bash
 ./story.sh build
 ./story.sh publish \
-  --youtube-video-id NBSKt_dou6o \
-  --youtube-started-at 2026-07-18T17:02:43Z
+  --youtube-video-id CURRENT_VIDEO_ID \
+  --youtube-started-at UTC_BROADCAST_START
 nohup ./story.sh watch --interval 600 \
-  --youtube-video-id NBSKt_dou6o \
-  --youtube-started-at 2026-07-18T17:02:43Z \
+  --youtube-video-id CURRENT_VIDEO_ID \
+  --youtube-started-at UTC_BROADCAST_START \
   >> ~/.openrappter/pokemon-red/story-publisher.log 2>&1 &
 ```
 

@@ -16,9 +16,9 @@ Fame, but **it is not guaranteed to beat the game**.
 
 ## Watch the live run
 
-[![Watch RAPPter Plays Pokémon live on YouTube](https://img.youtube.com/vi/NBSKt_dou6o/maxresdefault.jpg)](https://www.youtube.com/watch?v=NBSKt_dou6o)
+[![Watch RAPPter Plays Pokémon live on YouTube](https://img.youtube.com/vi/NBSKt_dou6o/maxresdefault.jpg)](https://www.youtube.com/channel/UCz0Tfe07OAwnQR-fd3E1y4Q/live)
 
-**[Watch live on YouTube](https://www.youtube.com/watch?v=NBSKt_dou6o)** ·
+**[Watch live on YouTube](https://www.youtube.com/channel/UCz0Tfe07OAwnQR-fd3E1y4Q/live)** ·
 **[Open the dedicated GitHub Pages player](https://kody-w.github.io/rappter-plays-pokemon/)** ·
 **[Catch up from the beginning](https://kody-w.github.io/rappter-plays-pokemon/story/)**
 
@@ -143,11 +143,11 @@ Build or publish the public-safe story without stopping the game:
 ```bash
 ./story.sh build
 ./story.sh publish \
-  --youtube-video-id NBSKt_dou6o \
-  --youtube-started-at 2026-07-18T17:02:43Z
+  --youtube-video-id CURRENT_VIDEO_ID \
+  --youtube-started-at UTC_BROADCAST_START
 ./story.sh watch --interval 600 \
-  --youtube-video-id NBSKt_dou6o \
-  --youtube-started-at 2026-07-18T17:02:43Z
+  --youtube-video-id CURRENT_VIDEO_ID \
+  --youtube-started-at UTC_BROADCAST_START
 ```
 
 `launch.sh` never replaces the registered single-file agent for status or
@@ -387,7 +387,7 @@ Start the credential-free Top Chat bridge separately from the game:
 ```bash
 mkdir -p ~/.openrappter/youtube-chat
 chmod 700 ~/.openrappter/youtube-chat
-nohup ./chat.sh watch --video-id NBSKt_dou6o \
+nohup ./chat.sh watch --video-id CURRENT_VIDEO_ID \
   >> ~/.openrappter/youtube-chat/bridge.log 2>&1 &
 ```
 

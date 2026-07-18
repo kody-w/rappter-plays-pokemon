@@ -458,13 +458,17 @@ def test_pages_landing_features_public_stream_and_story_without_inline_code():
         "connect-src 'none'; script-src 'none'"
     )
     links = {anchor["href"] for anchor in parser.attributes("a")}
-    assert "https://www.youtube.com/watch?v=NBSKt_dou6o" in links
+    assert (
+        "https://www.youtube.com/channel/UCz0Tfe07OAwnQR-fd3E1y4Q/live"
+        in links
+    )
     assert "./story/" in links
     assert {link["href"] for link in parser.attributes("link")} >= {
         "./site.css"
     }
     assert {frame["src"] for frame in parser.attributes("iframe")} == {
-        "https://www.youtube-nocookie.com/embed/NBSKt_dou6o"
+        "https://www.youtube-nocookie.com/embed/live_stream?"
+        "channel=UCz0Tfe07OAwnQR-fd3E1y4Q"
     }
     assert (DOCS / "site.css").is_file()
 
@@ -553,7 +557,7 @@ def test_pages_qr_destination_is_project_first_and_fragment_only():
     )
     assert "location.hash" in javascript
     assert "buildIssueUrl" in javascript
-    assert "NBSKt_dou6o" in javascript
+    assert "UCz0Tfe07OAwnQR-fd3E1y4Q/live" in javascript
     for forbidden in (
         "fetch(",
         "XMLHttpRequest",

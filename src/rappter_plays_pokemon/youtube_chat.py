@@ -28,7 +28,6 @@ except ImportError:  # pragma: no cover - the supported runtime is macOS
 
 
 SCHEMA_VERSION = 1
-DEFAULT_VIDEO_ID = "NBSKt_dou6o"
 DEFAULT_RUNTIME_DIR = Path.home() / ".openrappter" / "pokemon-red"
 DEFAULT_STATE_DIR = Path.home() / ".openrappter" / "youtube-chat"
 ADVISORY_NAME = "youtube-chat-advisory.json"
@@ -524,7 +523,7 @@ def build_parser() -> argparse.ArgumentParser:
         description="Publish strict opt-in YouTube chat route advisories"
     )
     parser.add_argument("action", choices=("once", "watch"), nargs="?", default="watch")
-    parser.add_argument("--video-id", default=DEFAULT_VIDEO_ID)
+    parser.add_argument("--video-id", required=True)
     parser.add_argument("--runtime-dir", type=Path, default=DEFAULT_RUNTIME_DIR)
     parser.add_argument("--state-dir", type=Path, default=DEFAULT_STATE_DIR)
     parser.add_argument("--poll-seconds", type=int, default=DEFAULT_POLL_SECONDS)
