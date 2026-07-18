@@ -26,6 +26,25 @@
     color: var(--ink);
     font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   }
+  .tuning-watermark {
+    position: fixed; z-index: 20; left: 8px; right: 8px; bottom: 2px;
+    overflow: hidden; color: #b7c3d8; opacity: .38; pointer-events: none;
+    font-size: 8px; line-height: 1; letter-spacing: .04em;
+    text-align: center; text-overflow: ellipsis; white-space: nowrap;
+    text-shadow: 0 1px 2px #000;
+  }
+  .learn-more {
+    position: fixed; z-index: 19; right: 13px; bottom: 34px;
+    display: grid; justify-items: center; gap: 3px; pointer-events: none;
+    color: #d6deed; opacity: .82;
+    font-size: 7px; font-weight: 700; letter-spacing: .12em;
+    text-shadow: 0 1px 2px #000;
+  }
+  .learn-more canvas {
+    width: 84px; height: 84px; padding: 3px;
+    border: 1px solid rgba(255, 255, 255, .38); border-radius: 5px;
+    background: #f8fafc;
+  }
   /* Center column sits exactly on the 9:16 band YouTube's Dual-stream
      vertical crop keeps (x 437.5–842.5 at 1280 wide) — everything a
      Shorts viewer needs must live inside it. */
@@ -200,13 +219,16 @@
       <div class="label">AGENT</div>
       <div class="agent-line">Brain <b id="brain-status">—</b> · <b id="actions-taken">—</b> decisions this run</div>
       <div class="agent-line"><b id="clips-count">—</b> clips recorded · latest: <span id="clip-loc">—</span></div>
+      <div class="agent-line">Crowd hints <b id="crowd-hints">OFF</b> · advisory only</div>
+      <div class="agent-line">Web recovery <b id="web-research">OFF</b> · stuck states only</div>
     </div>
     <div class="card">
       <div class="label">ABOUT THIS STREAM</div>
       <div class="about">
         An AI agent plays Pokémon Red fully autonomously, 24/7 — reading the
         screen, choosing goals, battling, and checkpointing its own progress.
-        No human input.
+        Copilot controls every button. Optional <b>!hint direction</b> crowd
+        ballots are advisory and may be ignored.
       </div>
     </div>
     <div class="marquee">
@@ -288,9 +310,33 @@
     </div>
   </div>
 </div>
+<div class="learn-more" id="learn-more" aria-hidden="true">
+  <canvas id="learn-more-qr" width="168" height="168"></canvas>
+  <span>SCAN · LEARN MORE</span>
+</div>
+<div class="tuning-watermark" id="tuning-watermark" aria-hidden="true">
+  TUNE1 · SYNC — · DLY 200ms · AUDIO — · SRC — · SHOT — · CAP — · AI — · EMU — · ENC —
+</div>
+<script src="/vendor/qrious.js"></script>
 <script>
 const scale = Number(new URLSearchParams(location.search).get('scale')) || 1;
 if (scale !== 1) document.body.style.zoom = scale;
+const DIAGNOSTIC_BASE = 'https://kody-w.github.io/rappter-plays-pokemon/d/';
+let learnMoreQr = null;
+let lastDiagnosticQrAt = 0;
+if (typeof QRious === 'function') {
+  learnMoreQr = new QRious({
+    element: document.getElementById('learn-more-qr'),
+    value: DIAGNOSTIC_BASE,
+    size: 168,
+    level: 'M',
+    background: '#f8fafc',
+    foreground: '#0b1120',
+    padding: 8
+  });
+} else {
+  document.getElementById('learn-more').hidden = true;
+}
 // Gen-1 internal species index → National Dex number, generated from
 // pret/pokered data/pokemon/dex_order.asm; gaps are MissingNo slots.
 const GEN1_DEX = {1:112,2:115,3:32,4:35,5:21,6:100,7:34,8:80,9:2,10:103,11:108,12:102,13:88,14:94,15:29,16:31,17:104,18:111,19:131,20:59,21:151,22:130,23:90,24:72,25:92,26:123,27:120,28:9,29:127,30:114,33:58,34:95,35:22,36:16,37:79,38:64,39:75,40:113,41:67,42:122,43:106,44:107,45:24,46:47,47:54,48:96,49:76,51:126,53:125,54:82,55:109,57:56,58:86,59:50,60:128,64:83,65:48,66:149,70:84,71:60,72:124,73:146,74:144,75:145,76:132,77:52,78:98,82:37,83:38,84:25,85:26,88:147,89:148,90:140,91:141,92:116,93:117,96:27,97:28,98:138,99:139,100:39,101:40,102:133,103:136,104:135,105:134,106:66,107:41,108:23,109:46,110:61,111:62,112:13,113:14,114:15,116:85,117:57,118:51,119:49,120:87,123:10,124:11,125:12,126:68,128:55,129:97,130:42,131:150,132:143,133:129,136:89,138:99,139:91,141:101,142:36,143:110,144:53,145:105,147:93,148:63,149:65,150:17,151:18,152:121,153:1,154:3,155:73,157:118,158:119,163:77,164:78,165:19,166:20,167:33,168:30,169:74,170:137,171:142,173:81,176:4,177:7,178:5,179:8,180:6,185:43,186:44,187:45,188:69,189:70,190:71};
@@ -437,6 +483,7 @@ function renderSnapshot(s, host) {
 }
 
 function renderNonParty(s, host) {
+  renderTuning(host);
   const modeText =
     s.player && s.player.paused ? 'paused'
       : (s.player && s.player.mode === 'ai' ? 'Copilot at the controls' : (s.player ? s.player.mode : '—'));
@@ -486,6 +533,14 @@ function renderNonParty(s, host) {
     document.getElementById('clips-count').textContent =
       host.clips_count === null ? '—' : host.clips_count;
     document.getElementById('clip-loc').textContent = host.latest_clip_location || '—';
+    const hintState = host.crowd_hints_enabled
+      ? String(host.crowd_hints_state || 'waiting').toUpperCase()
+      : 'OFF';
+    document.getElementById('crowd-hints').textContent = hintState;
+    document.getElementById('web-research').textContent =
+      host.web_research_enabled
+        ? String(host.web_research_state || 'idle').toUpperCase()
+        : 'OFF';
 
     document.getElementById('mini-speed').textContent =
       typeof host.emulation_speed === 'number'
@@ -510,6 +565,111 @@ function renderNonParty(s, host) {
       feed.appendChild(item);
     }
   }
+}
+
+function renderTuning(host) {
+  const tuning = host && host.tuning;
+  const number = value => typeof value === 'number' && Number.isFinite(value);
+  const milliseconds = value => number(value)
+    ? (value > 0 ? '+' : '') + Math.round(value) + 'ms'
+    : '—';
+  const age = value => number(value) ? Math.round(value) + 'ms' : '—';
+  const percent = value => number(value) ? value.toFixed(1) + '%' : '—';
+  const fps = value => number(value) ? value.toFixed(1) + 'fps' : '—';
+  const seconds = value => number(value) ? value.toFixed(1) + 's' : '—';
+  const uptime = tuning && number(tuning.encoder_uptime_seconds)
+    ? Math.round(tuning.encoder_uptime_seconds) + 's'
+    : '—';
+  document.getElementById('tuning-watermark').textContent = [
+    'TUNE1',
+    'SYNC ' + milliseconds(tuning && tuning.av_clock_drift_ms),
+    'DLY ' + age(tuning && tuning.configured_audio_delay_ms),
+    'AUDIO ' + percent(tuning && tuning.audio_fill_percent),
+    'SRC ' + age(tuning && tuning.source_age_ms),
+    'SHOT ' + age(tuning && tuning.capture_age_ms),
+    'CAP ' + fps(tuning && tuning.capture_fps),
+    'AI ' + seconds(host && host.decision_latency_seconds),
+    'EFF ' + ((host && host.reasoning_effort) || '—').toUpperCase(),
+    'HINT ' + (host && host.crowd_hints_enabled
+      ? String(host.crowd_hints_state || 'waiting').toUpperCase() : 'OFF'),
+    'NAV ' + (host && Number.isInteger(host.navigation_memory_count)
+      ? host.navigation_memory_count : '—'),
+    'WEB ' + (host && host.web_research_enabled
+      ? String(host.web_research_state || 'idle').toUpperCase() +
+        '/' + (Number.isInteger(host.web_research_source_count)
+          ? host.web_research_source_count : '—')
+      : 'OFF'),
+    'EMU ' + (number(host && host.emulation_speed)
+      ? host.emulation_speed.toFixed(2) + 'x' : '—'),
+    'ENC ' + ((tuning && tuning.encoder_state) || '—').toUpperCase() + '/' + uptime
+  ].join(' · ');
+  renderDiagnosticQr(host);
+}
+
+function renderDiagnosticQr(host) {
+  if (!learnMoreQr || !host || !host.tuning) return;
+  const now = Date.now();
+  const tuning = host.tuning;
+  const required = [
+    tuning.av_clock_drift_ms,
+    tuning.audio_fill_percent,
+    tuning.source_age_ms,
+    tuning.capture_age_ms,
+    tuning.capture_fps,
+    host.decision_latency_seconds,
+    host.emulation_speed
+  ];
+  if (required.some(value =>
+    typeof value !== 'number' || !Number.isFinite(value))) return;
+  if (now - lastDiagnosticQrAt < 15000) return;
+  const params = new URLSearchParams({v: '1'});
+  const put = (key, value, digits = 0) => {
+    if (typeof value !== 'number' || !Number.isFinite(value)) return;
+    params.set(key, value.toFixed(digits));
+  };
+  put('s', tuning.av_clock_drift_ms);
+  put('d', tuning.configured_audio_delay_ms);
+  put('a', tuning.audio_fill_percent, 1);
+  put('f', tuning.source_age_ms);
+  put('h', tuning.capture_age_ms);
+  put('c', tuning.capture_fps, 1);
+  put('i', host.decision_latency_seconds, 1);
+  put('e', host.emulation_speed, 2);
+  put('u', tuning.encoder_uptime_seconds);
+  params.set('t', String(Math.floor(now / 1000)));
+  const hintCodes = {
+    off: 'o',
+    waiting: 'w',
+    eligible: 'e',
+    mixed: 'm',
+    armed: 'a',
+    prompted: 'p',
+    consumed: 'c',
+    collision_blocked: 'b',
+    context_blocked: 'x',
+    invalid: 'i',
+    missing: 'n'
+  };
+  params.set('g', hintCodes[host.crowd_hints_state] || 'u');
+  if (Number.isInteger(host.navigation_memory_count)) {
+    params.set('q', String(Math.max(0, host.navigation_memory_count)));
+  }
+  const webCodes = {
+    off: 'o',
+    idle: 'i',
+    searching: 's',
+    ready: 'r',
+    failed: 'f'
+  };
+  params.set('w', webCodes[host.web_research_state] || 'u');
+  if (Number.isInteger(host.web_research_source_count)) {
+    params.set('z', String(Math.max(0, host.web_research_source_count)));
+  }
+  if (host.reasoning_effort) {
+    params.set('r', String(host.reasoning_effort).toLowerCase());
+  }
+  learnMoreQr.value = DIAGNOSTIC_BASE + '#' + params.toString();
+  lastDiagnosticQrAt = now;
 }
 
 async function refreshData() {

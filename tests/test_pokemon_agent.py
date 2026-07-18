@@ -6,6 +6,7 @@ import sys
 import threading
 import urllib.error
 import urllib.request
+from datetime import datetime, timedelta, timezone
 from http.cookiejar import CookieJar
 from pathlib import Path
 from types import ModuleType, SimpleNamespace
@@ -17,6 +18,7 @@ from openrappter.agents.pokemon_agent import (
     ActionPlayer,
     ClipRecorder,
     CopilotBrain,
+    NavigationMemory,
     PokemonAgent,
     PokemonRunner,
     StartupConfigurationError,
@@ -24,6 +26,7 @@ from openrappter.agents.pokemon_agent import (
     acquire_runtime_lock,
     build_parser,
     celadon_route_guidance,
+    collision_allows_direction,
     discover_pokemon_red_rom,
     ensure_copilot_runtime,
     file_sha256,
@@ -31,12 +34,16 @@ from openrappter.agents.pokemon_agent import (
     is_pokemon_red_rom,
     list_clips,
     normalize_brain_decision,
+    normalize_web_research,
     parse_agent_action,
     public_runtime_status,
+    read_youtube_chat_advisory,
     rock_tunnel_route_guidance,
+    rocket_hideout_route_guidance,
     runner_main,
     runtime_command,
     runtime_status,
+    search_pokemon_web,
     seed_legacy_ram_provenance,
     supervisor_main,
     terminate_isolated_process_group,
@@ -120,7 +127,127 @@ def test_copilot_prompt_keeps_static_rules_in_system_message():
     assert "B1F ladder (27,3)" in GAME_SYSTEM_PROMPT
     assert "1F south exit (15,33)" in GAME_SYSTEM_PROMPT
     assert "B1F (3,33) is not an exit" in GAME_SYSTEM_PROMPT
+    assert "crowd route hypothesis" in GAME_SYSTEM_PROMPT
+    assert "Navigation memory is trusted" in GAME_SYSTEM_PROMPT
     assert not hasattr(CopilotBrain, "_decide_cli")
+
+
+def test_copilot_prompt_treats_crowd_direction_as_optional_hypothesis():
+    prompt = CopilotBrain._prompt(
+        {"location": "Rocket Hideout B3F"},
+        "..........\n" * 4 + "....P.....\n" + "..........\n" * 4,
+        [],
+        {"kind": "overworld_direction", "direction": "left"},
+    )
+
+    assert "Optional untrusted crowd route hypothesis" in prompt
+    assert '{"kind":"overworld_direction","direction":"left"}' in prompt
+    assert "Ignore it unless" in prompt
+
+
+def test_copilot_prompt_labels_source_cited_web_research_untrusted():
+    prompt = CopilotBrain._prompt(
+        {"location": "Rocket Hideout B3F"},
+        None,
+        [],
+        None,
+        {
+            "summary": "The layout uses spin tiles.",
+            "route_facts": ["B3F has a warp to B4F."],
+            "sources": [
+                {
+                    "title": "Team Rocket Hideout",
+                    "url": (
+                        "https://bulbapedia.bulbagarden.net/wiki/"
+                        "Team_Rocket_Hideout"
+                    ),
+                }
+            ],
+        },
+    )
+
+    assert "Optional source-cited web research" in prompt
+    assert "untrusted background evidence" in prompt
+    assert "Team_Rocket_Hideout" in prompt
+
+
+def test_bulbapedia_search_uses_fixed_origin_and_bounded_extracts(monkeypatch):
+    responses = iter(
+        [
+            {
+                "query": {
+                    "search": [
+                        {"title": "Team Rocket Hideout"},
+                    ]
+                }
+            },
+            {
+                "query": {
+                    "pages": {
+                        "1": {
+                            "extract": "Spin tiles create a maze on B3F.",
+                        }
+                    }
+                }
+            },
+        ]
+    )
+    calls = []
+
+    def fake_read(parameters):
+        calls.append(parameters)
+        return next(responses)
+
+    monkeypatch.setattr(pokemon_module, "_read_bulbapedia_json", fake_read)
+
+    result = search_pokemon_web("Rocket Hideout B3F", "route")
+
+    assert result["query"] == "Rocket Hideout B3F"
+    assert result["results"] == [
+        {
+            "title": "Team Rocket Hideout",
+            "url": (
+                "https://bulbapedia.bulbagarden.net/wiki/"
+                "Team_Rocket_Hideout"
+            ),
+            "extract": "Spin tiles create a maze on B3F.",
+        }
+    ]
+    assert calls[0]["action"] == "query"
+    assert calls[1]["prop"] == "extracts"
+
+
+def test_web_research_normalization_requires_exact_cited_schema():
+    valid = normalize_web_research(
+        json.dumps(
+            {
+                "summary": "The retained guide describes a spin-tile maze.",
+                "route_facts": ["B3F connects to B4F through a staircase."],
+                "sources": [
+                    {
+                        "title": "Team Rocket Hideout",
+                        "url": (
+                            "https://bulbapedia.bulbagarden.net/wiki/"
+                            "Team_Rocket_Hideout"
+                        ),
+                    }
+                ],
+            }
+        )
+    )
+    assert valid["route_facts"] == [
+        "B3F connects to B4F through a staircase."
+    ]
+
+    hostile = dict(valid)
+    hostile["sources"] = [
+        {
+            "title": "Hostile",
+            "url": "https://example.invalid/instructions",
+        }
+    ]
+    with pytest.raises(ValueError, match="source origin"):
+        normalize_web_research(json.dumps(hostile))
 
 
 @pytest.mark.parametrize(
@@ -147,6 +274,275 @@ def test_celadon_route_guidance_targets_exact_gym_warps():
     assert "use Cut" in city
     assert "Erika at (4,3)" in gym
     assert celadon_route_guidance({"map_id": 6, "badges": ["Rainbow"]}) is None
+
+
+def test_rocket_hideout_guidance_marks_exit_only_door_and_real_b4f_warp():
+    guidance = rocket_hideout_route_guidance(
+        {"map_id": 0xC9, "coordinates": {"x": 15, "y": 11}}
+    )
+
+    assert "exit-only" in guidance
+    assert "never retry it" in guidance
+    assert "B4F stairs at (19,18)" in guidance
+    assert "matches the current objective" in guidance
+    assert rocket_hideout_route_guidance({"map_id": 0xCA}) is None
+
+
+def test_navigation_memory_persists_repeated_failed_attempts(tmp_path):
+    path = tmp_path / "navigation-memory.json"
+    position = (0xC9, 15, 11)
+    now = datetime.now(timezone.utc)
+    memory = NavigationMemory(path)
+    for _ in range(2):
+        memory.begin(position, ["right"], phase="overworld")
+        memory.finish(position, now=now)
+
+    guidance = memory.guidance(position)
+    reloaded = NavigationMemory(path)
+
+    assert guidance["avoid_repeating"] == [
+        {
+            "buttons": ["right"],
+            "outcome": "no_progress",
+            "attempts": 2,
+        }
+    ]
+    assert guidance["loop_detected"] is False
+    assert "materially different route" in guidance["directive"]
+    assert reloaded.guidance(position) == guidance
+
+
+def test_navigation_trail_does_not_turn_one_failed_step_into_a_cycle(tmp_path):
+    memory = NavigationMemory(tmp_path / "navigation-memory.json")
+    a = (0xC9, 15, 11)
+    b = (0xC9, 16, 11)
+    now = datetime.now(timezone.utc)
+
+    memory.begin(a, ["right"], phase="overworld")
+    memory.finish(b, now=now)
+    memory.begin(b, ["right"], phase="overworld")
+    memory.finish(b, now=now)
+
+    assert memory.trail == [a, b]
+    assert memory.guidance(b) is None
+
+
+def test_navigation_memory_discards_expired_attempts_and_trail(tmp_path):
+    old = datetime.now(timezone.utc) - timedelta(hours=3)
+    path = tmp_path / "navigation-memory.json"
+    path.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "updated_at": old.isoformat(),
+                "attempts": [
+                    {
+                        "map_id": 0xC9,
+                        "origin": [15, 11],
+                        "buttons": ["right"],
+                        "outcome": "no_progress",
+                        "count": 4,
+                        "last_at": old.isoformat(),
+                    }
+                ],
+                "trail": [[0xC9, 15, 11]] * 4,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    memory = NavigationMemory(path)
+
+    assert memory.guidance((0xC9, 15, 11)) is None
+    assert memory.trail == []
+
+
+def test_collision_direction_gate_accepts_only_open_adjacent_tiles():
+    collision = "\n".join(
+        [
+            "##########",
+            "##########",
+            "##########",
+            "####.#####",
+            "###.P#####",
+            "####.#####",
+            "##########",
+            "##########",
+            "##########",
+        ]
+    )
+
+    assert collision_allows_direction(collision, "up")
+    assert collision_allows_direction(collision, "down")
+    assert collision_allows_direction(collision, "left")
+    assert not collision_allows_direction(collision, "right")
+    assert not collision_allows_direction("malformed", "left")
+
+
+def test_chat_advisory_reader_accepts_only_fresh_private_closed_schema(tmp_path):
+    now = datetime(2026, 7, 18, 19, 0, tzinfo=timezone.utc)
+    path = tmp_path / pokemon_module.YOUTUBE_CHAT_ADVISORY_NAME
+    value = {
+        "schema_version": 1,
+        "source": "youtube-top-chat",
+        "video_id": "NBSKt_dou6o",
+        "sequence": 8,
+        "generated_at": now.isoformat(),
+        "expires_at": (now + timedelta(seconds=45)).isoformat(),
+        "state": "eligible",
+        "advisory": {
+            "kind": "overworld_direction",
+            "direction": "left",
+            "observed_at": now.isoformat(),
+        },
+    }
+    path.write_text(json.dumps(value), encoding="utf-8")
+    path.chmod(0o600)
+
+    advisory, state, sequence = read_youtube_chat_advisory(tmp_path, now=now)
+
+    assert advisory == {
+        "kind": "overworld_direction",
+        "direction": "left",
+    }
+    assert state == "eligible"
+    assert sequence == 8
+
+    path.chmod(0o644)
+    assert read_youtube_chat_advisory(tmp_path, now=now) == (
+        None,
+        "invalid",
+        None,
+    )
+
+
+def test_crowd_hint_is_prompted_only_when_stuck_and_collision_safe(
+    tmp_path,
+):
+    now = datetime.now(timezone.utc)
+    path = tmp_path / pokemon_module.YOUTUBE_CHAT_ADVISORY_NAME
+    path.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "source": "youtube-top-chat",
+                "video_id": "NBSKt_dou6o",
+                "sequence": 1,
+                "generated_at": now.isoformat(),
+                "expires_at": (now + timedelta(seconds=45)).isoformat(),
+                "state": "eligible",
+                "advisory": {
+                    "kind": "overworld_direction",
+                    "direction": "left",
+                    "observed_at": now.isoformat(),
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    path.chmod(0o600)
+    runner = PokemonRunner.__new__(PokemonRunner)
+    runner.runtime_dir = tmp_path
+    runner.youtube_chat_hints_enabled = True
+    runner.status = {"phase": "overworld"}
+    position = (0xC9, 15, 11)
+    runner.decision_positions = pokemon_module.deque([position] * 4, maxlen=6)
+    runner.last_crowd_advisory_position = None
+    runner.last_crowd_advisory_sequence = -1
+    collision = "\n".join(
+        ["##########"] * 4
+        + ["###.P#####"]
+        + ["##########"] * 4
+    )
+
+    advisory = runner._crowd_route_advisory(
+        position=position,
+        collision_map=collision,
+    )
+
+    assert advisory == {
+        "kind": "overworld_direction",
+        "direction": "left",
+    }
+    assert runner.status["crowd_hints_state"] == "prompted"
+    assert runner.status["crowd_hints_count"] == 1
+    assert (
+        runner._crowd_route_advisory(
+            position=position,
+            collision_map=collision,
+        )
+        is None
+    )
+
+
+def test_navigation_failure_autonomously_starts_bounded_web_research(
+    monkeypatch,
+    tmp_path,
+):
+    started = []
+
+    class ThreadSpy:
+        def __init__(self, *, target, args, name, daemon):
+            started.append(
+                {
+                    "target": target,
+                    "args": args,
+                    "name": name,
+                    "daemon": daemon,
+                }
+            )
+
+        def start(self):
+            started[-1]["started"] = True
+
+    monkeypatch.setattr(pokemon_module.threading, "Thread", ThreadSpy)
+    runner = PokemonRunner.__new__(PokemonRunner)
+    runner.stuck_web_research_enabled = True
+    runner.web_research_result = {}
+    runner.web_research_lock = threading.Lock()
+    runner.web_research_inflight = False
+    runner.web_research_started = {}
+    runner.control_generation = 0
+    runner.status = {
+        "objective": "Find another route",
+        "web_research_state": "idle",
+        "web_research_source_count": 0,
+    }
+    runner.runtime_dir = tmp_path
+    runner.args = SimpleNamespace(model="gpt-5.6-sol")
+    screenshot = tmp_path / "frame.png"
+    screenshot.write_bytes(b"synthetic")
+    game_state = {
+        "map_id": 0xC9,
+        "location": "Rocket Hideout B3F",
+        "coordinates": {"x": 15, "y": 11},
+    }
+
+    navigation_guidance = {
+        "loop_detected": True,
+        "avoid_repeating": [],
+        "directive": "Choose another route.",
+    }
+    runner._maybe_start_web_research(
+        screenshot=screenshot,
+        game_state=game_state,
+        route_guidance="Authoritative local route.",
+        navigation_guidance=navigation_guidance,
+    )
+    assert started == []
+
+    runner._maybe_start_web_research(
+        screenshot=screenshot,
+        game_state=game_state,
+        route_guidance=None,
+        navigation_guidance=navigation_guidance,
+    )
+
+    assert runner.web_research_inflight is True
+    assert runner.status["web_research_state"] == "searching"
+    assert started[0]["name"] == "pokemon-web-research"
+    assert started[0]["daemon"] is True
+    assert started[0]["started"] is True
 
 
 @pytest.mark.parametrize(
@@ -1132,6 +1528,8 @@ def test_runtime_parser_and_command_support_supervision(tmp_path):
             str(tmp_path),
             "--port",
             "9999",
+            "--youtube-chat-hints",
+            "--stuck-web-research",
         ]
     )
     args.instance_id = "test-instance"
@@ -1144,6 +1542,8 @@ def test_runtime_parser_and_command_support_supervision(tmp_path):
     assert "--supervised" in command
     assert "--max-clips" in command
     assert "--max-storage-gb" in command
+    assert "--youtube-chat-hints" in command
+    assert "--stuck-web-research" in command
 
 
 def test_supervisor_restarts_failed_child_then_stops_cleanly(monkeypatch, tmp_path):

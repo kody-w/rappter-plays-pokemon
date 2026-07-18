@@ -519,6 +519,56 @@ def test_pages_story_player_has_a_strict_public_data_boundary():
     assert "min-width: 320px" in css
 
 
+def test_pages_qr_destination_is_project_first_and_fragment_only():
+    diagnostics_dir = DOCS / "d"
+    html = (diagnostics_dir / "index.html").read_text(encoding="utf-8")
+    css = (diagnostics_dir / "diagnostics.css").read_text(encoding="utf-8")
+    javascript = (diagnostics_dir / "diagnostics.js").read_text(encoding="utf-8")
+    parser = ParsedHTML()
+    parser.feed(html)
+
+    csp = next(
+        meta["content"]
+        for meta in parser.attributes("meta")
+        if meta.get("http-equiv") == "Content-Security-Policy"
+    )
+    assert csp == (
+        "default-src 'none'; base-uri 'none'; form-action 'none'; "
+        "object-src 'none'; script-src 'self'; style-src 'self'"
+    )
+    assert {script["src"] for script in parser.attributes("script")} == {
+        "./diagnostics.js"
+    }
+    assert "Meet the agent playing Pokémon Red." in html
+    assert html.index("How the autonomous run works") < html.index(
+        "Optional technical snapshot"
+    )
+    links = {anchor["href"] for anchor in parser.attributes("a")}
+    assert "../" in links
+    assert "../story/" in links
+    assert "https://github.com/kody-w/rappter-plays-pokemon" in links
+    assert (
+        "https://github.com/kody-w/rappter-plays-pokemon/issues/new"
+        in links
+    )
+    assert "location.hash" in javascript
+    assert "buildIssueUrl" in javascript
+    assert "NBSKt_dou6o" in javascript
+    for forbidden in (
+        "fetch(",
+        "XMLHttpRequest",
+        "innerHTML",
+        "localStorage",
+        "sessionStorage",
+        "document.cookie",
+        "serviceWorker",
+    ):
+        assert forbidden not in javascript
+    assert "textContent" in javascript
+    assert "@media (prefers-reduced-motion: reduce)" in css
+    assert "@media (forced-colors: active)" in css
+
+
 def test_v1_rollback_and_v2_return_trees_are_cache_isolated():
     old_host = (HOST / "index.html").read_text()
     old_watch = (WATCH / "index.html").read_text()

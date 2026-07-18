@@ -176,6 +176,20 @@ def test_node_parses_all_browser_javascript_and_runs_contracts():
         story_player_contract.stderr or story_player_contract.stdout
     )
 
+    diagnostics_contract = subprocess.run(
+        [node, str(ROOT / "tests" / "diagnostics_contract_harness.js")],
+        cwd=ROOT,
+        input=(ROOT / "docs" / "d" / "diagnostics.js").read_text(
+            encoding="utf-8"
+        ),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert diagnostics_contract.returncode == 0, (
+        diagnostics_contract.stderr or diagnostics_contract.stdout
+    )
+
     trystero_cleanup_contract = subprocess.run(
         [node, str(ROOT / "tests" / "trystero_cleanup_harness.js")],
         cwd=ROOT,
@@ -187,3 +201,54 @@ def test_node_parses_all_browser_javascript_and_runs_contracts():
     assert trystero_cleanup_contract.returncode == 0, (
         trystero_cleanup_contract.stderr or trystero_cleanup_contract.stdout
     )
+
+
+def test_overlay_exposes_screenshot_safe_tuning_metrics_and_qr():
+    checker = runpy.run_path(str(CHECKER))
+    scripts = checker["browser_scripts"]()
+    overlay = scripts["scripts/overlay/overlay.html#script"]
+    encoder = scripts["scripts/overlay/stream_overlay.mjs"]
+    html = (ROOT / "scripts" / "overlay" / "overlay.html").read_text()
+
+    assert 'id="tuning-watermark"' in html
+    assert 'id="learn-more-qr"' in html
+    assert 'src="/vendor/qrious.js"' in html
+    assert "https://kody-w.github.io/rappter-plays-pokemon/d/" in overlay
+    assert "lastDiagnosticQrAt" in overlay
+    for label in (
+        "TUNE1",
+        "SYNC ",
+        "DLY ",
+        "AUDIO ",
+        "SRC ",
+        "SHOT ",
+        "CAP ",
+        "AI ",
+        "EFF ",
+        "HINT ",
+        "NAV ",
+        "WEB ",
+        "EMU ",
+        "ENC ",
+    ):
+        assert label in overlay
+    for field in (
+        "av_clock_drift_ms",
+        "configured_audio_delay_ms",
+        "audio_fill_percent",
+        "source_age_ms",
+        "capture_age_ms",
+        "capture_fps",
+        "encoder_uptime_seconds",
+        "decision_latency_seconds",
+        "reasoning_effort",
+        "crowd_hints_enabled",
+        "crowd_hints_state",
+        "crowd_hints_count",
+        "navigation_memory_count",
+        "web_research_enabled",
+        "web_research_state",
+        "web_research_source_count",
+    ):
+        assert field in encoder
+    assert "innerHTML" not in overlay

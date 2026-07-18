@@ -37,6 +37,7 @@ dev = [
 rappter-plays-pokemon = "rappter_plays_pokemon.cli:main"
 rappter-register-pokemon = "rappter_plays_pokemon.install_agent:main"
 rappter-pokemon-story = "rappter_plays_pokemon.story:main"
+rappter-youtube-chat = "rappter_plays_pokemon.youtube_chat:main"
 
 [project.urls]
 Homepage = "https://github.com/kody-w/rappter-plays-pokemon"

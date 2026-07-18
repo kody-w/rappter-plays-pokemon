@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta
+    http-equiv="Content-Security-Policy"
+    content="default-src 'none'; base-uri 'none'; form-action 'none'; object-src 'none'; script-src 'self'; style-src 'self'"
+  >
+  <meta name="referrer" content="no-referrer">
+  <meta name="theme-color" content="#090d18">
+  <link rel="stylesheet" href="./diagnostics.css">
+  <script src="./diagnostics.js" defer></script>
+  <title>Learn More — RAPPter Plays Pokémon</title>
+</head>
+<body>
+  <header>
+    <a class="brand" href="../">
+      <span class="brand-mark" aria-hidden="true">RPP</span>
+      <span>RAPPter Plays Pokémon</span>
+    </a>
+    <a href="../">Watch live</a>
+  </header>
+
+  <main>
+    <p class="eyebrow">Scanned from the live stream</p>
+    <h1>Meet the agent playing Pokémon Red.</h1>
+    <p class="lede">
+      RAPPter Plays Pokémon is an experimental autonomous run where GitHub
+      Copilot watches the game, chooses controller inputs, builds its own
+      objectives, and checkpoints progress toward the Hall of Fame.
+    </p>
+
+    <nav class="actions primary-actions" aria-label="Project links">
+      <a class="primary" href="../">Open the live stream</a>
+      <a href="../story/">Catch up in the story theater</a>
+      <a href="https://github.com/kody-w/rappter-plays-pokemon">Explore the code</a>
+    </nav>
+
+    <section class="explainer" aria-label="How the autonomous run works">
+      <article>
+        <span>01</span>
+        <h2>Observe</h2>
+        <p>Copilot receives the current game screen and a bounded state snapshot.</p>
+      </article>
+      <article>
+        <span>02</span>
+        <h2>Decide</h2>
+        <p>The model returns controller inputs while the game continues in real time.</p>
+      </article>
+      <article>
+        <span>03</span>
+        <h2>Persist</h2>
+        <p>Automatic checkpoints let the same adventure survive restarts.</p>
+      </article>
+    </section>
+
+    <section class="crowd-help" aria-labelledby="crowd-help-title">
+      <div>
+        <p class="section-kicker">Optional crowd hints</p>
+        <h2 id="crowd-help-title">Helpful viewers can suggest a direction.</h2>
+        <p>
+          Use one exact ballot in YouTube chat. At least two distinct recent
+          viewers must agree, and Copilot considers it only if the run appears
+          stuck and the adjacent tile is open. It may ignore every hint.
+        </p>
+      </div>
+      <div class="hint-commands" aria-label="Accepted crowd hint commands">
+        <code>!hint up</code>
+        <code>!hint down</code>
+        <code>!hint left</code>
+        <code>!hint right</code>
+      </div>
+    </section>
+
+    <div class="technical-intro">
+      <p class="section-kicker">Optional technical snapshot</p>
+      <h2>What the encoder saw when this QR was rendered</h2>
+      <p>
+        The QR also carries a short, nonsecret tuning snapshot in its URL
+        fragment. The fragment stays on this device and is not sent to GitHub
+        Pages.
+      </p>
+      <div class="technical-actions">
+        <a id="report-issue" href="https://github.com/kody-w/rappter-plays-pokemon/issues/new">
+          Report a stream problem
+        </a>
+        <span>Opens a prefilled draft issue for review before submission.</span>
+      </div>
+    </div>
+
+    <section class="summary" aria-labelledby="snapshot-title">
+      <div>
+        <p class="section-kicker">Snapshot health</p>
+        <h2 id="snapshot-title">Waiting for overlay data</h2>
+      </div>
+      <span id="health-badge" class="health unknown">Unknown</span>
+    </section>
+
+    <section id="metrics" class="metrics" aria-label="Decoded stream metrics" hidden>
+      <article>
+        <h2>A/V clock drift</h2>
+        <p id="sync-value" class="value">—</p>
+        <p>Encoder input-clock difference. Near zero is healthiest.</p>
+      </article>
+      <article>
+        <h2>Configured audio delay</h2>
+        <p id="delay-value" class="value">—</p>
+        <p>Intentional audio alignment added after the input clock.</p>
+      </article>
+      <article>
+        <h2>Real audio fill</h2>
+        <p id="audio-value" class="value">—</p>
+        <p>Share of the last 10 seconds supplied by game audio, not silence.</p>
+      </article>
+      <article>
+        <h2>Source frame age</h2>
+        <p id="source-value" class="value">—</p>
+        <p>Age of the latest frame written by the game runtime.</p>
+      </article>
+      <article>
+        <h2>Capture frame age</h2>
+        <p id="capture-age-value" class="value">—</p>
+        <p>Age of the newest Chromium screencast frame.</p>
+      </article>
+      <article>
+        <h2>Capture rate</h2>
+        <p id="capture-fps-value" class="value">—</p>
+        <p>Recent Chromium screencast frames per second.</p>
+      </article>
+      <article>
+        <h2>AI response</h2>
+        <p id="ai-value" class="value">—</p>
+        <p>Most recent Copilot decision latency and reasoning effort.</p>
+      </article>
+      <article>
+        <h2>Emulation speed</h2>
+        <p id="emulation-value" class="value">—</p>
+        <p>Measured game speed relative to real time.</p>
+      </article>
+      <article>
+        <h2>Encoder uptime</h2>
+        <p id="uptime-value" class="value">—</p>
+        <p>Seconds since the current overlay encoder started.</p>
+      </article>
+      <article>
+        <h2>Crowd hint gate</h2>
+        <p id="hint-value" class="value">—</p>
+        <p>Whether a strict opt-in route ballot was eligible or withheld.</p>
+      </article>
+      <article>
+        <h2>Navigation memory</h2>
+        <p id="navigation-value" class="value">—</p>
+        <p>Repeated failed or cycling attempts currently remembered.</p>
+      </article>
+      <article>
+        <h2>Autonomous web recovery</h2>
+        <p id="web-value" class="value">—</p>
+        <p>Bounded source-cited research state and accepted source count.</p>
+      </article>
+    </section>
+
+    <section id="no-snapshot" class="empty">
+      <h2>No tuning snapshot was attached.</h2>
+      <p>
+        The project links above still work normally. A QR scanned directly from
+        the live overlay or a recent screenshot also includes these optional
+        encoder metrics.
+      </p>
+    </section>
+  </main>
+
+  <footer>
+    Metrics are diagnostic estimates, not guarantees of end-to-end viewer
+    playback latency.
+  </footer>
+</body>
+</html>

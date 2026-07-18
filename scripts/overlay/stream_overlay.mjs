@@ -14,7 +14,7 @@
 // directory (npm install playwright).
 
 import {createServer} from 'node:http';
-import {readFile, readdir} from 'node:fs/promises';
+import {readFile, readdir, stat} from 'node:fs/promises';
 import {readFileSync, existsSync, openSync, readSync, closeSync, constants as fsConstants} from 'node:fs';
 import {spawn} from 'node:child_process';
 import {homedir} from 'node:os';
@@ -32,6 +32,7 @@ try {
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const FRAME_RATE = 20;
 const STALL_EXIT_MS = 60000;
+const BACKPRESSURE_EXIT_MS = 30000;
 
 function parseArgs(argv) {
   const args = {
@@ -86,6 +87,72 @@ if (!existsSync(path.join(runtimeDir, 'latest.png'))) {
 }
 const target = resolveTarget(args);
 const overlayHtml = await readFile(path.join(SCRIPT_DIR, 'overlay.html'));
+const qriousRuntime = await readFile(
+  path.join(
+    SCRIPT_DIR,
+    '..',
+    '..',
+    'vendor',
+    'browser',
+    'qrious-4.0.2.runtime.min.js'
+  )
+);
+const encoderMetrics = {
+  audioSent: 0,
+  audioWindow: [],
+  captureTimes: [],
+  encoderStartedAt: 0,
+  audioBackpressureAt: 0,
+  videoBackpressureAt: 0,
+  lastShotAt: 0,
+  piped: 0
+};
+
+function tuningSnapshot(sourceAgeMs) {
+  const now = Date.now();
+  const recentAudio = encoderMetrics.audioWindow
+    .filter(sample => sample.at >= now - 10000);
+  encoderMetrics.audioWindow = recentAudio;
+  const audioTotal = recentAudio.reduce((total, sample) => total + sample.total, 0);
+  const audioReal = recentAudio.reduce((total, sample) => total + sample.real, 0);
+  const captureTimes = encoderMetrics.captureTimes
+    .filter(timestamp => timestamp >= now - 5000);
+  encoderMetrics.captureTimes = captureTimes;
+  const captureSpan = captureTimes.length > 1
+    ? (captureTimes[captureTimes.length - 1] - captureTimes[0]) / 1000
+    : 0;
+  const audioClock = encoderMetrics.audioSent > 0
+    ? encoderMetrics.audioSent / (48000 * 2 * 2) * 1000
+    : null;
+  const videoClock = encoderMetrics.piped > 0
+    ? encoderMetrics.piped / FRAME_RATE * 1000
+    : null;
+  return {
+    schema_version: 1,
+    av_clock_drift_ms:
+      audioClock === null || videoClock === null
+        ? null
+        : Math.round(audioClock - videoClock),
+    configured_audio_delay_ms: 200,
+    audio_fill_percent:
+      audioTotal > 0 ? Math.round(audioReal / audioTotal * 1000) / 10 : null,
+    source_age_ms:
+      Number.isFinite(sourceAgeMs) ? Math.max(0, Math.round(sourceAgeMs)) : null,
+    capture_age_ms:
+      encoderMetrics.lastShotAt
+        ? Math.max(0, Math.round(now - encoderMetrics.lastShotAt))
+        : null,
+    capture_fps:
+      captureSpan > 0
+        ? Math.round((captureTimes.length - 1) / captureSpan * 10) / 10
+        : null,
+    encoder_uptime_seconds:
+      encoderMetrics.encoderStartedAt
+        ? Math.max(0, Math.round((now - encoderMetrics.encoderStartedAt) / 1000))
+        : null,
+    encoder_state: encoderMetrics.encoderStartedAt ? 'up' : 'starting'
+  };
+}
 
 const server = createServer(async (request, response) => {
   const url = new URL(request.url, 'http://localhost');
@@ -93,6 +160,12 @@ const server = createServer(async (request, response) => {
     if (url.pathname === '/') {
       response.writeHead(200, {'Content-Type': 'text/html; charset=utf-8'});
       response.end(overlayHtml);
+    } else if (url.pathname === '/vendor/qrious.js') {
+      response.writeHead(200, {
+        'Content-Type': 'text/javascript; charset=utf-8',
+        'Cache-Control': 'public, max-age=31536000, immutable'
+      });
+      response.end(qriousRuntime);
     } else if (url.pathname === '/frame.png') {
       const png = await readFile(path.join(runtimeDir, 'latest.png'));
       response.writeHead(200, {
@@ -104,6 +177,24 @@ const server = createServer(async (request, response) => {
       const telemetry = JSON.parse(
         await readFile(path.join(runtimeDir, 'kite-telemetry.json'), 'utf-8')
       );
+      const host = {
+        brain_status: 'idle',
+        actions_taken: null,
+        clips_count: null,
+        latest_clip_location: null,
+        brain_recent: [],
+        emulation_speed: null,
+        decision_latency_seconds: null,
+        reasoning_effort: null,
+        crowd_hints_enabled: false,
+        crowd_hints_state: 'off',
+        crowd_hints_count: 0,
+        navigation_memory_count: 0,
+        web_research_enabled: false,
+        web_research_state: 'off',
+        web_research_source_count: 0,
+        tuning: null
+      };
       try {
         const brain = JSON.parse(
           await readFile(path.join(runtimeDir, 'brain.json'), 'utf-8')
@@ -116,31 +207,56 @@ const server = createServer(async (request, response) => {
               await readFile(path.join(runtimeDir, 'clips', newest), 'utf-8')
             )
           : null;
-        telemetry.host = {
-          brain_status:
-            brain.updated_at &&
-            Date.now() - Date.parse(brain.updated_at) < 120000
-              ? 'active' : 'idle',
-          actions_taken: brain.total_decisions ?? null,
-          clips_count: newest
-            ? Number((newest.match(/^clip-0*(\d+)/) || [])[1]) || metas.length
-            : null,
-          latest_clip_location:
-            latest && latest.game_state ? latest.game_state.location ?? null : null,
-          brain_recent: Array.isArray(brain.history)
-            ? brain.history.slice(-3).reverse().map(entry => ({
-                reason: entry.reason || '',
-                at: entry.timestamp || null
-              }))
-            : []
-        };
-        try {
-          const agentStatus = JSON.parse(
-            await readFile(path.join(runtimeDir, 'status.json'), 'utf-8')
-          );
-          telemetry.host.emulation_speed = agentStatus.emulation_speed ?? null;
-        } catch (_error) {}
+        host.brain_status =
+          brain.updated_at &&
+          Date.now() - Date.parse(brain.updated_at) < 120000
+            ? 'active' : 'idle';
+        host.actions_taken = brain.total_decisions ?? null;
+        host.clips_count = newest
+          ? Number((newest.match(/^clip-0*(\d+)/) || [])[1]) || metas.length
+          : null;
+        host.latest_clip_location =
+          latest && latest.game_state ? latest.game_state.location ?? null : null;
+        host.brain_recent = Array.isArray(brain.history)
+          ? brain.history.slice(-3).reverse().map(entry => ({
+              reason: entry.reason || '',
+              at: entry.timestamp || null
+            }))
+          : [];
       } catch (_error) {}
+      try {
+        const agentStatus = JSON.parse(
+          await readFile(path.join(runtimeDir, 'status.json'), 'utf-8')
+        );
+        host.emulation_speed = agentStatus.emulation_speed ?? null;
+        host.decision_latency_seconds =
+          agentStatus.decision_latency_seconds ?? null;
+        host.reasoning_effort = agentStatus.reasoning_effort ?? null;
+        host.crowd_hints_enabled =
+          agentStatus.crowd_hints_enabled === true;
+        host.crowd_hints_state =
+          agentStatus.crowd_hints_state ?? 'off';
+        host.crowd_hints_count =
+          Number.isInteger(agentStatus.crowd_hints_count)
+            ? agentStatus.crowd_hints_count : 0;
+        host.navigation_memory_count =
+          Number.isInteger(agentStatus.navigation_memory_count)
+            ? agentStatus.navigation_memory_count : 0;
+        host.web_research_enabled =
+          agentStatus.web_research_enabled === true;
+        host.web_research_state =
+          agentStatus.web_research_state ?? 'off';
+        host.web_research_source_count =
+          Number.isInteger(agentStatus.web_research_source_count)
+            ? agentStatus.web_research_source_count : 0;
+      } catch (_error) {}
+      let sourceAgeMs = null;
+      try {
+        const source = await stat(path.join(runtimeDir, 'latest.png'));
+        sourceAgeMs = Date.now() - source.mtimeMs;
+      } catch (_error) {}
+      host.tuning = tuningSnapshot(sourceAgeMs);
+      telemetry.host = host;
       response.writeHead(200, {
         'Content-Type': 'application/json',
         'Cache-Control': 'no-store'
@@ -171,6 +287,11 @@ await page.goto(
 );
 await page.waitForTimeout(1500);
 
+let stopping = false;
+const stop = () => { stopping = true; };
+process.on('SIGINT', stop);
+process.on('SIGTERM', stop);
+
 const ffmpeg = spawn('ffmpeg', [
   '-hide_banner',
   '-loglevel', 'warning',
@@ -199,6 +320,7 @@ const ffmpeg = spawn('ffmpeg', [
   '-f', 'flv',
   target
 ], {stdio: ['pipe', 'inherit', 'inherit', 'pipe']});
+encoderMetrics.encoderStartedAt = Date.now();
 
 // Audio pacer: the encoder is the audio clock master. Wall-clock time decides
 // exactly how many PCM bytes ffmpeg gets; whatever the agent's FIFO can't
@@ -212,9 +334,23 @@ let audioSent = 0;
 const audioStartedAt = Date.now();
 const audioChunk = Buffer.alloc(AUDIO_BYTES_PER_SECOND / 10);
 const audioTimer = setInterval(() => {
+  const audioPipe = ffmpeg.stdio[3];
+  if (audioPipe && audioPipe.writableNeedDrain) {
+    if (!encoderMetrics.audioBackpressureAt) {
+      encoderMetrics.audioBackpressureAt = Date.now();
+    } else if (
+      Date.now() - encoderMetrics.audioBackpressureAt > BACKPRESSURE_EXIT_MS
+    ) {
+      stopping = true;
+    }
+    return;
+  }
+  encoderMetrics.audioBackpressureAt = 0;
   const due = Math.floor((Date.now() - audioStartedAt) / 1000 * AUDIO_BYTES_PER_SECOND) & ~3;
   let deficit = due - audioSent;
-  if (deficit <= 0 || !ffmpeg.stdio[3] || ffmpeg.exitCode !== null) return;
+  if (deficit <= 0 || !audioPipe || ffmpeg.exitCode !== null) return;
+  let tickReal = 0;
+  let tickTotal = 0;
   while (deficit > 0) {
     const want = Math.min(deficit, audioChunk.length);
     let got = 0;
@@ -238,21 +374,44 @@ const audioTimer = setInterval(() => {
     }
     if (got < want) audioChunk.fill(0, got, want);
     try {
-      ffmpeg.stdio[3].write(Buffer.from(audioChunk.subarray(0, want)));
+      audioPipe.write(Buffer.from(audioChunk.subarray(0, want)));
     } catch (_error) {
       return;
     }
     audioSent += want;
+    tickReal += got;
+    tickTotal += want;
     deficit -= want;
+  }
+  encoderMetrics.audioSent = audioSent;
+  encoderMetrics.audioWindow.push({
+    at: Date.now(),
+    real: tickReal,
+    total: tickTotal
+  });
+  if (encoderMetrics.audioWindow.length > 400) {
+    encoderMetrics.audioWindow.splice(
+      0,
+      encoderMetrics.audioWindow.length - 400
+    );
   }
 }, 50);
 
 let latestShot = null;
 let lastShotAt = Date.now();
+encoderMetrics.lastShotAt = lastShotAt;
 const cdp = await page.context().newCDPSession(page);
 cdp.on('Page.screencastFrame', event => {
   latestShot = Buffer.from(event.data, 'base64');
   lastShotAt = Date.now();
+  encoderMetrics.lastShotAt = lastShotAt;
+  encoderMetrics.captureTimes.push(lastShotAt);
+  if (encoderMetrics.captureTimes.length > 600) {
+    encoderMetrics.captureTimes.splice(
+      0,
+      encoderMetrics.captureTimes.length - 600
+    );
+  }
   cdp.send('Page.screencastFrameAck', {sessionId: event.sessionId}).catch(() => {});
 });
 await cdp.send('Page.startScreencast', {
@@ -267,11 +426,6 @@ console.error(
     ? 'rendering overlay (pipeline test)'
     : 'streaming overlay to RTMP ingest'
 );
-
-let stopping = false;
-const stop = () => { stopping = true; };
-process.on('SIGINT', stop);
-process.on('SIGTERM', stop);
 
 const startedAt = Date.now();
 let piped = 0;
@@ -289,8 +443,21 @@ await new Promise(resolve => {
     }
     if (latestShot) {
       try {
+        if (ffmpeg.stdin.writableNeedDrain) {
+          if (!encoderMetrics.videoBackpressureAt) {
+            encoderMetrics.videoBackpressureAt = Date.now();
+          } else if (
+            Date.now() - encoderMetrics.videoBackpressureAt >
+              BACKPRESSURE_EXIT_MS
+          ) {
+            stopping = true;
+          }
+          return;
+        }
+        encoderMetrics.videoBackpressureAt = 0;
         ffmpeg.stdin.write(latestShot);
         piped += 1;
+        encoderMetrics.piped = piped;
       } catch (_error) {
         clearInterval(timer);
         resolve();

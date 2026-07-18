@@ -119,6 +119,28 @@ def build_parser() -> argparse.ArgumentParser:
         "--reasoning-effort",
         choices=("low", "medium", "high", "max"),
     )
+    chat_group = parser.add_mutually_exclusive_group()
+    chat_group.add_argument(
+        "--youtube-chat-hints",
+        action="store_true",
+        dest="youtube_chat_hints",
+    )
+    chat_group.add_argument(
+        "--no-youtube-chat-hints",
+        action="store_false",
+        dest="youtube_chat_hints",
+    )
+    research_group = parser.add_mutually_exclusive_group()
+    research_group.add_argument(
+        "--stuck-web-research",
+        action="store_true",
+        dest="stuck_web_research",
+    )
+    research_group.add_argument(
+        "--no-stuck-web-research",
+        action="store_false",
+        dest="stuck_web_research",
+    )
     parser.add_argument("--decision-timeout", type=int)
     parser.add_argument("--startup-timeout", type=float)
     parser.add_argument("--max-clips", type=int)
@@ -128,7 +150,13 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--visible", action="store_true", default=None)
     parser.add_argument("--no-open-viewer", action="store_false", dest="open_viewer")
     parser.add_argument("--no-resume", action="store_false", dest="resume")
-    parser.set_defaults(open_viewer=None, resume=None, livestream=None)
+    parser.set_defaults(
+        open_viewer=None,
+        resume=None,
+        livestream=None,
+        youtube_chat_hints=None,
+        stuck_web_research=None,
+    )
     return parser
 
 
@@ -207,6 +235,18 @@ def agent_kwargs(args: argparse.Namespace, config: dict[str, Any]) -> dict[str, 
             config,
             "reasoning_effort",
             "medium",
+        ),
+        "youtube_chat_hints": _configured(
+            args,
+            config,
+            "youtube_chat_hints",
+            False,
+        ),
+        "stuck_web_research": _configured(
+            args,
+            config,
+            "stuck_web_research",
+            False,
         ),
         "decision_timeout": _configured(args, config, "decision_timeout", 180),
         "startup_timeout": _configured(args, config, "startup_timeout", 180),

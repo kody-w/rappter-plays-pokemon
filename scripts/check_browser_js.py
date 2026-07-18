@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import re
 import shutil
 import subprocess
 import sys
@@ -45,6 +46,24 @@ def browser_scripts() -> dict[str, str]:
     scripts[str(story_player.relative_to(ROOT))] = story_player.read_text(
         encoding="utf-8"
     )
+    diagnostics = ROOT / "docs/d/diagnostics.js"
+    scripts[str(diagnostics.relative_to(ROOT))] = diagnostics.read_text(
+        encoding="utf-8"
+    )
+    overlay_path = ROOT / "scripts/overlay/overlay.html"
+    overlay_html = overlay_path.read_text(encoding="utf-8")
+    overlay_script = re.search(
+        r"<script>(.*)</script>",
+        overlay_html,
+        flags=re.DOTALL,
+    )
+    if overlay_script is None:
+        raise RuntimeError("Overlay HTML is missing its inline script")
+    scripts["scripts/overlay/overlay.html#script"] = overlay_script.group(1)
+    overlay_encoder = ROOT / "scripts/overlay/stream_overlay.mjs"
+    scripts[str(overlay_encoder.relative_to(ROOT))] = overlay_encoder.read_text(
+        encoding="utf-8"
+    )
     for path in sorted((ROOT / "vendor/browser").glob("*.js")):
         scripts[str(path.relative_to(ROOT))] = path.read_text(encoding="utf-8")
     return scripts
@@ -53,8 +72,11 @@ def browser_scripts() -> dict[str, str]:
 def check_with_node(node: str) -> None:
     failures: list[str] = []
     for name, source in browser_scripts().items():
+        command = [node, "--check", "-"]
+        if name.endswith(".mjs"):
+            command = [node, "--input-type=module", "--check", "-"]
         result = subprocess.run(
-            [node, "--check", "-"],
+            command,
             input=source,
             text=True,
             capture_output=True,

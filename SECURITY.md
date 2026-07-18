@@ -201,6 +201,12 @@ YouTube ID and bounded integer start/end offsets; the page constructs an exact
 `youtube-nocookie.com` embed. No gameplay recording or screenshot is published
 to GitHub.
 
+The overlay's learn-more QR points to the user-facing `/d/` Pages route. It may
+include bounded encoder metrics only after `#`; fragments do not reach Pages
+HTTP requests or logs. The decoder accepts an exact numeric allowlist and can
+construct a GitHub `issues/new` draft URL. It never submits an issue, uploads a
+screenshot, reads storage/cookies, or sends a network request on its own.
+
 GitHub Pages does not let this repository configure the local server's custom
 HTTP response headers. The published spectator HTML therefore carries a strict
 meta CSP limited to self assets, media blobs, five exact reviewed Nostr WSS
@@ -219,6 +225,40 @@ PeerJS and v1 links remain legacy rollback behavior, not the default.
 The Copilot SDK session has no tools and only gameplay PNG screenshots are
 attached. Local filesystem compromise, a malicious OpenRappter installation,
 or a modified Python environment is outside this project's threat model.
+
+YouTube crowd hints are default-off and handled by a separate credential-free
+Top Chat process. Only exact `!hint up|down|left|right` ballots are eligible.
+The bridge uses ephemeral HMACs to deduplicate distinct viewers, requires a
+strict majority of at least two recent viewers, deletes its private raw sample
+after each poll, and publishes only one expiring direction enum. Names, channel
+IDs, message text, paid/member/moderator status, URLs, and vote counts never
+cross into the gameplay process. Conflicts fail closed.
+
+The gameplay process accepts that enum only after repeated no movement in
+overworld mode and an open adjacent collision tile. It passes the enum to
+Copilot as an explicitly untrusted optional hypothesis; it never maps chat to
+buttons, battle/menu choices, tools, controls, checkpoints, or durable model
+instructions. Manual takeover, stale data, movement, collision, malformed
+files, bridge failure, or disabling the flag removes the advisory path without
+stopping gameplay.
+
+Autonomous stuck research is also default-off. Enabling
+`--stuck-web-research` does not add tools to the gameplay Copilot session.
+Instead, deterministic navigation memory may launch one isolated one-shot
+Copilot session with one custom `pokemon_web_search` tool. The handler builds
+queries from trusted local map names and a fixed focus enum, permits only the
+exact Bulbapedia HTTPS API/origin, bounds every response, and returns plaintext
+extracts. It cannot read arbitrary URLs, local files, controls, credentials,
+chat, saves, or runtime state beyond the supplied screenshot/context.
+
+Web extracts and research output remain untrusted. Only schema-validated route
+facts with exact Bulbapedia source links are cached in mode-`0600` state, for
+30 minutes, and only near the same map coordinates. The gameplay model must
+independently verify them against the screenshot, RAM, collision grid, trusted
+route rules, and navigation memory. Research is rate-limited per stuck
+position, runs asynchronously, and cannot block or directly affect gameplay.
+If an authoritative local route rule exists for the current state, web research
+is not launched.
 
 The bootstrap downloads Python packages and a pinned OpenRappter Git commit over
 TLS. Review changes before overriding `OPENRAPPTER_REF` or using

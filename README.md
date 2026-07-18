@@ -49,11 +49,23 @@ reasoning.
   relays perform handshake-only signaling; a local CDP string tethers the tab
   to private runtime frames without exposing localhost.
 - **Public YouTube broadcast:** a responsive stream overlay combines the live
-  game, audio, progress, current objective, and recent autonomous decisions.
+  game, audio, progress, current objective, recent autonomous decisions, a
+  subtle screenshot-diagnostics watermark, and a scannable project QR.
+- **Layered stream recovery:** stale gameplay is supervised, capture/RTMP
+  backpressure forces an encoder recycle, the keep-alive loop reconnects, and
+  YouTube Auto-start republishes the feed without losing the checkpoint.
 - **Public story player:** a grounded, chronological recap streams sanitized
   key-event JSON from a dedicated public data branch. Its static theater can
   play bounded YouTube highlight segments without publishing local gameplay
   files or raw model output to GitHub.
+- **Opt-in crowd route hints:** a separate Top Chat bridge accepts only exact
+  `!hint up|down|left|right` ballots. Raw comments and identities never reach
+  Copilot; a strict-majority direction is considered only after repeated
+  no-movement decisions and a local collision check.
+- **Autonomous stuck recovery:** after deterministic repeated failures or a
+  route cycle, an isolated one-shot Copilot session can search reviewed
+  Bulbapedia text with a single bounded tool, inspect the current screenshot,
+  and return source-cited facts for the gameplay model to verify or ignore.
 - **Bounded recording:** local, rotating H.264 MP4 clips with manifests,
   retention limits, a disk budget, and a free-space reserve.
 - **Local-only state:** ROM path, screenshots, saves, logs, and videos stay in a
@@ -163,6 +175,8 @@ Useful start options:
   --max-storage-gb 20 \
   --min-free-gb 2 \
   --reasoning-effort medium \
+  --youtube-chat-hints \
+  --stuck-web-research \
   --port 8765
 ```
 
@@ -359,6 +373,62 @@ original run started, so the curator never invents missing opening events.
 Gameplay MP4s, screenshots, ROM data, paths, hashes, names, screen text,
 objectives, buttons, and raw model reasoning remain private.
 
+The overlay QR opens a
+[user-facing project introduction](https://kody-w.github.io/rappter-plays-pokemon/d/)
+with live, catch-up, and source links. Its fragment may also carry a bounded,
+nonsecret tuning snapshot for screenshot troubleshooting. The page can turn
+that snapshot into a prefilled GitHub issue draft, but the viewer must review
+and submit it explicitly.
+
+### Optional YouTube crowd hints
+
+Start the credential-free Top Chat bridge separately from the game:
+
+```bash
+mkdir -p ~/.openrappter/youtube-chat
+chmod 700 ~/.openrappter/youtube-chat
+nohup ./chat.sh watch --video-id NBSKt_dou6o \
+  >> ~/.openrappter/youtube-chat/bridge.log 2>&1 &
+```
+
+Then start the player with `--youtube-chat-hints`. A chat message participates
+only when its complete ASCII text is one of:
+
+```text
+!hint up
+!hint down
+!hint left
+!hint right
+```
+
+At least two distinct recent viewers and a strict majority are required.
+Conflicts are withheld. The bridge immediately reduces eligible messages to a
+direction enum, discards text and identities, and writes one expiring
+mode-`0600` advisory. The game considers that enum only when it has remained at
+the same overworld coordinates for four decisions and the adjacent collision
+tile is open. Copilot may still ignore it; chat never presses buttons, changes
+control ownership, affects battles or menus, or overrides trusted route facts
+and navigation memory.
+
+### Autonomous web research when stuck
+
+Start with `--stuck-web-research` to enable bounded recovery. The normal
+gameplay Copilot session remains zero-tool. When deterministic navigation
+memory records repeated no-progress attempts or a route cycle, the runner
+starts a separate one-shot Copilot research session in the background. That
+session receives the current screenshot and safe map context and can call only
+`pokemon_web_search`, a custom tool restricted to reviewed Bulbapedia search
+and plaintext extracts. Existing authoritative local route rules take
+precedence and suppress web research entirely.
+
+The result must contain bounded route facts and exact Bulbapedia source links.
+It is cached privately for 30 minutes and is supplied to the gameplay model
+only while the map and coordinates still match. Web text is always labeled
+untrusted: it cannot press buttons, change control ownership, access local
+files, use arbitrary URLs, or override screenshots, RAM state, collision data,
+trusted route rules, and navigation memory. One stuck position can trigger at
+most one search every 30 minutes, and gameplay continues while research runs.
+
 To use a config file, copy the safe template outside version control, fill in
 your local ROM path, and pass it explicitly:
 
@@ -381,6 +451,9 @@ files containing local state are mode `0600`.
 | `pokemon-red.ram` | Atomic cartridge RAM |
 | `screens/` | Bounded decision screenshots |
 | `brain.json` | Recent decisions and progress context |
+| `navigation-memory.json` | Bounded failed/cycling route-attempt history |
+| `youtube-chat-advisory.json` | Expiring direction enum; never raw chat |
+| `web-research.json` | Expiring source-cited stuck-recovery facts |
 | `player.log` | Local supervisor/player diagnostics |
 | `runtime-owner.json` | Safety marker required for explicit purge |
 | `viewer-auth.json` | Short-lived authenticated viewer bootstrap secret |

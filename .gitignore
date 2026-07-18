@@ -47,6 +47,10 @@ clips/
 states/
 screens/
 runtime/
+*.live_chat.json*
+youtube-chat-advisory.json
+navigation-memory.json
+web-research.json
 
 # Overlay encoder dependencies
 node_modules/

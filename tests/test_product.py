@@ -260,6 +260,8 @@ def test_cli_config_and_agent_dispatch(monkeypatch, tmp_path):
                 "max_clips": 12,
                 "open_viewer": False,
                 "livestream": True,
+                "youtube_chat_hints": True,
+                "stuck_web_research": True,
                 "spectator_port": 0,
                 "advertised_host": "pokemon.local",
                 "max_viewers": 4,
@@ -283,6 +285,8 @@ def test_cli_config_and_agent_dispatch(monkeypatch, tmp_path):
     assert captured["max_clips"] == 12
     assert captured["open_viewer"] is False
     assert captured["livestream"] is True
+    assert captured["youtube_chat_hints"] is True
+    assert captured["stuck_web_research"] is True
     assert captured["spectator_port"] == 0
     assert captured["advertised_host"] == "pokemon.local"
     assert captured["max_viewers"] == 4
@@ -294,15 +298,31 @@ def test_launchers_preserve_rom_paths_as_single_arguments():
     launch = (ROOT / "launch.sh").read_text()
     bootstrap = (ROOT / "bootstrap.sh").read_text()
     story = (ROOT / "story.sh").read_text()
+    chat = (ROOT / "chat.sh").read_text()
 
     assert 'rappter_plays_pokemon.cli "$@"' in launch
     assert 'rappter_plays_pokemon.story "$@"' in story
+    assert 'rappter_plays_pokemon.youtube_chat "$@"' in chat
     assert '"${LAUNCH_ARGS[@]}"' in bootstrap
     assert 'if [[ "$ACTION" == "start" ]]' in launch
     assert launch.index('if [[ "$ACTION" == "start" ]]') < launch.index(
         "rappter_plays_pokemon.install_agent"
     )
     assert "refusing to replace the registered agent" in launch
+
+
+def test_raw_chat_artifacts_are_ignored_and_rejected_by_ci():
+    ignore = (ROOT / ".gitignore").read_text()
+    workflow = (ROOT / ".github" / "workflows" / "ci.yml").read_text()
+
+    for pattern in (
+        "*.live_chat.json*",
+        "youtube-chat-advisory.json",
+        "navigation-memory.json",
+        "web-research.json",
+    ):
+        assert pattern in ignore
+        assert pattern in workflow
 
 
 def test_launch_preflight_bypasses_controls_and_blocks_live_start(

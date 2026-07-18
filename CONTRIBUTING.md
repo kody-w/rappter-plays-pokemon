@@ -21,6 +21,18 @@ only the schema-validated projection produced by
 audio, video, model prompts, or arbitrary runtime dictionaries. Public story
 updates belong on the isolated `story-archive` branch, not `main`.
 
+Never commit `*.live_chat.json` or `youtube-chat-advisory.json`. Chat tests use
+synthetic renderer objects only and may assert only the closed direction enum;
+raw text, identities, URLs, payment metadata, or arbitrary suggestions must
+not enter the gameplay prompt or fixtures derived from real users.
+
+Web-research tests must mock the exact Bulbapedia API boundary. Do not contact
+the network in pytest. Preserve the separation between the zero-tool gameplay
+session and the one-shot researcher; only the researcher may register the
+single `pokemon_web_search` tool, and its output must retain exact source
+allowlisting, response bounds, context/TTL checks, and optional-evidence
+wording.
+
 ## Development setup
 
 Python 3.11+ is required.
@@ -39,7 +51,7 @@ Run every check before submitting:
 .venv-dev/bin/python scripts/update_browser_assets.py --check
 .venv-dev/bin/python scripts/build_pages_site.py --check
 .venv-dev/bin/python scripts/check_browser_js.py
-bash -n bootstrap.sh launch.sh story.sh uninstall.sh
+bash -n bootstrap.sh chat.sh launch.sh story.sh uninstall.sh
 ```
 
 No test may contact GitHub Copilot, PeerJS Cloud, a Nostr relay, STUN, the
@@ -88,11 +100,13 @@ self-contained. After changing any of these sources, rebuild and check them:
 .venv-dev/bin/python scripts/build_pages_site.py --check
 ```
 
-The root `docs/index.html`, `docs/site.css`, and `docs/story/` files are
+The root `docs/index.html`, `docs/site.css`, `docs/story/`, and `docs/d/` files are
 hand-authored public entry points. They must remain separate from the generated
 host/watch protocol trees. The story page may connect only to the exact
 `raw.githubusercontent.com` story URL and must render every archive string via
-safe DOM text properties.
+safe DOM text properties. The QR destination must remain project-first,
+fragment-only for diagnostics, and incapable of automatically submitting an
+issue.
 
 The Pages trees must remain static: no gameplay controls, analytics, service
 workers, storage, CDN scripts, or Pages-to-localhost requests. The v2 static
