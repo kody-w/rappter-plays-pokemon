@@ -1,10 +1,10 @@
 {
   "coverage": {
     "continuous_source": false,
-    "event_count": 36,
+    "event_count": 46,
     "first_observed_at": "2026-07-17T04:22:13.529703Z",
     "incomplete_before": true,
-    "last_observed_at": "2026-07-18T16:22:31.995232Z"
+    "last_observed_at": "2026-07-18T17:22:32.332280Z"
   },
   "events": [
     {
@@ -24,7 +24,8 @@
       },
       "sequence": 36,
       "summary": "The public story begins with the earliest retained recording in Pewter City, not necessarily the first minutes of the run. The retained state shows 1 caught Pokémon and a party of 1.",
-      "title": "Earliest retained chapter: Pewter City"
+      "title": "Earliest retained chapter: Pewter City",
+      "video": null
     },
     {
       "badges": [
@@ -45,7 +46,8 @@
       },
       "sequence": 42,
       "summary": "The recorded state now includes Boulder Badge in Pewter Gym, bringing the verified total to 1. The retained state shows 1 badge, 1 caught Pokémon, and a party of 1.",
-      "title": "Boulder Badge observed"
+      "title": "Boulder Badge observed",
+      "video": null
     },
     {
       "badges": [
@@ -66,7 +68,8 @@
       },
       "sequence": 108,
       "summary": "The verified caught count increased from 1 to 2 by this retained checkpoint. The retained state shows 1 badge, 2 caught Pokémon, and a party of 1.",
-      "title": "Pokédex progress in Cerulean Gym"
+      "title": "Pokédex progress in Cerulean Gym",
+      "video": null
     },
     {
       "badges": [
@@ -88,7 +91,8 @@
       },
       "sequence": 109,
       "summary": "The recorded state now includes Cascade Badge in Cerulean Gym, bringing the verified total to 2. The retained state shows 2 badges, 2 caught Pokémon, and a party of 1.",
-      "title": "Cascade Badge observed"
+      "title": "Cascade Badge observed",
+      "video": null
     },
     {
       "badges": [
@@ -110,7 +114,8 @@
       },
       "sequence": 162,
       "summary": "The run had moved from Cerulean Gym to Diglett's Cave. The retained state shows 2 badges, 2 caught Pokémon, and a party of 1.",
-      "title": "Reaching Diglett's Cave"
+      "title": "Reaching Diglett's Cave",
+      "video": null
     },
     {
       "badges": [
@@ -132,7 +137,8 @@
       },
       "sequence": 165,
       "summary": "The run had moved from Diglett's Cave to Vermilion City. The retained state shows 2 badges, 2 caught Pokémon, and a party of 1.",
-      "title": "Reaching Vermilion City"
+      "title": "Reaching Vermilion City",
+      "video": null
     },
     {
       "badges": [
@@ -154,7 +160,8 @@
       },
       "sequence": 175,
       "summary": "The run had moved from Vermilion City to Diglett's Cave. The retained state shows 2 badges, 2 caught Pokémon, and a party of 1.",
-      "title": "Reaching Diglett's Cave"
+      "title": "Reaching Diglett's Cave",
+      "video": null
     },
     {
       "badges": [
@@ -176,7 +183,8 @@
       },
       "sequence": 176,
       "summary": "The recorded party size increased from 1 to 2 while the run was in Diglett's Cave. The retained state shows 2 badges, 3 caught Pokémon, and a party of 2.",
-      "title": "The party grows in Diglett's Cave"
+      "title": "The party grows in Diglett's Cave",
+      "video": null
     },
     {
       "badges": [
@@ -198,7 +206,8 @@
       },
       "sequence": 178,
       "summary": "The recorded party size increased from 2 to 3 while the run was in Route 6. The retained state shows 2 badges, 4 caught Pokémon, and a party of 3.",
-      "title": "The party grows in Route 6"
+      "title": "The party grows in Route 6",
+      "video": null
     },
     {
       "badges": [
@@ -220,7 +229,8 @@
       },
       "sequence": 184,
       "summary": "The run had moved from Route 6 to Vermilion City. The retained state shows 2 badges, 4 caught Pokémon, and a party of 3.",
-      "title": "Reaching Vermilion City"
+      "title": "Reaching Vermilion City",
+      "video": null
     },
     {
       "badges": [
@@ -242,7 +252,8 @@
       },
       "sequence": 194,
       "summary": "The run had moved from Vermilion City to Route 6. The retained state shows 2 badges, 4 caught Pokémon, and a party of 3.",
-      "title": "Reaching Route 6"
+      "title": "Reaching Route 6",
+      "video": null
     },
     {
       "badges": [
@@ -264,7 +275,8 @@
       },
       "sequence": 210,
       "summary": "The run had moved from Route 6 to Cerulean City. The retained state shows 2 badges, 4 caught Pokémon, and a party of 3.",
-      "title": "Reaching Cerulean City"
+      "title": "Reaching Cerulean City",
+      "video": null
     },
     {
       "badges": [
@@ -286,7 +298,8 @@
       },
       "sequence": 215,
       "summary": "The run had moved from Cerulean City to Route 5. The retained state shows 2 badges, 4 caught Pokémon, and a party of 3.",
-      "title": "Reaching Route 5"
+      "title": "Reaching Route 5",
+      "video": null
     },
     {
       "badges": [
@@ -308,7 +321,8 @@
       },
       "sequence": 218,
       "summary": "The run had moved from Route 5 to Vermilion City. The retained state shows 2 badges, 4 caught Pokémon, and a party of 3.",
-      "title": "Reaching Vermilion City"
+      "title": "Reaching Vermilion City",
+      "video": null
     },
     {
       "badges": [
@@ -330,7 +344,8 @@
       },
       "sequence": 222,
       "summary": "The run had moved from Vermilion City to Vermilion Gym. The retained state shows 2 badges, 4 caught Pokémon, and a party of 3.",
-      "title": "Reaching Vermilion Gym"
+      "title": "Reaching Vermilion Gym",
+      "video": null
     },
     {
       "badges": [
@@ -352,7 +367,8 @@
       },
       "sequence": 228,
       "summary": "A retained progress checkpoint records the autonomous run in Vermilion Gym. The retained state shows 2 badges, 4 caught Pokémon, and a party of 3.",
-      "title": "Checkpoint in Vermilion Gym"
+      "title": "Checkpoint in Vermilion Gym",
+      "video": null
     },
     {
       "badges": [
@@ -375,7 +391,8 @@
       },
       "sequence": 229,
       "summary": "The recorded state now includes Thunder Badge in Vermilion Gym, bringing the verified total to 3. The retained state shows 3 badges, 4 caught Pokémon, and a party of 3.",
-      "title": "Thunder Badge observed"
+      "title": "Thunder Badge observed",
+      "video": null
     },
     {
       "badges": [
@@ -398,7 +415,8 @@
       },
       "sequence": 233,
       "summary": "The run had moved from Vermilion Gym to Cerulean City. The retained state shows 3 badges, 4 caught Pokémon, and a party of 3.",
-      "title": "Reaching Cerulean City"
+      "title": "Reaching Cerulean City",
+      "video": null
     },
     {
       "badges": [
@@ -421,7 +439,8 @@
       },
       "sequence": 236,
       "summary": "The run had moved from Cerulean City to Route 9. The retained state shows 3 badges, 4 caught Pokémon, and a party of 3.",
-      "title": "Reaching Route 9"
+      "title": "Reaching Route 9",
+      "video": null
     },
     {
       "badges": [
@@ -444,7 +463,8 @@
       },
       "sequence": 238,
       "summary": "The run had moved from Route 9 to Route 10. The retained state shows 3 badges, 4 caught Pokémon, and a party of 3.",
-      "title": "Reaching Route 10"
+      "title": "Reaching Route 10",
+      "video": null
     },
     {
       "badges": [
@@ -467,7 +487,32 @@
       },
       "sequence": 241,
       "summary": "The run had moved from Route 10 to Rock Tunnel 1F. The retained state shows 3 badges, 4 caught Pokémon, and a party of 3.",
-      "title": "Reaching Rock Tunnel 1F"
+      "title": "Reaching Rock Tunnel 1F",
+      "video": null
+    },
+    {
+      "badges": [
+        "Boulder",
+        "Cascade",
+        "Thunder"
+      ],
+      "chapter": "Beyond the Thunder Badge",
+      "coverage_gap_before": false,
+      "highest_level": 32,
+      "id": "event-000248",
+      "kind": "progress",
+      "location": "Rock Tunnel B1F",
+      "observed_at": "2026-07-18T02:21:23.529443Z",
+      "party_size": 3,
+      "play_time_seconds": 14785,
+      "pokedex": {
+        "caught": 4,
+        "seen": 48
+      },
+      "sequence": 248,
+      "summary": "A retained progress checkpoint records the autonomous run in Rock Tunnel B1F. The retained state shows 3 badges, 4 caught Pokémon, and a party of 3.",
+      "title": "Checkpoint in Rock Tunnel B1F",
+      "video": null
     },
     {
       "badges": [
@@ -490,7 +535,8 @@
       },
       "sequence": 250,
       "summary": "The run had moved from Rock Tunnel 1F to Rock Tunnel B1F. The retained state shows 3 badges, 4 caught Pokémon, and a party of 3.",
-      "title": "Reaching Rock Tunnel B1F"
+      "title": "Reaching Rock Tunnel B1F",
+      "video": null
     },
     {
       "badges": [
@@ -513,7 +559,8 @@
       },
       "sequence": 254,
       "summary": "The run had moved from Rock Tunnel B1F to Rock Tunnel 1F. The retained state shows 3 badges, 4 caught Pokémon, and a party of 3.",
-      "title": "Reaching Rock Tunnel 1F"
+      "title": "Reaching Rock Tunnel 1F",
+      "video": null
     },
     {
       "badges": [
@@ -536,7 +583,8 @@
       },
       "sequence": 261,
       "summary": "The run had moved from Rock Tunnel 1F to Route 10. The retained state shows 3 badges, 4 caught Pokémon, and a party of 3.",
-      "title": "Reaching Route 10"
+      "title": "Reaching Route 10",
+      "video": null
     },
     {
       "badges": [
@@ -559,7 +607,8 @@
       },
       "sequence": 265,
       "summary": "The run had moved from Route 10 to Lavender Pokémon Center. The retained state shows 3 badges, 4 caught Pokémon, and a party of 3.",
-      "title": "Reaching Lavender Pokémon Center"
+      "title": "Reaching Lavender Pokémon Center",
+      "video": null
     },
     {
       "badges": [
@@ -582,7 +631,8 @@
       },
       "sequence": 267,
       "summary": "The verified caught count increased from 4 to 5 by this retained checkpoint. The retained state shows 3 badges, 5 caught Pokémon, and a party of 3.",
-      "title": "Pokédex progress in Route 8"
+      "title": "Pokédex progress in Route 8",
+      "video": null
     },
     {
       "badges": [
@@ -605,7 +655,80 @@
       },
       "sequence": 271,
       "summary": "The run had moved from Route 8 to Celadon City. The retained state shows 3 badges, 5 caught Pokémon, and a party of 3.",
-      "title": "Reaching Celadon City"
+      "title": "Reaching Celadon City",
+      "video": null
+    },
+    {
+      "badges": [
+        "Boulder",
+        "Cascade",
+        "Thunder"
+      ],
+      "chapter": "Beyond the Thunder Badge",
+      "coverage_gap_before": false,
+      "highest_level": 37,
+      "id": "event-000277",
+      "kind": "progress",
+      "location": "Celadon City",
+      "observed_at": "2026-07-18T05:59:45.236787Z",
+      "party_size": 3,
+      "play_time_seconds": 26441,
+      "pokedex": {
+        "caught": 5,
+        "seen": 54
+      },
+      "sequence": 277,
+      "summary": "A retained progress checkpoint records the autonomous run in Celadon City. The retained state shows 3 badges, 5 caught Pokémon, and a party of 3.",
+      "title": "Checkpoint in Celadon City",
+      "video": null
+    },
+    {
+      "badges": [
+        "Boulder",
+        "Cascade",
+        "Thunder"
+      ],
+      "chapter": "Beyond the Thunder Badge",
+      "coverage_gap_before": false,
+      "highest_level": 37,
+      "id": "event-000283",
+      "kind": "progress",
+      "location": "Celadon City",
+      "observed_at": "2026-07-18T06:59:45.554665Z",
+      "party_size": 3,
+      "play_time_seconds": 30040,
+      "pokedex": {
+        "caught": 5,
+        "seen": 54
+      },
+      "sequence": 283,
+      "summary": "A retained progress checkpoint records the autonomous run in Celadon City. The retained state shows 3 badges, 5 caught Pokémon, and a party of 3.",
+      "title": "Checkpoint in Celadon City",
+      "video": null
+    },
+    {
+      "badges": [
+        "Boulder",
+        "Cascade",
+        "Thunder"
+      ],
+      "chapter": "Beyond the Thunder Badge",
+      "coverage_gap_before": false,
+      "highest_level": 37,
+      "id": "event-000289",
+      "kind": "progress",
+      "location": "Celadon Gym",
+      "observed_at": "2026-07-18T07:59:45.882964Z",
+      "party_size": 3,
+      "play_time_seconds": 33638,
+      "pokedex": {
+        "caught": 5,
+        "seen": 54
+      },
+      "sequence": 289,
+      "summary": "A retained progress checkpoint records the autonomous run in Celadon Gym. The retained state shows 3 badges, 5 caught Pokémon, and a party of 3.",
+      "title": "Checkpoint in Celadon Gym",
+      "video": null
     },
     {
       "badges": [
@@ -628,7 +751,32 @@
       },
       "sequence": 290,
       "summary": "The run had moved from Celadon City to Celadon Gym. The retained state shows 3 badges, 5 caught Pokémon, and a party of 3.",
-      "title": "Reaching Celadon Gym"
+      "title": "Reaching Celadon Gym",
+      "video": null
+    },
+    {
+      "badges": [
+        "Boulder",
+        "Cascade",
+        "Thunder"
+      ],
+      "chapter": "Beyond the Thunder Badge",
+      "coverage_gap_before": false,
+      "highest_level": 38,
+      "id": "event-000296",
+      "kind": "progress",
+      "location": "Celadon Gym",
+      "observed_at": "2026-07-18T09:00:05.330170Z",
+      "party_size": 3,
+      "play_time_seconds": 37256,
+      "pokedex": {
+        "caught": 5,
+        "seen": 57
+      },
+      "sequence": 296,
+      "summary": "A retained progress checkpoint records the autonomous run in Celadon Gym. The retained state shows 3 badges, 5 caught Pokémon, and a party of 3.",
+      "title": "Checkpoint in Celadon Gym",
+      "video": null
     },
     {
       "badges": [
@@ -652,7 +800,8 @@
       },
       "sequence": 301,
       "summary": "The recorded state now includes Rainbow Badge in Celadon Gym, bringing the verified total to 4. The retained state shows 4 badges, 5 caught Pokémon, and a party of 3.",
-      "title": "Rainbow Badge observed"
+      "title": "Rainbow Badge observed",
+      "video": null
     },
     {
       "badges": [
@@ -676,7 +825,8 @@
       },
       "sequence": 308,
       "summary": "The run had moved from Celadon Gym to Game Corner. The retained state shows 4 badges, 5 caught Pokémon, and a party of 3.",
-      "title": "Reaching Game Corner"
+      "title": "Reaching Game Corner",
+      "video": null
     },
     {
       "badges": [
@@ -700,7 +850,8 @@
       },
       "sequence": 312,
       "summary": "The run had moved from Game Corner to Rocket Hideout B2F. The retained state shows 4 badges, 5 caught Pokémon, and a party of 3.",
-      "title": "Reaching Rocket Hideout B2F"
+      "title": "Reaching Rocket Hideout B2F",
+      "video": null
     },
     {
       "badges": [
@@ -724,7 +875,33 @@
       },
       "sequence": 316,
       "summary": "The run had moved from Rocket Hideout B2F to Rocket Hideout B3F. The retained state shows 4 badges, 5 caught Pokémon, and a party of 3.",
-      "title": "Reaching Rocket Hideout B3F"
+      "title": "Reaching Rocket Hideout B3F",
+      "video": null
+    },
+    {
+      "badges": [
+        "Boulder",
+        "Cascade",
+        "Thunder",
+        "Rainbow"
+      ],
+      "chapter": "Beyond the Rainbow Badge",
+      "coverage_gap_before": false,
+      "highest_level": 40,
+      "id": "event-000322",
+      "kind": "progress",
+      "location": "Rocket Hideout B3F",
+      "observed_at": "2026-07-18T12:50:10.654602Z",
+      "party_size": 3,
+      "play_time_seconds": 51058,
+      "pokedex": {
+        "caught": 5,
+        "seen": 59
+      },
+      "sequence": 322,
+      "summary": "A retained progress checkpoint records the autonomous run in Rocket Hideout B3F. The retained state shows 4 badges, 5 caught Pokémon, and a party of 3.",
+      "title": "Checkpoint in Rocket Hideout B3F",
+      "video": null
     },
     {
       "badges": [
@@ -748,7 +925,33 @@
       },
       "sequence": 323,
       "summary": "The run had moved from Rocket Hideout B3F to Celadon City. The retained state shows 4 badges, 5 caught Pokémon, and a party of 3.",
-      "title": "Reaching Celadon City"
+      "title": "Reaching Celadon City",
+      "video": null
+    },
+    {
+      "badges": [
+        "Boulder",
+        "Cascade",
+        "Thunder",
+        "Rainbow"
+      ],
+      "chapter": "Beyond the Rainbow Badge",
+      "coverage_gap_before": false,
+      "highest_level": 40,
+      "id": "event-000324",
+      "kind": "journey",
+      "location": "Game Corner",
+      "observed_at": "2026-07-18T13:06:25.903959Z",
+      "party_size": 3,
+      "play_time_seconds": 52033,
+      "pokedex": {
+        "caught": 5,
+        "seen": 59
+      },
+      "sequence": 324,
+      "summary": "The run had moved from Rocket Hideout B3F to Game Corner. The retained state shows 4 badges, 5 caught Pokémon, and a party of 3.",
+      "title": "Reaching Game Corner",
+      "video": null
     },
     {
       "badges": [
@@ -772,7 +975,33 @@
       },
       "sequence": 326,
       "summary": "The run had moved from Celadon City to Rocket Hideout B2F. The retained state shows 4 badges, 5 caught Pokémon, and a party of 3.",
-      "title": "Reaching Rocket Hideout B2F"
+      "title": "Reaching Rocket Hideout B2F",
+      "video": null
+    },
+    {
+      "badges": [
+        "Boulder",
+        "Cascade",
+        "Thunder",
+        "Rainbow"
+      ],
+      "chapter": "Beyond the Rainbow Badge",
+      "coverage_gap_before": false,
+      "highest_level": 40,
+      "id": "event-000332",
+      "kind": "progress",
+      "location": "Rocket Hideout B2F",
+      "observed_at": "2026-07-18T14:15:22.149483Z",
+      "party_size": 3,
+      "play_time_seconds": 56169,
+      "pokedex": {
+        "caught": 5,
+        "seen": 59
+      },
+      "sequence": 332,
+      "summary": "A retained progress checkpoint records the autonomous run in Rocket Hideout B2F. The retained state shows 4 badges, 5 caught Pokémon, and a party of 3.",
+      "title": "Checkpoint in Rocket Hideout B2F",
+      "video": null
     },
     {
       "badges": [
@@ -796,7 +1025,33 @@
       },
       "sequence": 338,
       "summary": "The run had moved from Rocket Hideout B2F to Rocket Hideout B3F. The retained state shows 4 badges, 5 caught Pokémon, and a party of 3.",
-      "title": "Reaching Rocket Hideout B3F"
+      "title": "Reaching Rocket Hideout B3F",
+      "video": null
+    },
+    {
+      "badges": [
+        "Boulder",
+        "Cascade",
+        "Thunder",
+        "Rainbow"
+      ],
+      "chapter": "Beyond the Rainbow Badge",
+      "coverage_gap_before": false,
+      "highest_level": 40,
+      "id": "event-000345",
+      "kind": "progress",
+      "location": "Rocket Hideout B3F",
+      "observed_at": "2026-07-18T16:20:29.603526Z",
+      "party_size": 3,
+      "play_time_seconds": 63675,
+      "pokedex": {
+        "caught": 5,
+        "seen": 59
+      },
+      "sequence": 345,
+      "summary": "A retained progress checkpoint records the autonomous run in Rocket Hideout B3F. The retained state shows 4 badges, 5 caught Pokémon, and a party of 3.",
+      "title": "Checkpoint in Rocket Hideout B3F",
+      "video": null
     },
     {
       "badges": [
@@ -820,13 +1075,43 @@
       },
       "sequence": 346,
       "summary": "A retained progress checkpoint records the autonomous run in Rocket Hideout B3F. The retained state shows 4 badges, 5 caught Pokémon, and a party of 3.",
-      "title": "Checkpoint in Rocket Hideout B3F"
+      "title": "Checkpoint in Rocket Hideout B3F",
+      "video": null
+    },
+    {
+      "badges": [
+        "Boulder",
+        "Cascade",
+        "Thunder",
+        "Rainbow"
+      ],
+      "chapter": "Beyond the Rainbow Badge",
+      "coverage_gap_before": false,
+      "highest_level": 40,
+      "id": "event-000352",
+      "kind": "progress",
+      "location": "Rocket Hideout B3F",
+      "observed_at": "2026-07-18T17:22:32.332280Z",
+      "party_size": 3,
+      "play_time_seconds": 67398,
+      "pokedex": {
+        "caught": 5,
+        "seen": 59
+      },
+      "sequence": 352,
+      "summary": "A retained progress checkpoint records the autonomous run in Rocket Hideout B3F. The retained state shows 4 badges, 5 caught Pokémon, and a party of 3.",
+      "title": "Checkpoint in Rocket Hideout B3F",
+      "video": {
+        "end_seconds": 1219,
+        "start_seconds": 1069,
+        "youtube_id": "NBSKt_dou6o"
+      }
     }
   ],
-  "revision": "sha256:59c3b45055219481fabe166fbc2be6a935668b894649208b169b8ac9a883f7d6",
+  "revision": "sha256:b6a54b828cf8c53ecee68796a8450f79ce4ee466f4cdee05022e1d80d9f7e53a",
   "schema_version": 1,
   "status": "in_progress",
   "story_id": "rappter-plays-pokemon-main-run",
-  "summary": "The archive starts with the earliest retained evidence in Pewter City and follows 36 verified key events. It currently records 4 badges. The latest published chapter reaches Rocket Hideout B3F.",
-  "updated_at": "2026-07-18T16:22:31.995232Z"
+  "summary": "The archive starts with the earliest retained evidence in Pewter City and follows 46 verified key events. It currently records 4 badges. The latest published chapter reaches Rocket Hideout B3F.",
+  "updated_at": "2026-07-18T17:22:32.332280Z"
 }
