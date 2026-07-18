@@ -47,3 +47,7 @@ clips/
 states/
 screens/
 runtime/
+
+# Overlay encoder dependencies
+node_modules/
+package-lock.json

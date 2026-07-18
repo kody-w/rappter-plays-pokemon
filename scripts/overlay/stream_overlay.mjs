@@ -22,8 +22,12 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {createRequire} from 'node:module';
 
-const require = createRequire(path.join(process.cwd(), 'noop.js'));
-const {chromium} = require('playwright');
+let chromium;
+try {
+  ({chromium} = createRequire(import.meta.url)('playwright'));
+} catch (_error) {
+  ({chromium} = createRequire(path.join(process.cwd(), 'noop.js'))('playwright'));
+}
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const FRAME_RATE = 10;

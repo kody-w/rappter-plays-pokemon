@@ -139,7 +139,9 @@ delete existing saves.
 
 ### Browser livestream
 
-Livestreaming is opt-in. The recommended and default livestream host is the
+Livestreaming is opt-in. For an unattended 24/7 YouTube broadcast with the
+overlay scene, follow [STREAMING.md](STREAMING.md). The recommended and
+default livestream host is the
 **kited twin** at
 <https://kody-w.github.io/rappter-plays-pokemon/host/v2/>:
 

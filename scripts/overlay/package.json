@@ -1,0 +1,9 @@
+{
+  "name": "rappter-plays-pokemon-overlay",
+  "private": true,
+  "description": "Headless overlay renderer and RTMP encoder for the livestream",
+  "type": "module",
+  "dependencies": {
+    "playwright": "^1.61.1"
+  }
+}
