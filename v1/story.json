@@ -1,10 +1,10 @@
 {
   "coverage": {
     "continuous_source": false,
-    "event_count": 133,
+    "event_count": 135,
     "first_observed_at": "2026-07-17T04:22:13.529703Z",
     "incomplete_before": true,
-    "last_observed_at": "2026-07-19T07:17:16.687002Z"
+    "last_observed_at": "2026-07-19T07:41:55.252861Z"
   },
   "events": [
     {
@@ -2352,6 +2352,31 @@
         "Rainbow"
       ],
       "chapter": "Beyond the Rainbow Badge",
+      "coverage_gap_before": true,
+      "highest_level": 40,
+      "id": "event-000317",
+      "kind": "progress",
+      "location": "Rocket Hideout B3F",
+      "observed_at": "2026-07-18T12:00:10.422660Z",
+      "party_size": 3,
+      "play_time_seconds": 48058,
+      "pokedex": {
+        "caught": 5,
+        "seen": 59
+      },
+      "sequence": 317,
+      "summary": "A retained progress checkpoint records the autonomous run in Rocket Hideout B3F. The retained state shows 4 badges, 5 caught Pokémon, and a party of 3.",
+      "title": "Checkpoint in Rocket Hideout B3F",
+      "video": null
+    },
+    {
+      "badges": [
+        "Boulder",
+        "Cascade",
+        "Thunder",
+        "Rainbow"
+      ],
+      "chapter": "Beyond the Rainbow Badge",
       "coverage_gap_before": false,
       "highest_level": 40,
       "id": "event-000322",
@@ -3277,12 +3302,41 @@
         "start_seconds": 26365,
         "youtube_id": "lAi3T3V_-50"
       }
+    },
+    {
+      "badges": [
+        "Boulder",
+        "Cascade",
+        "Thunder",
+        "Rainbow"
+      ],
+      "chapter": "Beyond the Rainbow Badge",
+      "coverage_gap_before": false,
+      "highest_level": 40,
+      "id": "event-000507",
+      "kind": "journey",
+      "location": "Route 8",
+      "observed_at": "2026-07-19T07:41:55.252861Z",
+      "party_size": 3,
+      "play_time_seconds": 118901,
+      "pokedex": {
+        "caught": 5,
+        "seen": 59
+      },
+      "sequence": 507,
+      "summary": "The run had moved from Rocket Hideout B2F to Route 8. The retained state shows 4 badges, 5 caught Pokémon, and a party of 3.",
+      "title": "Reaching Route 8",
+      "video": {
+        "end_seconds": 27994,
+        "start_seconds": 27844,
+        "youtube_id": "lAi3T3V_-50"
+      }
     }
   ],
-  "revision": "sha256:306becefb5c94629e5477352b4b5bc7b241391a4b81a439fa8ad07f2bed1d0c6",
+  "revision": "sha256:6840702094b7ad9b327b17d6c4d9c4e7b5b13a63eb72bd215e5b2f1195046b66",
   "schema_version": 1,
   "status": "in_progress",
   "story_id": "rappter-plays-pokemon-main-run",
-  "summary": "The archive starts with the earliest retained evidence in Pewter City and follows 133 verified key events. It currently records 4 badges. The latest published chapter reaches Rocket Hideout B2F.",
-  "updated_at": "2026-07-19T07:17:16.687002Z"
+  "summary": "The archive starts with the earliest retained evidence in Pewter City and follows 135 verified key events. It currently records 4 badges. The latest published chapter reaches Route 8.",
+  "updated_at": "2026-07-19T07:41:55.252861Z"
 }
