@@ -1,10 +1,10 @@
 {
   "coverage": {
     "continuous_source": false,
-    "event_count": 98,
+    "event_count": 102,
     "first_observed_at": "2026-07-17T04:22:13.529703Z",
     "incomplete_before": true,
-    "last_observed_at": "2026-07-19T02:22:09.263087Z"
+    "last_observed_at": "2026-07-19T03:10:01.611903Z"
   },
   "events": [
     {
@@ -1432,6 +1432,30 @@
         "Thunder"
       ],
       "chapter": "Beyond the Thunder Badge",
+      "coverage_gap_before": true,
+      "highest_level": 34,
+      "id": "event-000260",
+      "kind": "progress",
+      "location": "Rock Tunnel 1F",
+      "observed_at": "2026-07-18T03:39:47.066100Z",
+      "party_size": 3,
+      "play_time_seconds": 18046,
+      "pokedex": {
+        "caught": 4,
+        "seen": 49
+      },
+      "sequence": 260,
+      "summary": "A retained progress checkpoint records the autonomous run in Rock Tunnel 1F. The retained state shows 3 badges, 4 caught Pokémon, and a party of 3.",
+      "title": "Checkpoint in Rock Tunnel 1F",
+      "video": null
+    },
+    {
+      "badges": [
+        "Boulder",
+        "Cascade",
+        "Thunder"
+      ],
+      "chapter": "Beyond the Thunder Badge",
       "coverage_gap_before": false,
       "highest_level": 34,
       "id": "event-000261",
@@ -1458,6 +1482,30 @@
       "chapter": "Beyond the Thunder Badge",
       "coverage_gap_before": false,
       "highest_level": 35,
+      "id": "event-000263",
+      "kind": "journey",
+      "location": "Route 10",
+      "observed_at": "2026-07-18T03:57:44.496112Z",
+      "party_size": 3,
+      "play_time_seconds": 19122,
+      "pokedex": {
+        "caught": 4,
+        "seen": 49
+      },
+      "sequence": 263,
+      "summary": "The run had moved from Rock Tunnel 1F to Route 10. The retained state shows 3 badges, 4 caught Pokémon, and a party of 3.",
+      "title": "Reaching Route 10",
+      "video": null
+    },
+    {
+      "badges": [
+        "Boulder",
+        "Cascade",
+        "Thunder"
+      ],
+      "chapter": "Beyond the Thunder Badge",
+      "coverage_gap_before": false,
+      "highest_level": 35,
       "id": "event-000265",
       "kind": "journey",
       "location": "Lavender Pokémon Center",
@@ -1471,6 +1519,30 @@
       "sequence": 265,
       "summary": "The run had moved from Route 10 to Lavender Pokémon Center. The retained state shows 3 badges, 4 caught Pokémon, and a party of 3.",
       "title": "Reaching Lavender Pokémon Center",
+      "video": null
+    },
+    {
+      "badges": [
+        "Boulder",
+        "Cascade",
+        "Thunder"
+      ],
+      "chapter": "Beyond the Thunder Badge",
+      "coverage_gap_before": false,
+      "highest_level": 35,
+      "id": "event-000266",
+      "kind": "journey",
+      "location": "Lavender Town",
+      "observed_at": "2026-07-18T04:13:02.074641Z",
+      "party_size": 3,
+      "play_time_seconds": 20039,
+      "pokedex": {
+        "caught": 4,
+        "seen": 51
+      },
+      "sequence": 266,
+      "summary": "The run had moved from Route 10 to Lavender Town. The retained state shows 3 badges, 4 caught Pokémon, and a party of 3.",
+      "title": "Reaching Lavender Town",
       "video": null
     },
     {
@@ -2384,12 +2456,41 @@
         "start_seconds": 8658,
         "youtube_id": "lAi3T3V_-50"
       }
+    },
+    {
+      "badges": [
+        "Boulder",
+        "Cascade",
+        "Thunder",
+        "Rainbow"
+      ],
+      "chapter": "Beyond the Rainbow Badge",
+      "coverage_gap_before": false,
+      "highest_level": 40,
+      "id": "event-000452",
+      "kind": "journey",
+      "location": "Rocket Hideout B2F",
+      "observed_at": "2026-07-19T03:10:01.611903Z",
+      "party_size": 3,
+      "play_time_seconds": 102601,
+      "pokedex": {
+        "caught": 5,
+        "seen": 59
+      },
+      "sequence": 452,
+      "summary": "The run had moved from Rocket Hideout B1F to Rocket Hideout B2F. The retained state shows 4 badges, 5 caught Pokémon, and a party of 3.",
+      "title": "Reaching Rocket Hideout B2F",
+      "video": {
+        "end_seconds": 11680,
+        "start_seconds": 11530,
+        "youtube_id": "lAi3T3V_-50"
+      }
     }
   ],
-  "revision": "sha256:e128237c19de0e06cf1aa21f3108f1f3ab8101238f53c7bbead4fcbf18059230",
+  "revision": "sha256:614f5edfcddc1250a878ccc0b667f0bb74a409889b76a8730b3f5553abeed82d",
   "schema_version": 1,
   "status": "in_progress",
   "story_id": "rappter-plays-pokemon-main-run",
-  "summary": "The archive starts with the earliest retained evidence in Pewter City and follows 98 verified key events. It currently records 4 badges. The latest published chapter reaches Rocket Hideout B1F.",
-  "updated_at": "2026-07-19T02:22:09.263087Z"
+  "summary": "The archive starts with the earliest retained evidence in Pewter City and follows 102 verified key events. It currently records 4 badges. The latest published chapter reaches Rocket Hideout B2F.",
+  "updated_at": "2026-07-19T03:10:01.611903Z"
 }
