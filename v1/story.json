@@ -1,7 +1,7 @@
 {
   "coverage": {
     "continuous_source": false,
-    "event_count": 114,
+    "event_count": 116,
     "first_observed_at": "2026-07-17T04:22:13.529703Z",
     "incomplete_before": true,
     "last_observed_at": "2026-07-19T04:46:43.021314Z"
@@ -1768,6 +1768,30 @@
         "Thunder"
       ],
       "chapter": "Beyond the Thunder Badge",
+      "coverage_gap_before": true,
+      "highest_level": 37,
+      "id": "event-000279",
+      "kind": "pokedex",
+      "location": "Celadon City",
+      "observed_at": "2026-07-18T06:19:45.335557Z",
+      "party_size": 3,
+      "play_time_seconds": 27640,
+      "pokedex": {
+        "caught": 5,
+        "seen": 54
+      },
+      "sequence": 279,
+      "summary": "The verified caught count increased from 4 to 5 by this retained checkpoint. The retained state shows 3 badges, 5 caught Pokémon, and a party of 3.",
+      "title": "Pokédex progress in Celadon City",
+      "video": null
+    },
+    {
+      "badges": [
+        "Boulder",
+        "Cascade",
+        "Thunder"
+      ],
+      "chapter": "Beyond the Thunder Badge",
       "coverage_gap_before": false,
       "highest_level": 37,
       "id": "event-000281",
@@ -1829,6 +1853,30 @@
         "seen": 54
       },
       "sequence": 284,
+      "summary": "A retained progress checkpoint records the autonomous run in Celadon City. The retained state shows 3 badges, 5 caught Pokémon, and a party of 3.",
+      "title": "Checkpoint in Celadon City",
+      "video": null
+    },
+    {
+      "badges": [
+        "Boulder",
+        "Cascade",
+        "Thunder"
+      ],
+      "chapter": "Beyond the Thunder Badge",
+      "coverage_gap_before": false,
+      "highest_level": 37,
+      "id": "event-000285",
+      "kind": "progress",
+      "location": "Celadon City",
+      "observed_at": "2026-07-18T07:19:45.656820Z",
+      "party_size": 3,
+      "play_time_seconds": 31240,
+      "pokedex": {
+        "caught": 5,
+        "seen": 54
+      },
+      "sequence": 285,
       "summary": "A retained progress checkpoint records the autonomous run in Celadon City. The retained state shows 3 badges, 5 caught Pokémon, and a party of 3.",
       "title": "Checkpoint in Celadon City",
       "video": null
@@ -2790,10 +2838,10 @@
       }
     }
   ],
-  "revision": "sha256:e11168486e3323e231cb5eea90f5b119e2329c6bca7f4968ba6d16c39db69159",
+  "revision": "sha256:b7bedc69ae44e5a09bf0a0f90f0fd6a44075fd928e8a0ff0ae1e07830e4a610c",
   "schema_version": 1,
   "status": "in_progress",
   "story_id": "rappter-plays-pokemon-main-run",
-  "summary": "The archive starts with the earliest retained evidence in Pewter City and follows 114 verified key events. It currently records 4 badges. The latest published chapter reaches Game Corner.",
+  "summary": "The archive starts with the earliest retained evidence in Pewter City and follows 116 verified key events. It currently records 4 badges. The latest published chapter reaches Game Corner.",
   "updated_at": "2026-07-19T04:46:43.021314Z"
 }
