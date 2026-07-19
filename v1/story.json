@@ -1,10 +1,10 @@
 {
   "coverage": {
     "continuous_source": false,
-    "event_count": 241,
+    "event_count": 243,
     "first_observed_at": "2026-07-17T04:22:13.529703Z",
     "incomplete_before": true,
-    "last_observed_at": "2026-07-19T19:43:17.780963Z"
+    "last_observed_at": "2026-07-19T20:05:38.350567Z"
   },
   "events": [
     {
@@ -5281,6 +5281,35 @@
         "Rainbow"
       ],
       "chapter": "Beyond the Rainbow Badge",
+      "coverage_gap_before": true,
+      "highest_level": 40,
+      "id": "event-000484",
+      "kind": "progress",
+      "location": "Celadon City",
+      "observed_at": "2026-07-19T05:52:47.738713Z",
+      "party_size": 3,
+      "play_time_seconds": 112359,
+      "pokedex": {
+        "caught": 5,
+        "seen": 59
+      },
+      "sequence": 484,
+      "summary": "A retained progress checkpoint records the autonomous run in Celadon City. The retained state shows 4 badges, 5 caught Pokémon, and a party of 3.",
+      "title": "Checkpoint in Celadon City",
+      "video": {
+        "end_seconds": 21446,
+        "start_seconds": 21296,
+        "youtube_id": "lAi3T3V_-50"
+      }
+    },
+    {
+      "badges": [
+        "Boulder",
+        "Cascade",
+        "Thunder",
+        "Rainbow"
+      ],
+      "chapter": "Beyond the Rainbow Badge",
       "coverage_gap_before": false,
       "highest_level": 40,
       "id": "event-000489",
@@ -6229,12 +6258,41 @@
         "start_seconds": 71126,
         "youtube_id": "lAi3T3V_-50"
       }
+    },
+    {
+      "badges": [
+        "Boulder",
+        "Cascade",
+        "Thunder",
+        "Rainbow"
+      ],
+      "chapter": "Beyond the Rainbow Badge",
+      "coverage_gap_before": false,
+      "highest_level": 41,
+      "id": "event-000674",
+      "kind": "journey",
+      "location": "Game Corner",
+      "observed_at": "2026-07-19T20:05:38.350567Z",
+      "party_size": 3,
+      "play_time_seconds": 163496,
+      "pokedex": {
+        "caught": 5,
+        "seen": 62
+      },
+      "sequence": 674,
+      "summary": "The run had moved from Route 7 to Game Corner. The retained state shows 4 badges, 5 caught Pokémon, and a party of 3.",
+      "title": "Reaching Game Corner",
+      "video": {
+        "end_seconds": 72617,
+        "start_seconds": 72467,
+        "youtube_id": "lAi3T3V_-50"
+      }
     }
   ],
-  "revision": "sha256:45b0517f50f16a5aa12eb9d5ba76061cd7a928622699427c9a44c4384974a294",
+  "revision": "sha256:f0947c7e0b6f915da6a8405e0d4872897f9d2fddfb4e7b7f0af941fbab90a78a",
   "schema_version": 1,
   "status": "in_progress",
   "story_id": "rappter-plays-pokemon-main-run",
-  "summary": "The archive starts with the earliest retained evidence in Pewter City and follows 241 verified key events. It currently records 4 badges. The latest published chapter reaches Route 7.",
-  "updated_at": "2026-07-19T19:43:17.780963Z"
+  "summary": "The archive starts with the earliest retained evidence in Pewter City and follows 243 verified key events. It currently records 4 badges. The latest published chapter reaches Game Corner.",
+  "updated_at": "2026-07-19T20:05:38.350567Z"
 }
