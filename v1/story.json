@@ -1,10 +1,10 @@
 {
   "coverage": {
     "continuous_source": false,
-    "event_count": 261,
+    "event_count": 262,
     "first_observed_at": "2026-07-17T04:22:13.529703Z",
     "incomplete_before": true,
-    "last_observed_at": "2026-07-19T21:49:02.535631Z"
+    "last_observed_at": "2026-07-19T22:07:03.908332Z"
   },
   "events": [
     {
@@ -6809,12 +6809,41 @@
         "start_seconds": 78671,
         "youtube_id": "lAi3T3V_-50"
       }
+    },
+    {
+      "badges": [
+        "Boulder",
+        "Cascade",
+        "Thunder",
+        "Rainbow"
+      ],
+      "chapter": "Beyond the Rainbow Badge",
+      "coverage_gap_before": false,
+      "highest_level": 41,
+      "id": "event-000697",
+      "kind": "journey",
+      "location": "Rocket Hideout B1F",
+      "observed_at": "2026-07-19T22:07:03.908332Z",
+      "party_size": 3,
+      "play_time_seconds": 170778,
+      "pokedex": {
+        "caught": 5,
+        "seen": 62
+      },
+      "sequence": 697,
+      "summary": "The run had moved from Game Corner to Rocket Hideout B1F. The retained state shows 4 badges, 5 caught Pokémon, and a party of 3.",
+      "title": "Reaching Rocket Hideout B1F",
+      "video": {
+        "end_seconds": 79902,
+        "start_seconds": 79752,
+        "youtube_id": "lAi3T3V_-50"
+      }
     }
   ],
-  "revision": "sha256:aef1e463c24284fade99b978428c6305ffc3e939a9975f2f3ca258c126e0ad03",
+  "revision": "sha256:90beaebf13f64210ac32d507103af596e6131d4af834bb50e99e9f0ae33cba03",
   "schema_version": 1,
   "status": "in_progress",
   "story_id": "rappter-plays-pokemon-main-run",
-  "summary": "The archive starts with the earliest retained evidence in Pewter City and follows 261 verified key events. It currently records 4 badges. The latest published chapter reaches Game Corner.",
-  "updated_at": "2026-07-19T21:49:02.535631Z"
+  "summary": "The archive starts with the earliest retained evidence in Pewter City and follows 262 verified key events. It currently records 4 badges. The latest published chapter reaches Rocket Hideout B1F.",
+  "updated_at": "2026-07-19T22:07:03.908332Z"
 }
