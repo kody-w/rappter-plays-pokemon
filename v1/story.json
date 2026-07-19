@@ -1,10 +1,10 @@
 {
   "coverage": {
     "continuous_source": false,
-    "event_count": 81,
+    "event_count": 83,
     "first_observed_at": "2026-07-17T04:22:13.529703Z",
     "incomplete_before": true,
-    "last_observed_at": "2026-07-19T00:18:07.218473Z"
+    "last_observed_at": "2026-07-19T00:56:52.176297Z"
   },
   "events": [
     {
@@ -895,6 +895,29 @@
         "seen": 44
       },
       "sequence": 223,
+      "summary": "The recorded party size increased from 1 to 3 while the run was in Vermilion Gym. The retained state shows 2 badges, 4 caught Pokémon, and a party of 3.",
+      "title": "The party grows in Vermilion Gym",
+      "video": null
+    },
+    {
+      "badges": [
+        "Boulder",
+        "Cascade"
+      ],
+      "chapter": "Beyond the Cascade Badge",
+      "coverage_gap_before": true,
+      "highest_level": 30,
+      "id": "event-000227",
+      "kind": "party",
+      "location": "Vermilion Gym",
+      "observed_at": "2026-07-17T23:48:17.475657Z",
+      "party_size": 3,
+      "play_time_seconds": 13499,
+      "pokedex": {
+        "caught": 4,
+        "seen": 45
+      },
+      "sequence": 227,
       "summary": "The recorded party size increased from 1 to 3 while the run was in Vermilion Gym. The retained state shows 2 badges, 4 caught Pokémon, and a party of 3.",
       "title": "The party grows in Vermilion Gym",
       "video": null
@@ -1957,12 +1980,41 @@
         "start_seconds": 1216,
         "youtube_id": "lAi3T3V_-50"
       }
+    },
+    {
+      "badges": [
+        "Boulder",
+        "Cascade",
+        "Thunder",
+        "Rainbow"
+      ],
+      "chapter": "Beyond the Rainbow Badge",
+      "coverage_gap_before": false,
+      "highest_level": 40,
+      "id": "event-000419",
+      "kind": "journey",
+      "location": "Rocket Hideout B2F",
+      "observed_at": "2026-07-19T00:56:52.176297Z",
+      "party_size": 3,
+      "play_time_seconds": 94618,
+      "pokedex": {
+        "caught": 5,
+        "seen": 59
+      },
+      "sequence": 419,
+      "summary": "The run had moved from Rocket Hideout B3F to Rocket Hideout B2F. The retained state shows 4 badges, 5 caught Pokémon, and a party of 3.",
+      "title": "Reaching Rocket Hideout B2F",
+      "video": {
+        "end_seconds": 3691,
+        "start_seconds": 3541,
+        "youtube_id": "lAi3T3V_-50"
+      }
     }
   ],
-  "revision": "sha256:bbe8b4343b850b4cecd33671a437eb3312d4cb1aaf193c80b7dd8e5e8b9d8202",
+  "revision": "sha256:dc392bcf1b6f03009426f64da5de1f1d0f71e701dc7ff7dddd2688973203a6f8",
   "schema_version": 1,
   "status": "in_progress",
   "story_id": "rappter-plays-pokemon-main-run",
-  "summary": "The archive starts with the earliest retained evidence in Pewter City and follows 81 verified key events. It currently records 4 badges. The latest published chapter reaches Rocket Hideout B3F.",
-  "updated_at": "2026-07-19T00:18:07.218473Z"
+  "summary": "The archive starts with the earliest retained evidence in Pewter City and follows 83 verified key events. It currently records 4 badges. The latest published chapter reaches Rocket Hideout B2F.",
+  "updated_at": "2026-07-19T00:56:52.176297Z"
 }
