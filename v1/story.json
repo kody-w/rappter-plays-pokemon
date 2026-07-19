@@ -1,10 +1,10 @@
 {
   "coverage": {
     "continuous_source": false,
-    "event_count": 235,
+    "event_count": 236,
     "first_observed_at": "2026-07-17T04:22:13.529703Z",
     "incomplete_before": true,
-    "last_observed_at": "2026-07-19T18:51:50.677328Z"
+    "last_observed_at": "2026-07-19T19:10:50.463336Z"
   },
   "events": [
     {
@@ -6055,12 +6055,41 @@
         "start_seconds": 68039,
         "youtube_id": "lAi3T3V_-50"
       }
+    },
+    {
+      "badges": [
+        "Boulder",
+        "Cascade",
+        "Thunder",
+        "Rainbow"
+      ],
+      "chapter": "Beyond the Rainbow Badge",
+      "coverage_gap_before": false,
+      "highest_level": 41,
+      "id": "event-000657",
+      "kind": "journey",
+      "location": "Game Corner",
+      "observed_at": "2026-07-19T19:10:50.463336Z",
+      "party_size": 3,
+      "play_time_seconds": 160210,
+      "pokedex": {
+        "caught": 5,
+        "seen": 62
+      },
+      "sequence": 657,
+      "summary": "The run had moved from Celadon City to Game Corner. The retained state shows 4 badges, 5 caught Pokémon, and a party of 3.",
+      "title": "Reaching Game Corner",
+      "video": {
+        "end_seconds": 69329,
+        "start_seconds": 69179,
+        "youtube_id": "lAi3T3V_-50"
+      }
     }
   ],
-  "revision": "sha256:ae2104d786629ad8ca9ff46e23d546e61d58c12daab78f565c520ebb91951378",
+  "revision": "sha256:18ea3202edaed1341c844a86d363256b92964829b5f3d3a98d62ed0844c1ab87",
   "schema_version": 1,
   "status": "in_progress",
   "story_id": "rappter-plays-pokemon-main-run",
-  "summary": "The archive starts with the earliest retained evidence in Pewter City and follows 235 verified key events. It currently records 4 badges. The latest published chapter reaches Celadon City.",
-  "updated_at": "2026-07-19T18:51:50.677328Z"
+  "summary": "The archive starts with the earliest retained evidence in Pewter City and follows 236 verified key events. It currently records 4 badges. The latest published chapter reaches Game Corner.",
+  "updated_at": "2026-07-19T19:10:50.463336Z"
 }
