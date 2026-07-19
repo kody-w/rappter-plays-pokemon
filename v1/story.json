@@ -1,10 +1,10 @@
 {
   "coverage": {
     "continuous_source": false,
-    "event_count": 103,
+    "event_count": 104,
     "first_observed_at": "2026-07-17T04:22:13.529703Z",
     "incomplete_before": true,
-    "last_observed_at": "2026-07-19T03:10:01.611903Z"
+    "last_observed_at": "2026-07-19T03:45:10.118128Z"
   },
   "events": [
     {
@@ -2509,12 +2509,41 @@
         "start_seconds": 11530,
         "youtube_id": "lAi3T3V_-50"
       }
+    },
+    {
+      "badges": [
+        "Boulder",
+        "Cascade",
+        "Thunder",
+        "Rainbow"
+      ],
+      "chapter": "Beyond the Rainbow Badge",
+      "coverage_gap_before": false,
+      "highest_level": 40,
+      "id": "event-000456",
+      "kind": "journey",
+      "location": "Celadon City",
+      "observed_at": "2026-07-19T03:45:10.118128Z",
+      "party_size": 3,
+      "play_time_seconds": 104709,
+      "pokedex": {
+        "caught": 5,
+        "seen": 59
+      },
+      "sequence": 456,
+      "summary": "The run had moved from Rocket Hideout B2F to Celadon City. The retained state shows 4 badges, 5 caught Pokémon, and a party of 3.",
+      "title": "Reaching Celadon City",
+      "video": {
+        "end_seconds": 13789,
+        "start_seconds": 13639,
+        "youtube_id": "lAi3T3V_-50"
+      }
     }
   ],
-  "revision": "sha256:663e623d4486d6e36d24b6ce881cf3d2517bcd943061df914a8897f94e76f1d0",
+  "revision": "sha256:07fd627e1c36e3e61e714d5810fba3c6efc31ec6f45758e3e1d4a5c5102ab01b",
   "schema_version": 1,
   "status": "in_progress",
   "story_id": "rappter-plays-pokemon-main-run",
-  "summary": "The archive starts with the earliest retained evidence in Pewter City and follows 103 verified key events. It currently records 4 badges. The latest published chapter reaches Rocket Hideout B2F.",
-  "updated_at": "2026-07-19T03:10:01.611903Z"
+  "summary": "The archive starts with the earliest retained evidence in Pewter City and follows 104 verified key events. It currently records 4 badges. The latest published chapter reaches Celadon City.",
+  "updated_at": "2026-07-19T03:45:10.118128Z"
 }
