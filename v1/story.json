@@ -1,10 +1,10 @@
 {
   "coverage": {
     "continuous_source": false,
-    "event_count": 183,
+    "event_count": 186,
     "first_observed_at": "2026-07-17T04:22:13.529703Z",
     "incomplete_before": true,
-    "last_observed_at": "2026-07-19T13:06:32.811629Z"
+    "last_observed_at": "2026-07-19T13:23:19.281676Z"
   },
   "events": [
     {
@@ -3647,6 +3647,31 @@
         "Rainbow"
       ],
       "chapter": "Beyond the Rainbow Badge",
+      "coverage_gap_before": true,
+      "highest_level": 40,
+      "id": "event-000390",
+      "kind": "progress",
+      "location": "Celadon City",
+      "observed_at": "2026-07-18T21:51:23.296904Z",
+      "party_size": 3,
+      "play_time_seconds": 83493,
+      "pokedex": {
+        "caught": 5,
+        "seen": 59
+      },
+      "sequence": 390,
+      "summary": "A retained progress checkpoint records the autonomous run in Celadon City. The retained state shows 4 badges, 5 caught Pokémon, and a party of 3.",
+      "title": "Checkpoint in Celadon City",
+      "video": null
+    },
+    {
+      "badges": [
+        "Boulder",
+        "Cascade",
+        "Thunder",
+        "Rainbow"
+      ],
+      "chapter": "Beyond the Rainbow Badge",
       "coverage_gap_before": false,
       "highest_level": 40,
       "id": "event-000391",
@@ -3687,6 +3712,31 @@
       "sequence": 392,
       "summary": "The run had moved from Celadon City to Rocket Hideout B1F. The retained state shows 4 badges, 5 caught Pokémon, and a party of 3.",
       "title": "Reaching Rocket Hideout B1F",
+      "video": null
+    },
+    {
+      "badges": [
+        "Boulder",
+        "Cascade",
+        "Thunder",
+        "Rainbow"
+      ],
+      "chapter": "Beyond the Rainbow Badge",
+      "coverage_gap_before": false,
+      "highest_level": 40,
+      "id": "event-000394",
+      "kind": "journey",
+      "location": "Rocket Hideout B2F",
+      "observed_at": "2026-07-18T22:08:02.629975Z",
+      "party_size": 3,
+      "play_time_seconds": 84491,
+      "pokedex": {
+        "caught": 5,
+        "seen": 59
+      },
+      "sequence": 394,
+      "summary": "The run had moved from Celadon City to Rocket Hideout B2F. The retained state shows 4 badges, 5 caught Pokémon, and a party of 3.",
+      "title": "Reaching Rocket Hideout B2F",
       "video": null
     },
     {
@@ -4579,12 +4629,41 @@
         "start_seconds": 47321,
         "youtube_id": "lAi3T3V_-50"
       }
+    },
+    {
+      "badges": [
+        "Boulder",
+        "Cascade",
+        "Thunder",
+        "Rainbow"
+      ],
+      "chapter": "Beyond the Rainbow Badge",
+      "coverage_gap_before": false,
+      "highest_level": 41,
+      "id": "event-000582",
+      "kind": "journey",
+      "location": "Rocket Hideout B3F",
+      "observed_at": "2026-07-19T13:23:19.281676Z",
+      "party_size": 3,
+      "play_time_seconds": 139372,
+      "pokedex": {
+        "caught": 5,
+        "seen": 62
+      },
+      "sequence": 582,
+      "summary": "The run had moved from Rocket Hideout B2F to Rocket Hideout B3F. The retained state shows 4 badges, 5 caught Pokémon, and a party of 3.",
+      "title": "Reaching Rocket Hideout B3F",
+      "video": {
+        "end_seconds": 48478,
+        "start_seconds": 48328,
+        "youtube_id": "lAi3T3V_-50"
+      }
     }
   ],
-  "revision": "sha256:e6c808ecb0c70e1acb4258ae8cdf7563fd8cfc6b6372b015543eb0d1765ee579",
+  "revision": "sha256:19aa140402ad6e23d3adf1ef854356cad45a6680c61bc28ad6b5a15668f77a1d",
   "schema_version": 1,
   "status": "in_progress",
   "story_id": "rappter-plays-pokemon-main-run",
-  "summary": "The archive starts with the earliest retained evidence in Pewter City and follows 183 verified key events. It currently records 4 badges. The latest published chapter reaches Rocket Hideout B2F.",
-  "updated_at": "2026-07-19T13:06:32.811629Z"
+  "summary": "The archive starts with the earliest retained evidence in Pewter City and follows 186 verified key events. It currently records 4 badges. The latest published chapter reaches Rocket Hideout B3F.",
+  "updated_at": "2026-07-19T13:23:19.281676Z"
 }
