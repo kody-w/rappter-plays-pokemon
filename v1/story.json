@@ -1,7 +1,7 @@
 {
   "coverage": {
     "continuous_source": false,
-    "event_count": 97,
+    "event_count": 98,
     "first_observed_at": "2026-07-17T04:22:13.529703Z",
     "incomplete_before": true,
     "last_observed_at": "2026-07-19T02:22:09.263087Z"
@@ -1384,6 +1384,30 @@
         "Thunder"
       ],
       "chapter": "Beyond the Thunder Badge",
+      "coverage_gap_before": true,
+      "highest_level": 33,
+      "id": "event-000258",
+      "kind": "progress",
+      "location": "Rock Tunnel B1F",
+      "observed_at": "2026-07-18T03:24:23.672551Z",
+      "party_size": 3,
+      "play_time_seconds": 17123,
+      "pokedex": {
+        "caught": 4,
+        "seen": 49
+      },
+      "sequence": 258,
+      "summary": "A retained progress checkpoint records the autonomous run in Rock Tunnel B1F. The retained state shows 3 badges, 4 caught Pokémon, and a party of 3.",
+      "title": "Checkpoint in Rock Tunnel B1F",
+      "video": null
+    },
+    {
+      "badges": [
+        "Boulder",
+        "Cascade",
+        "Thunder"
+      ],
+      "chapter": "Beyond the Thunder Badge",
       "coverage_gap_before": false,
       "highest_level": 34,
       "id": "event-000259",
@@ -2362,10 +2386,10 @@
       }
     }
   ],
-  "revision": "sha256:dc0c7d64cf4e86819eafe311b7c332e279d21f3632a424b150e00d9ee1b16548",
+  "revision": "sha256:e128237c19de0e06cf1aa21f3108f1f3ab8101238f53c7bbead4fcbf18059230",
   "schema_version": 1,
   "status": "in_progress",
   "story_id": "rappter-plays-pokemon-main-run",
-  "summary": "The archive starts with the earliest retained evidence in Pewter City and follows 97 verified key events. It currently records 4 badges. The latest published chapter reaches Rocket Hideout B1F.",
+  "summary": "The archive starts with the earliest retained evidence in Pewter City and follows 98 verified key events. It currently records 4 badges. The latest published chapter reaches Rocket Hideout B1F.",
   "updated_at": "2026-07-19T02:22:09.263087Z"
 }
