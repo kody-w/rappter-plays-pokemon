@@ -1,7 +1,7 @@
 {
   "coverage": {
     "continuous_source": false,
-    "event_count": 104,
+    "event_count": 105,
     "first_observed_at": "2026-07-17T04:22:13.529703Z",
     "incomplete_before": true,
     "last_observed_at": "2026-07-19T03:45:10.118128Z"
@@ -1600,6 +1600,30 @@
         "Thunder"
       ],
       "chapter": "Beyond the Thunder Badge",
+      "coverage_gap_before": true,
+      "highest_level": 36,
+      "id": "event-000268",
+      "kind": "pokedex",
+      "location": "Route 8",
+      "observed_at": "2026-07-18T04:31:38.958966Z",
+      "party_size": 3,
+      "play_time_seconds": 21156,
+      "pokedex": {
+        "caught": 5,
+        "seen": 52
+      },
+      "sequence": 268,
+      "summary": "The verified caught count increased from 4 to 5 by this retained checkpoint. The retained state shows 3 badges, 5 caught Pokémon, and a party of 3.",
+      "title": "Pokédex progress in Route 8",
+      "video": null
+    },
+    {
+      "badges": [
+        "Boulder",
+        "Cascade",
+        "Thunder"
+      ],
+      "chapter": "Beyond the Thunder Badge",
       "coverage_gap_before": false,
       "highest_level": 37,
       "id": "event-000271",
@@ -2540,10 +2564,10 @@
       }
     }
   ],
-  "revision": "sha256:07fd627e1c36e3e61e714d5810fba3c6efc31ec6f45758e3e1d4a5c5102ab01b",
+  "revision": "sha256:cf0b365981285e30ecf5ccde0ffc4c751ef13a2f8e3973a5e7282ec96f74d9b6",
   "schema_version": 1,
   "status": "in_progress",
   "story_id": "rappter-plays-pokemon-main-run",
-  "summary": "The archive starts with the earliest retained evidence in Pewter City and follows 104 verified key events. It currently records 4 badges. The latest published chapter reaches Celadon City.",
+  "summary": "The archive starts with the earliest retained evidence in Pewter City and follows 105 verified key events. It currently records 4 badges. The latest published chapter reaches Celadon City.",
   "updated_at": "2026-07-19T03:45:10.118128Z"
 }
