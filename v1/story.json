@@ -1,7 +1,7 @@
 {
   "coverage": {
     "continuous_source": false,
-    "event_count": 83,
+    "event_count": 85,
     "first_observed_at": "2026-07-17T04:22:13.529703Z",
     "incomplete_before": true,
     "last_observed_at": "2026-07-19T00:56:52.176297Z"
@@ -1024,6 +1024,30 @@
         "Thunder"
       ],
       "chapter": "Beyond the Thunder Badge",
+      "coverage_gap_before": true,
+      "highest_level": 31,
+      "id": "event-000237",
+      "kind": "progress",
+      "location": "Route 9",
+      "observed_at": "2026-07-18T00:53:56.379887Z",
+      "party_size": 3,
+      "play_time_seconds": 14020,
+      "pokedex": {
+        "caught": 4,
+        "seen": 46
+      },
+      "sequence": 237,
+      "summary": "A retained progress checkpoint records the autonomous run in Route 9. The retained state shows 3 badges, 4 caught Pokémon, and a party of 3.",
+      "title": "Checkpoint in Route 9",
+      "video": null
+    },
+    {
+      "badges": [
+        "Boulder",
+        "Cascade",
+        "Thunder"
+      ],
+      "chapter": "Beyond the Thunder Badge",
       "coverage_gap_before": false,
       "highest_level": 31,
       "id": "event-000238",
@@ -1037,6 +1061,30 @@
         "seen": 47
       },
       "sequence": 238,
+      "summary": "The run had moved from Route 9 to Route 10. The retained state shows 3 badges, 4 caught Pokémon, and a party of 3.",
+      "title": "Reaching Route 10",
+      "video": null
+    },
+    {
+      "badges": [
+        "Boulder",
+        "Cascade",
+        "Thunder"
+      ],
+      "chapter": "Beyond the Thunder Badge",
+      "coverage_gap_before": false,
+      "highest_level": 31,
+      "id": "event-000240",
+      "kind": "journey",
+      "location": "Route 10",
+      "observed_at": "2026-07-18T01:19:13.000428Z",
+      "party_size": 3,
+      "play_time_seconds": 14214,
+      "pokedex": {
+        "caught": 4,
+        "seen": 47
+      },
+      "sequence": 240,
       "summary": "The run had moved from Route 9 to Route 10. The retained state shows 3 badges, 4 caught Pokémon, and a party of 3.",
       "title": "Reaching Route 10",
       "video": null
@@ -2011,10 +2059,10 @@
       }
     }
   ],
-  "revision": "sha256:dc392bcf1b6f03009426f64da5de1f1d0f71e701dc7ff7dddd2688973203a6f8",
+  "revision": "sha256:7da61babad2168da00b04e40d77e296287de153095054aab32c4b582932803cd",
   "schema_version": 1,
   "status": "in_progress",
   "story_id": "rappter-plays-pokemon-main-run",
-  "summary": "The archive starts with the earliest retained evidence in Pewter City and follows 83 verified key events. It currently records 4 badges. The latest published chapter reaches Rocket Hideout B2F.",
+  "summary": "The archive starts with the earliest retained evidence in Pewter City and follows 85 verified key events. It currently records 4 badges. The latest published chapter reaches Rocket Hideout B2F.",
   "updated_at": "2026-07-19T00:56:52.176297Z"
 }
