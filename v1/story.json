@@ -1,10 +1,10 @@
 {
   "coverage": {
     "continuous_source": false,
-    "event_count": 142,
+    "event_count": 143,
     "first_observed_at": "2026-07-17T04:22:13.529703Z",
     "incomplete_before": true,
-    "last_observed_at": "2026-07-19T08:00:42.533688Z"
+    "last_observed_at": "2026-07-19T08:15:47.272688Z"
   },
   "events": [
     {
@@ -3510,12 +3510,41 @@
         "start_seconds": 28971,
         "youtube_id": "lAi3T3V_-50"
       }
+    },
+    {
+      "badges": [
+        "Boulder",
+        "Cascade",
+        "Thunder",
+        "Rainbow"
+      ],
+      "chapter": "Beyond the Rainbow Badge",
+      "coverage_gap_before": false,
+      "highest_level": 41,
+      "id": "event-000529",
+      "kind": "journey",
+      "location": "Celadon City",
+      "observed_at": "2026-07-19T08:15:47.272688Z",
+      "party_size": 3,
+      "play_time_seconds": 120931,
+      "pokedex": {
+        "caught": 5,
+        "seen": 62
+      },
+      "sequence": 529,
+      "summary": "The run had moved from Pokémon Tower 2F to Celadon City. The retained state shows 4 badges, 5 caught Pokémon, and a party of 3.",
+      "title": "Reaching Celadon City",
+      "video": {
+        "end_seconds": 30026,
+        "start_seconds": 29876,
+        "youtube_id": "lAi3T3V_-50"
+      }
     }
   ],
-  "revision": "sha256:c531d439c2d46871d2871fde02528ce22f954742fb6741a1cf8353f9ce288278",
+  "revision": "sha256:328978d91be03feb118cd821537acfba282acdd1311da2988a1be46dd4c1d875",
   "schema_version": 1,
   "status": "in_progress",
   "story_id": "rappter-plays-pokemon-main-run",
-  "summary": "The archive starts with the earliest retained evidence in Pewter City and follows 142 verified key events. It currently records 4 badges. The latest published chapter reaches Pokémon Tower 2F.",
-  "updated_at": "2026-07-19T08:00:42.533688Z"
+  "summary": "The archive starts with the earliest retained evidence in Pewter City and follows 143 verified key events. It currently records 4 badges. The latest published chapter reaches Celadon City.",
+  "updated_at": "2026-07-19T08:15:47.272688Z"
 }
