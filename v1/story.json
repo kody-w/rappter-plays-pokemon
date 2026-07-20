@@ -1,10 +1,10 @@
 {
   "coverage": {
     "continuous_source": false,
-    "event_count": 415,
+    "event_count": 418,
     "first_observed_at": "2026-07-17T04:22:13.529703Z",
     "incomplete_before": true,
-    "last_observed_at": "2026-07-20T19:25:45.763588Z"
+    "last_observed_at": "2026-07-20T19:50:33.198348Z"
   },
   "events": [
     {
@@ -10124,6 +10124,35 @@
         "Rainbow"
       ],
       "chapter": "Beyond the Rainbow Badge",
+      "coverage_gap_before": true,
+      "highest_level": 41,
+      "id": "event-000736",
+      "kind": "journey",
+      "location": "Rocket Hideout B1F",
+      "observed_at": "2026-07-20T02:06:20.192727Z",
+      "party_size": 3,
+      "play_time_seconds": 185127,
+      "pokedex": {
+        "caught": 5,
+        "seen": 62
+      },
+      "sequence": 736,
+      "summary": "By the next retained checkpoint, the run had moved from Celadon Gym to Rocket Hideout B1F. The retained state shows 4 badges, 5 caught Pokémon, and a party of 3.",
+      "title": "Reaching Rocket Hideout B1F",
+      "video": {
+        "end_seconds": 94259,
+        "start_seconds": 94109,
+        "youtube_id": "lAi3T3V_-50"
+      }
+    },
+    {
+      "badges": [
+        "Boulder",
+        "Cascade",
+        "Thunder",
+        "Rainbow"
+      ],
+      "chapter": "Beyond the Rainbow Badge",
       "coverage_gap_before": false,
       "highest_level": 41,
       "id": "event-000737",
@@ -10200,6 +10229,35 @@
       "video": {
         "end_seconds": 95091,
         "start_seconds": 94941,
+        "youtube_id": "lAi3T3V_-50"
+      }
+    },
+    {
+      "badges": [
+        "Boulder",
+        "Cascade",
+        "Thunder",
+        "Rainbow"
+      ],
+      "chapter": "Beyond the Rainbow Badge",
+      "coverage_gap_before": false,
+      "highest_level": 41,
+      "id": "event-000744",
+      "kind": "journey",
+      "location": "Rocket Hideout B2F",
+      "observed_at": "2026-07-20T02:26:41.856306Z",
+      "party_size": 3,
+      "play_time_seconds": 186349,
+      "pokedex": {
+        "caught": 5,
+        "seen": 62
+      },
+      "sequence": 744,
+      "summary": "The run had moved from Rocket Hideout B1F to Rocket Hideout B2F. The retained state shows 4 badges, 5 caught Pokémon, and a party of 3.",
+      "title": "Reaching Rocket Hideout B2F",
+      "video": {
+        "end_seconds": 95480,
+        "start_seconds": 95330,
         "youtube_id": "lAi3T3V_-50"
       }
     },
@@ -11275,12 +11333,41 @@
         "start_seconds": 156474,
         "youtube_id": "lAi3T3V_-50"
       }
+    },
+    {
+      "badges": [
+        "Boulder",
+        "Cascade",
+        "Thunder",
+        "Rainbow"
+      ],
+      "chapter": "Beyond the Rainbow Badge",
+      "coverage_gap_before": false,
+      "highest_level": 41,
+      "id": "event-000928",
+      "kind": "journey",
+      "location": "Rocket Hideout B1F",
+      "observed_at": "2026-07-20T19:50:33.198348Z",
+      "party_size": 3,
+      "play_time_seconds": 248951,
+      "pokedex": {
+        "caught": 5,
+        "seen": 62
+      },
+      "sequence": 928,
+      "summary": "The run had moved from Game Corner to Rocket Hideout B1F. The retained state shows 4 badges, 5 caught Pokémon, and a party of 3.",
+      "title": "Reaching Rocket Hideout B1F",
+      "video": {
+        "end_seconds": 158112,
+        "start_seconds": 157962,
+        "youtube_id": "lAi3T3V_-50"
+      }
     }
   ],
-  "revision": "sha256:e54b7348af12308293ef986df6466ad5bc1df5f5f45d5db8df39089e4d3f330e",
+  "revision": "sha256:e535a572a3f9d40fbdbf3f348cdf0d618f91dd4ec1ca41c9bc4af2a1d9ce8967",
   "schema_version": 1,
   "status": "in_progress",
   "story_id": "rappter-plays-pokemon-main-run",
-  "summary": "The archive starts with the earliest retained evidence in Pewter City and follows 415 verified key events. It currently records 4 badges. The latest published chapter reaches Game Corner.",
-  "updated_at": "2026-07-20T19:25:45.763588Z"
+  "summary": "The archive starts with the earliest retained evidence in Pewter City and follows 418 verified key events. It currently records 4 badges. The latest published chapter reaches Rocket Hideout B1F.",
+  "updated_at": "2026-07-20T19:50:33.198348Z"
 }
