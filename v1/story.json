@@ -1,10 +1,10 @@
 {
   "coverage": {
     "continuous_source": false,
-    "event_count": 324,
+    "event_count": 326,
     "first_observed_at": "2026-07-17T04:22:13.529703Z",
     "incomplete_before": true,
-    "last_observed_at": "2026-07-20T07:29:28.382941Z"
+    "last_observed_at": "2026-07-20T08:06:23.370570Z"
   },
   "events": [
     {
@@ -7688,6 +7688,35 @@
         "Rainbow"
       ],
       "chapter": "Beyond the Rainbow Badge",
+      "coverage_gap_before": true,
+      "highest_level": 41,
+      "id": "event-000609",
+      "kind": "journey",
+      "location": "Game Corner",
+      "observed_at": "2026-07-19T15:36:27.396319Z",
+      "party_size": 3,
+      "play_time_seconds": 147353,
+      "pokedex": {
+        "caught": 5,
+        "seen": 62
+      },
+      "sequence": 609,
+      "summary": "By the next retained checkpoint, the run had moved from Celadon Gym to Game Corner. The retained state shows 4 badges, 5 caught Pokémon, and a party of 3.",
+      "title": "Reaching Game Corner",
+      "video": {
+        "end_seconds": 56466,
+        "start_seconds": 56316,
+        "youtube_id": "lAi3T3V_-50"
+      }
+    },
+    {
+      "badges": [
+        "Boulder",
+        "Cascade",
+        "Thunder",
+        "Rainbow"
+      ],
+      "chapter": "Beyond the Rainbow Badge",
       "coverage_gap_before": false,
       "highest_level": 41,
       "id": "event-000612",
@@ -8636,12 +8665,41 @@
         "start_seconds": 113497,
         "youtube_id": "lAi3T3V_-50"
       }
+    },
+    {
+      "badges": [
+        "Boulder",
+        "Cascade",
+        "Thunder",
+        "Rainbow"
+      ],
+      "chapter": "Beyond the Rainbow Badge",
+      "coverage_gap_before": false,
+      "highest_level": 41,
+      "id": "event-000798",
+      "kind": "journey",
+      "location": "Celadon City",
+      "observed_at": "2026-07-20T08:06:23.370570Z",
+      "party_size": 3,
+      "play_time_seconds": 206722,
+      "pokedex": {
+        "caught": 5,
+        "seen": 62
+      },
+      "sequence": 798,
+      "summary": "The run had moved from Rocket Hideout B2F to Celadon City. The retained state shows 4 badges, 5 caught Pokémon, and a party of 3.",
+      "title": "Reaching Celadon City",
+      "video": {
+        "end_seconds": 115862,
+        "start_seconds": 115712,
+        "youtube_id": "lAi3T3V_-50"
+      }
     }
   ],
-  "revision": "sha256:2f8d7a3783627b821dda4af1e65b22d21c6952fc02814b9cf43a0e638334ff44",
+  "revision": "sha256:36b34af76793666aa129d39a197047b0288ab84826690dc1ef5da1199f192c71",
   "schema_version": 1,
   "status": "in_progress",
   "story_id": "rappter-plays-pokemon-main-run",
-  "summary": "The archive starts with the earliest retained evidence in Pewter City and follows 324 verified key events. It currently records 4 badges. The latest published chapter reaches Rocket Hideout B2F.",
-  "updated_at": "2026-07-20T07:29:28.382941Z"
+  "summary": "The archive starts with the earliest retained evidence in Pewter City and follows 326 verified key events. It currently records 4 badges. The latest published chapter reaches Celadon City.",
+  "updated_at": "2026-07-20T08:06:23.370570Z"
 }
