@@ -1,7 +1,7 @@
 {
   "coverage": {
     "continuous_source": false,
-    "event_count": 354,
+    "event_count": 357,
     "first_observed_at": "2026-07-17T04:22:13.529703Z",
     "incomplete_before": true,
     "last_observed_at": "2026-07-20T11:44:11.263650Z"
@@ -8529,6 +8529,35 @@
         "Rainbow"
       ],
       "chapter": "Beyond the Rainbow Badge",
+      "coverage_gap_before": true,
+      "highest_level": 41,
+      "id": "event-000648",
+      "kind": "journey",
+      "location": "Rocket Hideout B2F",
+      "observed_at": "2026-07-19T18:36:53.612965Z",
+      "party_size": 3,
+      "play_time_seconds": 158175,
+      "pokedex": {
+        "caught": 5,
+        "seen": 62
+      },
+      "sequence": 648,
+      "summary": "By the next retained checkpoint, the run had moved from Celadon Gym to Rocket Hideout B2F. The retained state shows 4 badges, 5 caught Pokémon, and a party of 3.",
+      "title": "Reaching Rocket Hideout B2F",
+      "video": {
+        "end_seconds": 67292,
+        "start_seconds": 67142,
+        "youtube_id": "lAi3T3V_-50"
+      }
+    },
+    {
+      "badges": [
+        "Boulder",
+        "Cascade",
+        "Thunder",
+        "Rainbow"
+      ],
+      "chapter": "Beyond the Rainbow Badge",
       "coverage_gap_before": false,
       "highest_level": 41,
       "id": "event-000649",
@@ -8589,6 +8618,35 @@
       "chapter": "Beyond the Rainbow Badge",
       "coverage_gap_before": false,
       "highest_level": 41,
+      "id": "event-000654",
+      "kind": "journey",
+      "location": "Celadon City",
+      "observed_at": "2026-07-19T19:03:43.177833Z",
+      "party_size": 3,
+      "play_time_seconds": 159784,
+      "pokedex": {
+        "caught": 5,
+        "seen": 62
+      },
+      "sequence": 654,
+      "summary": "The run had moved from Rocket Hideout B2F to Celadon City. The retained state shows 4 badges, 5 caught Pokémon, and a party of 3.",
+      "title": "Reaching Celadon City",
+      "video": {
+        "end_seconds": 68902,
+        "start_seconds": 68752,
+        "youtube_id": "lAi3T3V_-50"
+      }
+    },
+    {
+      "badges": [
+        "Boulder",
+        "Cascade",
+        "Thunder",
+        "Rainbow"
+      ],
+      "chapter": "Beyond the Rainbow Badge",
+      "coverage_gap_before": false,
+      "highest_level": 41,
       "id": "event-000657",
       "kind": "journey",
       "location": "Game Corner",
@@ -8605,6 +8663,35 @@
       "video": {
         "end_seconds": 69329,
         "start_seconds": 69179,
+        "youtube_id": "lAi3T3V_-50"
+      }
+    },
+    {
+      "badges": [
+        "Boulder",
+        "Cascade",
+        "Thunder",
+        "Rainbow"
+      ],
+      "chapter": "Beyond the Rainbow Badge",
+      "coverage_gap_before": false,
+      "highest_level": 41,
+      "id": "event-000659",
+      "kind": "journey",
+      "location": "Rocket Hideout B2F",
+      "observed_at": "2026-07-19T19:20:54.171274Z",
+      "party_size": 3,
+      "play_time_seconds": 160814,
+      "pokedex": {
+        "caught": 5,
+        "seen": 62
+      },
+      "sequence": 659,
+      "summary": "The run had moved from Celadon City to Rocket Hideout B2F. The retained state shows 4 badges, 5 caught Pokémon, and a party of 3.",
+      "title": "Reaching Rocket Hideout B2F",
+      "video": {
+        "end_seconds": 69933,
+        "start_seconds": 69783,
         "youtube_id": "lAi3T3V_-50"
       }
     },
@@ -9508,10 +9595,10 @@
       }
     }
   ],
-  "revision": "sha256:6bdc29ef10a36cff6550c22038ebe2209052d4c4a7b9fa4d2d9df65b587cf16c",
+  "revision": "sha256:1426ec881550156fda9a9f72ec0e7d638a9aa31672cc6d4807034a3ca965ec1b",
   "schema_version": 1,
   "status": "in_progress",
   "story_id": "rappter-plays-pokemon-main-run",
-  "summary": "The archive starts with the earliest retained evidence in Pewter City and follows 354 verified key events. It currently records 4 badges. The latest published chapter reaches Celadon City.",
+  "summary": "The archive starts with the earliest retained evidence in Pewter City and follows 357 verified key events. It currently records 4 badges. The latest published chapter reaches Celadon City.",
   "updated_at": "2026-07-20T11:44:11.263650Z"
 }
