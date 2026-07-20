@@ -1,10 +1,10 @@
 {
   "coverage": {
     "continuous_source": false,
-    "event_count": 278,
+    "event_count": 279,
     "first_observed_at": "2026-07-17T04:22:13.529703Z",
     "incomplete_before": true,
-    "last_observed_at": "2026-07-20T00:14:15.619551Z"
+    "last_observed_at": "2026-07-20T00:59:08.176311Z"
   },
   "events": [
     {
@@ -7302,12 +7302,41 @@
         "start_seconds": 87384,
         "youtube_id": "lAi3T3V_-50"
       }
+    },
+    {
+      "badges": [
+        "Boulder",
+        "Cascade",
+        "Thunder",
+        "Rainbow"
+      ],
+      "chapter": "Beyond the Rainbow Badge",
+      "coverage_gap_before": false,
+      "highest_level": 41,
+      "id": "event-000724",
+      "kind": "journey",
+      "location": "Rocket Hideout B1F",
+      "observed_at": "2026-07-20T00:59:08.176311Z",
+      "party_size": 3,
+      "play_time_seconds": 181097,
+      "pokedex": {
+        "caught": 5,
+        "seen": 62
+      },
+      "sequence": 724,
+      "summary": "The run had moved from Celadon City to Rocket Hideout B1F. The retained state shows 4 badges, 5 caught Pokémon, and a party of 3.",
+      "title": "Reaching Rocket Hideout B1F",
+      "video": {
+        "end_seconds": 90227,
+        "start_seconds": 90077,
+        "youtube_id": "lAi3T3V_-50"
+      }
     }
   ],
-  "revision": "sha256:7e2e69aa6761ff6fa5e74cebcfcb7e9a0c7c11f58f18839f3dd31ceed10eaebb",
+  "revision": "sha256:175eda02525cc85a25664c0eed07638722a7be13fed27694e62911b4002e1dfc",
   "schema_version": 1,
   "status": "in_progress",
   "story_id": "rappter-plays-pokemon-main-run",
-  "summary": "The archive starts with the earliest retained evidence in Pewter City and follows 278 verified key events. It currently records 4 badges. The latest published chapter reaches Celadon City.",
-  "updated_at": "2026-07-20T00:14:15.619551Z"
+  "summary": "The archive starts with the earliest retained evidence in Pewter City and follows 279 verified key events. It currently records 4 badges. The latest published chapter reaches Rocket Hideout B1F.",
+  "updated_at": "2026-07-20T00:59:08.176311Z"
 }
