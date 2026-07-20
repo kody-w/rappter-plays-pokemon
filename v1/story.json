@@ -1,10 +1,10 @@
 {
   "coverage": {
     "continuous_source": false,
-    "event_count": 313,
+    "event_count": 314,
     "first_observed_at": "2026-07-17T04:22:13.529703Z",
     "incomplete_before": true,
-    "last_observed_at": "2026-07-20T05:26:15.500528Z"
+    "last_observed_at": "2026-07-20T05:58:12.963571Z"
   },
   "events": [
     {
@@ -8317,12 +8317,41 @@
         "start_seconds": 106104,
         "youtube_id": "lAi3T3V_-50"
       }
+    },
+    {
+      "badges": [
+        "Boulder",
+        "Cascade",
+        "Thunder",
+        "Rainbow"
+      ],
+      "chapter": "Beyond the Rainbow Badge",
+      "coverage_gap_before": false,
+      "highest_level": 41,
+      "id": "event-000777",
+      "kind": "journey",
+      "location": "Celadon City",
+      "observed_at": "2026-07-20T05:58:12.963571Z",
+      "party_size": 3,
+      "play_time_seconds": 199036,
+      "pokedex": {
+        "caught": 5,
+        "seen": 62
+      },
+      "sequence": 777,
+      "summary": "The run had moved from Rocket Hideout B3F to Celadon City. The retained state shows 4 badges, 5 caught Pokémon, and a party of 3.",
+      "title": "Reaching Celadon City",
+      "video": {
+        "end_seconds": 108171,
+        "start_seconds": 108021,
+        "youtube_id": "lAi3T3V_-50"
+      }
     }
   ],
-  "revision": "sha256:63513c82d03112e9981f40ef373c301a6ac08d775bc7695f05146ab9496f1d8f",
+  "revision": "sha256:9e35e0e774632186c62dcf79d9387c530ab3495a7ecdb9980e064a9cb81cacfd",
   "schema_version": 1,
   "status": "in_progress",
   "story_id": "rappter-plays-pokemon-main-run",
-  "summary": "The archive starts with the earliest retained evidence in Pewter City and follows 313 verified key events. It currently records 4 badges. The latest published chapter reaches Rocket Hideout B3F.",
-  "updated_at": "2026-07-20T05:26:15.500528Z"
+  "summary": "The archive starts with the earliest retained evidence in Pewter City and follows 314 verified key events. It currently records 4 badges. The latest published chapter reaches Celadon City.",
+  "updated_at": "2026-07-20T05:58:12.963571Z"
 }
