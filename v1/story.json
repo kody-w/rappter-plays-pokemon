@@ -1,7 +1,7 @@
 {
   "coverage": {
     "continuous_source": false,
-    "event_count": 353,
+    "event_count": 354,
     "first_observed_at": "2026-07-17T04:22:13.529703Z",
     "incomplete_before": true,
     "last_observed_at": "2026-07-20T11:44:11.263650Z"
@@ -8384,6 +8384,35 @@
         "Rainbow"
       ],
       "chapter": "Beyond the Rainbow Badge",
+      "coverage_gap_before": true,
+      "highest_level": 41,
+      "id": "event-000643",
+      "kind": "progress",
+      "location": "Rocket Hideout B3F",
+      "observed_at": "2026-07-19T18:01:43.203772Z",
+      "party_size": 3,
+      "play_time_seconds": 156065,
+      "pokedex": {
+        "caught": 5,
+        "seen": 62
+      },
+      "sequence": 643,
+      "summary": "A retained progress checkpoint records the autonomous run in Rocket Hideout B3F. The retained state shows 4 badges, 5 caught Pokémon, and a party of 3.",
+      "title": "Checkpoint in Rocket Hideout B3F",
+      "video": {
+        "end_seconds": 65182,
+        "start_seconds": 65032,
+        "youtube_id": "lAi3T3V_-50"
+      }
+    },
+    {
+      "badges": [
+        "Boulder",
+        "Cascade",
+        "Thunder",
+        "Rainbow"
+      ],
+      "chapter": "Beyond the Rainbow Badge",
       "coverage_gap_before": false,
       "highest_level": 41,
       "id": "event-000644",
@@ -9479,10 +9508,10 @@
       }
     }
   ],
-  "revision": "sha256:2fda7b5d5868e1059f10b21129cefb36950832fa27e89d89ea0ae923f680fd2f",
+  "revision": "sha256:6bdc29ef10a36cff6550c22038ebe2209052d4c4a7b9fa4d2d9df65b587cf16c",
   "schema_version": 1,
   "status": "in_progress",
   "story_id": "rappter-plays-pokemon-main-run",
-  "summary": "The archive starts with the earliest retained evidence in Pewter City and follows 353 verified key events. It currently records 4 badges. The latest published chapter reaches Celadon City.",
+  "summary": "The archive starts with the earliest retained evidence in Pewter City and follows 354 verified key events. It currently records 4 badges. The latest published chapter reaches Celadon City.",
   "updated_at": "2026-07-20T11:44:11.263650Z"
 }
