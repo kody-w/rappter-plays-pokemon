@@ -1,7 +1,7 @@
 {
   "coverage": {
     "continuous_source": false,
-    "event_count": 374,
+    "event_count": 377,
     "first_observed_at": "2026-07-17T04:22:13.529703Z",
     "incomplete_before": true,
     "last_observed_at": "2026-07-20T15:03:09.907425Z"
@@ -9138,6 +9138,35 @@
         "Rainbow"
       ],
       "chapter": "Beyond the Rainbow Badge",
+      "coverage_gap_before": true,
+      "highest_level": 41,
+      "id": "event-000692",
+      "kind": "journey",
+      "location": "Celadon City",
+      "observed_at": "2026-07-19T21:47:40.288496Z",
+      "party_size": 3,
+      "play_time_seconds": 169615,
+      "pokedex": {
+        "caught": 5,
+        "seen": 62
+      },
+      "sequence": 692,
+      "summary": "By the next retained checkpoint, the run had moved from Celadon Gym to Celadon City. The retained state shows 4 badges, 5 caught Pokémon, and a party of 3.",
+      "title": "Reaching Celadon City",
+      "video": {
+        "end_seconds": 78739,
+        "start_seconds": 78589,
+        "youtube_id": "lAi3T3V_-50"
+      }
+    },
+    {
+      "badges": [
+        "Boulder",
+        "Cascade",
+        "Thunder",
+        "Rainbow"
+      ],
+      "chapter": "Beyond the Rainbow Badge",
       "coverage_gap_before": false,
       "highest_level": 41,
       "id": "event-000693",
@@ -9156,6 +9185,35 @@
       "video": {
         "end_seconds": 78821,
         "start_seconds": 78671,
+        "youtube_id": "lAi3T3V_-50"
+      }
+    },
+    {
+      "badges": [
+        "Boulder",
+        "Cascade",
+        "Thunder",
+        "Rainbow"
+      ],
+      "chapter": "Beyond the Rainbow Badge",
+      "coverage_gap_before": false,
+      "highest_level": 41,
+      "id": "event-000696",
+      "kind": "journey",
+      "location": "Game Corner",
+      "observed_at": "2026-07-19T22:06:40.676036Z",
+      "party_size": 3,
+      "play_time_seconds": 170755,
+      "pokedex": {
+        "caught": 5,
+        "seen": 62
+      },
+      "sequence": 696,
+      "summary": "The run had moved from Celadon City to Game Corner. The retained state shows 4 badges, 5 caught Pokémon, and a party of 3.",
+      "title": "Reaching Game Corner",
+      "video": {
+        "end_seconds": 79879,
+        "start_seconds": 79729,
         "youtube_id": "lAi3T3V_-50"
       }
     },
@@ -9214,6 +9272,35 @@
       "video": {
         "end_seconds": 82815,
         "start_seconds": 82665,
+        "youtube_id": "lAi3T3V_-50"
+      }
+    },
+    {
+      "badges": [
+        "Boulder",
+        "Cascade",
+        "Thunder",
+        "Rainbow"
+      ],
+      "chapter": "Beyond the Rainbow Badge",
+      "coverage_gap_before": false,
+      "highest_level": 41,
+      "id": "event-000703",
+      "kind": "journey",
+      "location": "Rocket Hideout B1F",
+      "observed_at": "2026-07-19T22:56:22.541032Z",
+      "party_size": 3,
+      "play_time_seconds": 173734,
+      "pokedex": {
+        "caught": 5,
+        "seen": 62
+      },
+      "sequence": 703,
+      "summary": "The run had moved from Game Corner to Rocket Hideout B1F. The retained state shows 4 badges, 5 caught Pokémon, and a party of 3.",
+      "title": "Reaching Rocket Hideout B1F",
+      "video": {
+        "end_seconds": 82861,
+        "start_seconds": 82711,
         "youtube_id": "lAi3T3V_-50"
       }
     },
@@ -10088,10 +10175,10 @@
       }
     }
   ],
-  "revision": "sha256:ef9e23f5733f8524b17dcba4303194024e3766b7ee1fadd96efbe370e9b1abc6",
+  "revision": "sha256:2741420166d70b64e8626619789933b79d3178ec784fe66a2075be33b7c3e49a",
   "schema_version": 1,
   "status": "in_progress",
   "story_id": "rappter-plays-pokemon-main-run",
-  "summary": "The archive starts with the earliest retained evidence in Pewter City and follows 374 verified key events. It currently records 4 badges. The latest published chapter reaches Rocket Hideout B3F.",
+  "summary": "The archive starts with the earliest retained evidence in Pewter City and follows 377 verified key events. It currently records 4 badges. The latest published chapter reaches Rocket Hideout B3F.",
   "updated_at": "2026-07-20T15:03:09.907425Z"
 }
