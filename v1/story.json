@@ -1,10 +1,10 @@
 {
   "coverage": {
     "continuous_source": false,
-    "event_count": 360,
+    "event_count": 361,
     "first_observed_at": "2026-07-17T04:22:13.529703Z",
     "incomplete_before": true,
-    "last_observed_at": "2026-07-20T13:04:25.090298Z"
+    "last_observed_at": "2026-07-20T13:22:41.617497Z"
   },
   "events": [
     {
@@ -9680,12 +9680,41 @@
         "start_seconds": 133594,
         "youtube_id": "lAi3T3V_-50"
       }
+    },
+    {
+      "badges": [
+        "Boulder",
+        "Cascade",
+        "Thunder",
+        "Rainbow"
+      ],
+      "chapter": "Beyond the Rainbow Badge",
+      "coverage_gap_before": false,
+      "highest_level": 41,
+      "id": "event-000854",
+      "kind": "journey",
+      "location": "Pokémon Tower 3F",
+      "observed_at": "2026-07-20T13:22:41.617497Z",
+      "party_size": 3,
+      "play_time_seconds": 225691,
+      "pokedex": {
+        "caught": 5,
+        "seen": 62
+      },
+      "sequence": 854,
+      "summary": "The run had moved from Route 7 to Pokémon Tower 3F. The retained state shows 4 badges, 5 caught Pokémon, and a party of 3.",
+      "title": "Reaching Pokémon Tower 3F",
+      "video": {
+        "end_seconds": 134840,
+        "start_seconds": 134690,
+        "youtube_id": "lAi3T3V_-50"
+      }
     }
   ],
-  "revision": "sha256:eddf42a6b61d9bd71024c34a4a4de87b03cba03d665a8139835a3881354597e2",
+  "revision": "sha256:a137890478854168693fc047adc2f19b9494c2842e07f90a259c9686c5566b5f",
   "schema_version": 1,
   "status": "in_progress",
   "story_id": "rappter-plays-pokemon-main-run",
-  "summary": "The archive starts with the earliest retained evidence in Pewter City and follows 360 verified key events. It currently records 4 badges. The latest published chapter reaches Route 7.",
-  "updated_at": "2026-07-20T13:04:25.090298Z"
+  "summary": "The archive starts with the earliest retained evidence in Pewter City and follows 361 verified key events. It currently records 4 badges. The latest published chapter reaches Pokémon Tower 3F.",
+  "updated_at": "2026-07-20T13:22:41.617497Z"
 }
