@@ -1,10 +1,10 @@
 {
   "coverage": {
     "continuous_source": false,
-    "event_count": 286,
+    "event_count": 287,
     "first_observed_at": "2026-07-17T04:22:13.529703Z",
     "incomplete_before": true,
-    "last_observed_at": "2026-07-20T02:05:07.074889Z"
+    "last_observed_at": "2026-07-20T02:20:12.891196Z"
   },
   "events": [
     {
@@ -7534,12 +7534,41 @@
         "start_seconds": 94036,
         "youtube_id": "lAi3T3V_-50"
       }
+    },
+    {
+      "badges": [
+        "Boulder",
+        "Cascade",
+        "Thunder",
+        "Rainbow"
+      ],
+      "chapter": "Beyond the Rainbow Badge",
+      "coverage_gap_before": false,
+      "highest_level": 41,
+      "id": "event-000742",
+      "kind": "journey",
+      "location": "Game Corner",
+      "observed_at": "2026-07-20T02:20:12.891196Z",
+      "party_size": 3,
+      "play_time_seconds": 185960,
+      "pokedex": {
+        "caught": 5,
+        "seen": 62
+      },
+      "sequence": 742,
+      "summary": "The run had moved from Rocket Hideout B2F to Game Corner. The retained state shows 4 badges, 5 caught Pokémon, and a party of 3.",
+      "title": "Reaching Game Corner",
+      "video": {
+        "end_seconds": 95091,
+        "start_seconds": 94941,
+        "youtube_id": "lAi3T3V_-50"
+      }
     }
   ],
-  "revision": "sha256:25508178041edac870dd5efc360632f5e869d3a192be402163fd26dc1fc721f8",
+  "revision": "sha256:e4666d444aa6174f810a2f0e7226a013de9cc62449c59883f111b48a0aeddb41",
   "schema_version": 1,
   "status": "in_progress",
   "story_id": "rappter-plays-pokemon-main-run",
-  "summary": "The archive starts with the earliest retained evidence in Pewter City and follows 286 verified key events. It currently records 4 badges. The latest published chapter reaches Rocket Hideout B2F.",
-  "updated_at": "2026-07-20T02:05:07.074889Z"
+  "summary": "The archive starts with the earliest retained evidence in Pewter City and follows 287 verified key events. It currently records 4 badges. The latest published chapter reaches Game Corner.",
+  "updated_at": "2026-07-20T02:20:12.891196Z"
 }
