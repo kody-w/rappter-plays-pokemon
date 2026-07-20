@@ -1,7 +1,7 @@
 {
   "coverage": {
     "continuous_source": false,
-    "event_count": 349,
+    "event_count": 350,
     "first_observed_at": "2026-07-17T04:22:13.529703Z",
     "incomplete_before": true,
     "last_observed_at": "2026-07-20T11:18:14.187169Z"
@@ -8297,6 +8297,35 @@
         "Rainbow"
       ],
       "chapter": "Beyond the Rainbow Badge",
+      "coverage_gap_before": true,
+      "highest_level": 41,
+      "id": "event-000639",
+      "kind": "journey",
+      "location": "Rocket Hideout B3F",
+      "observed_at": "2026-07-19T17:39:24.087495Z",
+      "party_size": 3,
+      "play_time_seconds": 154726,
+      "pokedex": {
+        "caught": 5,
+        "seen": 62
+      },
+      "sequence": 639,
+      "summary": "By the next retained checkpoint, the run had moved from Celadon Gym to Rocket Hideout B3F. The retained state shows 4 badges, 5 caught Pokémon, and a party of 3.",
+      "title": "Reaching Rocket Hideout B3F",
+      "video": {
+        "end_seconds": 63843,
+        "start_seconds": 63693,
+        "youtube_id": "lAi3T3V_-50"
+      }
+    },
+    {
+      "badges": [
+        "Boulder",
+        "Cascade",
+        "Thunder",
+        "Rainbow"
+      ],
+      "chapter": "Beyond the Rainbow Badge",
       "coverage_gap_before": false,
       "highest_level": 41,
       "id": "event-000644",
@@ -9363,10 +9392,10 @@
       }
     }
   ],
-  "revision": "sha256:d7c3aaf209c7504ca459ad36df80ec7abdbe7aa3976dafa965b8d984fe34829f",
+  "revision": "sha256:5b2c53766e90057643eba81ff25926d483e28f2407c6c83a74a28628951e3c9d",
   "schema_version": 1,
   "status": "in_progress",
   "story_id": "rappter-plays-pokemon-main-run",
-  "summary": "The archive starts with the earliest retained evidence in Pewter City and follows 349 verified key events. It currently records 4 badges. The latest published chapter reaches Rocket Hideout B3F.",
+  "summary": "The archive starts with the earliest retained evidence in Pewter City and follows 350 verified key events. It currently records 4 badges. The latest published chapter reaches Rocket Hideout B3F.",
   "updated_at": "2026-07-20T11:18:14.187169Z"
 }
