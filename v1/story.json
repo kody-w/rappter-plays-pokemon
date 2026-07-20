@@ -1,10 +1,10 @@
 {
   "coverage": {
     "continuous_source": false,
-    "event_count": 433,
+    "event_count": 434,
     "first_observed_at": "2026-07-17T04:22:13.529703Z",
     "incomplete_before": true,
-    "last_observed_at": "2026-07-20T22:36:38.024860Z"
+    "last_observed_at": "2026-07-20T22:54:45.135905Z"
   },
   "events": [
     {
@@ -11797,12 +11797,41 @@
         "start_seconds": 167927,
         "youtube_id": "lAi3T3V_-50"
       }
+    },
+    {
+      "badges": [
+        "Boulder",
+        "Cascade",
+        "Thunder",
+        "Rainbow"
+      ],
+      "chapter": "Beyond the Rainbow Badge",
+      "coverage_gap_before": false,
+      "highest_level": 41,
+      "id": "event-000959",
+      "kind": "journey",
+      "location": "Rocket Hideout B3F",
+      "observed_at": "2026-07-20T22:54:45.135905Z",
+      "party_size": 3,
+      "play_time_seconds": 259999,
+      "pokedex": {
+        "caught": 5,
+        "seen": 62
+      },
+      "sequence": 959,
+      "summary": "The run had moved from Rocket Hideout B2F to Rocket Hideout B3F. The retained state shows 4 badges, 5 caught Pokémon, and a party of 3.",
+      "title": "Reaching Rocket Hideout B3F",
+      "video": {
+        "end_seconds": 169164,
+        "start_seconds": 169014,
+        "youtube_id": "lAi3T3V_-50"
+      }
     }
   ],
-  "revision": "sha256:65e20993bed8182b9f4c64444f385757fb8163f733757c8114ef8d739c8d9842",
+  "revision": "sha256:290f56d734946dac678d0fa4b408c08d80bb97f2128e0e96365a464074323fc5",
   "schema_version": 1,
   "status": "in_progress",
   "story_id": "rappter-plays-pokemon-main-run",
-  "summary": "The archive starts with the earliest retained evidence in Pewter City and follows 433 verified key events. It currently records 4 badges. The latest published chapter reaches Rocket Hideout B2F.",
-  "updated_at": "2026-07-20T22:36:38.024860Z"
+  "summary": "The archive starts with the earliest retained evidence in Pewter City and follows 434 verified key events. It currently records 4 badges. The latest published chapter reaches Rocket Hideout B3F.",
+  "updated_at": "2026-07-20T22:54:45.135905Z"
 }
