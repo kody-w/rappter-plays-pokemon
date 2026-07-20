@@ -1,10 +1,10 @@
 {
   "coverage": {
     "continuous_source": false,
-    "event_count": 438,
+    "event_count": 441,
     "first_observed_at": "2026-07-17T04:22:13.529703Z",
     "incomplete_before": true,
-    "last_observed_at": "2026-07-20T23:29:31.537118Z"
+    "last_observed_at": "2026-07-20T23:48:01.182196Z"
   },
   "events": [
     {
@@ -11023,6 +11023,35 @@
         "Rainbow"
       ],
       "chapter": "Beyond the Rainbow Badge",
+      "coverage_gap_before": true,
+      "highest_level": 41,
+      "id": "event-000789",
+      "kind": "progress",
+      "location": "Rocket Hideout B2F",
+      "observed_at": "2026-07-20T07:11:25.949989Z",
+      "party_size": 3,
+      "play_time_seconds": 203425,
+      "pokedex": {
+        "caught": 5,
+        "seen": 62
+      },
+      "sequence": 789,
+      "summary": "A retained progress checkpoint records the autonomous run in Rocket Hideout B2F. The retained state shows 4 badges, 5 caught Pokémon, and a party of 3.",
+      "title": "Checkpoint in Rocket Hideout B2F",
+      "video": {
+        "end_seconds": 112564,
+        "start_seconds": 112414,
+        "youtube_id": "lAi3T3V_-50"
+      }
+    },
+    {
+      "badges": [
+        "Boulder",
+        "Cascade",
+        "Thunder",
+        "Rainbow"
+      ],
+      "chapter": "Beyond the Rainbow Badge",
       "coverage_gap_before": false,
       "highest_level": 41,
       "id": "event-000791",
@@ -11041,6 +11070,35 @@
       "video": {
         "end_seconds": 113647,
         "start_seconds": 113497,
+        "youtube_id": "lAi3T3V_-50"
+      }
+    },
+    {
+      "badges": [
+        "Boulder",
+        "Cascade",
+        "Thunder",
+        "Rainbow"
+      ],
+      "chapter": "Beyond the Rainbow Badge",
+      "coverage_gap_before": false,
+      "highest_level": 41,
+      "id": "event-000792",
+      "kind": "journey",
+      "location": "Rocket Hideout B3F",
+      "observed_at": "2026-07-20T07:30:05.332972Z",
+      "party_size": 3,
+      "play_time_seconds": 204544,
+      "pokedex": {
+        "caught": 5,
+        "seen": 62
+      },
+      "sequence": 792,
+      "summary": "The run had moved from Rocket Hideout B2F to Rocket Hideout B3F. The retained state shows 4 badges, 5 caught Pokémon, and a party of 3.",
+      "title": "Reaching Rocket Hideout B3F",
+      "video": {
+        "end_seconds": 113684,
+        "start_seconds": 113534,
         "youtube_id": "lAi3T3V_-50"
       }
     },
@@ -11942,12 +12000,41 @@
         "start_seconds": 171100,
         "youtube_id": "lAi3T3V_-50"
       }
+    },
+    {
+      "badges": [
+        "Boulder",
+        "Cascade",
+        "Thunder",
+        "Rainbow"
+      ],
+      "chapter": "Beyond the Rainbow Badge",
+      "coverage_gap_before": false,
+      "highest_level": 41,
+      "id": "event-000981",
+      "kind": "journey",
+      "location": "Lavender Town",
+      "observed_at": "2026-07-20T23:48:01.182196Z",
+      "party_size": 3,
+      "play_time_seconds": 263193,
+      "pokedex": {
+        "caught": 5,
+        "seen": 62
+      },
+      "sequence": 981,
+      "summary": "The run had moved from Pokémon Tower 3F to Lavender Town. The retained state shows 4 badges, 5 caught Pokémon, and a party of 3.",
+      "title": "Reaching Lavender Town",
+      "video": {
+        "end_seconds": 172360,
+        "start_seconds": 172210,
+        "youtube_id": "lAi3T3V_-50"
+      }
     }
   ],
-  "revision": "sha256:1b5e16d619c850ff4d21a3b816f9e43d929a93c81fe892f28aa48c3da88ed54b",
+  "revision": "sha256:8b1a5e65951d92a675a8dc4cb1120ffd4ec2d41561018ab36ad309efb3f241a0",
   "schema_version": 1,
   "status": "in_progress",
   "story_id": "rappter-plays-pokemon-main-run",
-  "summary": "The archive starts with the earliest retained evidence in Pewter City and follows 438 verified key events. It currently records 4 badges. The latest published chapter reaches Pokémon Tower 3F.",
-  "updated_at": "2026-07-20T23:29:31.537118Z"
+  "summary": "The archive starts with the earliest retained evidence in Pewter City and follows 441 verified key events. It currently records 4 badges. The latest published chapter reaches Lavender Town.",
+  "updated_at": "2026-07-20T23:48:01.182196Z"
 }
