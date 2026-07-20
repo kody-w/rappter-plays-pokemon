@@ -1,7 +1,7 @@
 {
   "coverage": {
     "continuous_source": false,
-    "event_count": 323,
+    "event_count": 324,
     "first_observed_at": "2026-07-17T04:22:13.529703Z",
     "incomplete_before": true,
     "last_observed_at": "2026-07-20T07:29:28.382941Z"
@@ -7630,6 +7630,35 @@
         "Rainbow"
       ],
       "chapter": "Beyond the Rainbow Badge",
+      "coverage_gap_before": true,
+      "highest_level": 41,
+      "id": "event-000603",
+      "kind": "progress",
+      "location": "Celadon City",
+      "observed_at": "2026-07-19T15:25:47.891659Z",
+      "party_size": 3,
+      "play_time_seconds": 146714,
+      "pokedex": {
+        "caught": 5,
+        "seen": 62
+      },
+      "sequence": 603,
+      "summary": "A retained progress checkpoint records the autonomous run in Celadon City. The retained state shows 4 badges, 5 caught Pokémon, and a party of 3.",
+      "title": "Checkpoint in Celadon City",
+      "video": {
+        "end_seconds": 55826,
+        "start_seconds": 55676,
+        "youtube_id": "lAi3T3V_-50"
+      }
+    },
+    {
+      "badges": [
+        "Boulder",
+        "Cascade",
+        "Thunder",
+        "Rainbow"
+      ],
+      "chapter": "Beyond the Rainbow Badge",
       "coverage_gap_before": false,
       "highest_level": 41,
       "id": "event-000606",
@@ -8609,10 +8638,10 @@
       }
     }
   ],
-  "revision": "sha256:b9ba53b784c360b90ab5b05a8f99936a70ab582a0b80453acb682eea082586d2",
+  "revision": "sha256:2f8d7a3783627b821dda4af1e65b22d21c6952fc02814b9cf43a0e638334ff44",
   "schema_version": 1,
   "status": "in_progress",
   "story_id": "rappter-plays-pokemon-main-run",
-  "summary": "The archive starts with the earliest retained evidence in Pewter City and follows 323 verified key events. It currently records 4 badges. The latest published chapter reaches Rocket Hideout B2F.",
+  "summary": "The archive starts with the earliest retained evidence in Pewter City and follows 324 verified key events. It currently records 4 badges. The latest published chapter reaches Rocket Hideout B2F.",
   "updated_at": "2026-07-20T07:29:28.382941Z"
 }
