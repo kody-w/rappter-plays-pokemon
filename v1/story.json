@@ -1,7 +1,7 @@
 {
   "coverage": {
     "continuous_source": false,
-    "event_count": 287,
+    "event_count": 288,
     "first_observed_at": "2026-07-17T04:22:13.529703Z",
     "incomplete_before": true,
     "last_observed_at": "2026-07-20T02:20:12.891196Z"
@@ -6586,6 +6586,35 @@
         "Rainbow"
       ],
       "chapter": "Beyond the Rainbow Badge",
+      "coverage_gap_before": true,
+      "highest_level": 41,
+      "id": "event-000554",
+      "kind": "journey",
+      "location": "Rocket Hideout B2F",
+      "observed_at": "2026-07-19T10:37:58.115648Z",
+      "party_size": 3,
+      "play_time_seconds": 129458,
+      "pokedex": {
+        "caught": 5,
+        "seen": 62
+      },
+      "sequence": 554,
+      "summary": "By the next retained checkpoint, the run had moved from Celadon Gym to Rocket Hideout B2F. The retained state shows 4 badges, 5 caught Pokémon, and a party of 3.",
+      "title": "Reaching Rocket Hideout B2F",
+      "video": {
+        "end_seconds": 38557,
+        "start_seconds": 38407,
+        "youtube_id": "lAi3T3V_-50"
+      }
+    },
+    {
+      "badges": [
+        "Boulder",
+        "Cascade",
+        "Thunder",
+        "Rainbow"
+      ],
+      "chapter": "Beyond the Rainbow Badge",
       "coverage_gap_before": false,
       "highest_level": 41,
       "id": "event-000557",
@@ -7565,10 +7594,10 @@
       }
     }
   ],
-  "revision": "sha256:e4666d444aa6174f810a2f0e7226a013de9cc62449c59883f111b48a0aeddb41",
+  "revision": "sha256:92bf7a10488b71bc608a559988d814eede740c38c38d02596f369ca2cde2eded",
   "schema_version": 1,
   "status": "in_progress",
   "story_id": "rappter-plays-pokemon-main-run",
-  "summary": "The archive starts with the earliest retained evidence in Pewter City and follows 287 verified key events. It currently records 4 badges. The latest published chapter reaches Game Corner.",
+  "summary": "The archive starts with the earliest retained evidence in Pewter City and follows 288 verified key events. It currently records 4 badges. The latest published chapter reaches Game Corner.",
   "updated_at": "2026-07-20T02:20:12.891196Z"
 }
