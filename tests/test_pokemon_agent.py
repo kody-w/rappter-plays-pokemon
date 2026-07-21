@@ -243,7 +243,8 @@ def test_bulbapedia_search_uses_fixed_origin_and_bounded_extracts(monkeypatch):
 
     result = search_pokemon_web("Rocket Hideout B3F", "route")
 
-    assert result["query"] == "Rocket Hideout B3F"
+    assert result["query"] == "Rocket Hideout B3F route"
+    assert calls[0]["srsearch"] == "Rocket Hideout B3F route"
     assert result["results"] == [
         {
             "title": "Team Rocket Hideout",
@@ -546,6 +547,196 @@ def test_navigation_memory_detects_cross_floor_cycle_and_survives_reload(
     assert reloaded.floor_trail[-4:] == [0xC8, 0xC7, 0xC8, 0xC7]
 
 
+def test_navigation_memory_migrates_v2_schema_without_discarding(tmp_path):
+    now = datetime.now(timezone.utc)
+    path = tmp_path / "navigation-memory.json"
+    path.write_text(
+        json.dumps(
+            {
+                "schema_version": 2,
+                "updated_at": now.isoformat(),
+                "attempts": [
+                    {
+                        "map_id": 0xC9,
+                        "origin": [15, 11],
+                        "buttons": ["right"],
+                        "outcome": "no_progress",
+                        "count": 1,
+                        "last_at": now.isoformat(),
+                    }
+                ],
+                "trail": [[0xC9, 15, 11], [0xC9, 16, 11]],
+                "floor_trail": [0xC9],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    memory = NavigationMemory(path)
+
+    assert len(memory.attempts) == 1
+    assert memory.trail == [(0xC9, 15, 11), (0xC9, 16, 11)]
+    assert memory.transitions == []
+    assert memory.episode is None
+
+    memory.begin((0xC9, 16, 11), ["down"], phase="overworld")
+    memory.finish((0xC9, 16, 12), now=now)
+    value = json.loads(path.read_text(encoding="utf-8"))
+
+    assert (
+        value["schema_version"]
+        == pokemon_module.NAVIGATION_MEMORY_SCHEMA_VERSION
+    )
+    assert value["attempts"][0]["count"] == 1
+    assert value["transitions"][0]["direction"] == "down"
+    assert value["transitions"][0]["outcome"] == "moved"
+
+    path.write_text(
+        json.dumps({"schema_version": 1, "attempts": [{"bad": True}]}),
+        encoding="utf-8",
+    )
+    discarded = NavigationMemory(path)
+    assert discarded.attempts == []
+    assert discarded.transitions == []
+
+
+def test_stuck_assessment_activates_from_count1_evidence(tmp_path):
+    path = tmp_path / "navigation-memory.json"
+    memory = NavigationMemory(path)
+    now = datetime.now(timezone.utc)
+    a = (0xC9, 15, 11)
+    b = (0xC9, 15, 13)
+
+    memory.begin(a, ["right"], phase="overworld")
+    memory.finish(a, now=now)
+    early = memory.stuck_assessment(a, now=now)
+
+    # One count-1 failed attempt is a single signal: not stuck yet.
+    assert early["active"] is False
+    assert early["episode"] is None
+
+    memory.begin(a, ["down"], phase="overworld")
+    memory.finish(b, now=now)
+    memory.begin(b, ["up"], phase="overworld")
+    memory.finish(a, now=now)
+    memory.begin(a, ["down"], phase="overworld")
+    memory.finish(b, now=now)
+
+    assessment = memory.stuck_assessment(b, now=now)
+
+    assert assessment["active"] is True
+    assert "repeated_edge" in assessment["reasons"]
+    # Every recorded attempt is still count 1: the old count>=2 gate never
+    # sees this loop, but the shared assessment activates anyway.
+    assert all(item["count"] == 1 for item in memory.attempts)
+    episode = assessment["episode"]
+    assert episode is not None
+    assert episode["map_id"] == 0xC9
+    assert episode["settled_transitions"] == 0
+
+    reloaded = NavigationMemory(path)
+    assert reloaded.episode is not None
+    assert reloaded.episode["started_at"] == episode["started_at"]
+
+
+def test_wall_bump_plus_hub_revisits_do_not_arm_puzzle_mode(tmp_path):
+    memory = NavigationMemory(tmp_path / "navigation-memory.json")
+    now = datetime.now(timezone.utc)
+    hub = (0x01, 10, 10)
+
+    # One bumped wall: a single count-1 failed attempt on this map.
+    memory.begin(hub, ["up"], phase="overworld")
+    memory.finish(hub, now=now)
+
+    # Routine town errands: three returns to the same hub tile within 20
+    # endpoints, but every directed edge is observed exactly once.
+    for stop, out, back in [
+        ((0x01, 10, 6), "up", "down"),
+        ((0x01, 14, 10), "right", "left"),
+        ((0x01, 6, 10), "left", "right"),
+    ]:
+        memory.begin(hub, [out], phase="overworld")
+        memory.finish(stop, now=now)
+        memory.begin(stop, [back], phase="overworld")
+        memory.finish(hub, now=now)
+
+    assessment = memory.stuck_assessment(hub, now=now)
+
+    # The single bump is one incident, not a repeated settled edge, so the
+    # hub revisits alone stay a single signal: no false puzzle activation
+    # during normal shopping/talking gameplay.
+    assert "repeated_edge" not in assessment["reasons"]
+    assert assessment["active"] is False
+    assert assessment["episode"] is None
+
+
+def _activated_memory(tmp_path):
+    memory = NavigationMemory(tmp_path / "navigation-memory.json")
+    now = datetime.now(timezone.utc)
+    a = (0xC9, 15, 11)
+    b = (0xC9, 15, 13)
+    memory.begin(a, ["down"], phase="overworld")
+    memory.finish(b, now=now)
+    memory.begin(b, ["up"], phase="overworld")
+    memory.finish(a, now=now)
+    memory.begin(a, ["down"], phase="overworld")
+    memory.finish(b, now=now)
+    assert memory.stuck_assessment(b, now=now)["episode"] is not None
+    return memory, now, b
+
+
+def test_stuck_episode_survives_single_novel_coordinate(tmp_path):
+    memory, now, b = _activated_memory(tmp_path)
+
+    memory.begin(b, ["left"], phase="overworld")
+    memory.finish((0xC9, 2, 2), now=now)
+
+    assert memory.episode is not None
+    assert memory.episode["discovery_streak"] == 1
+
+
+def test_stuck_episode_resets_on_sustained_discovery(tmp_path):
+    memory, now, b = _activated_memory(tmp_path)
+    previous = b
+
+    for step in range(pokemon_module.STUCK_EPISODE_DISCOVERY_EXIT):
+        target = (0xC9, 30 + step, 2)
+        memory.begin(previous, ["right"], phase="overworld")
+        memory.finish(target, now=now)
+        previous = target
+
+    assert memory.episode is None
+
+
+def test_stuck_episode_resets_on_map_and_story_progress(tmp_path):
+    memory, now, b = _activated_memory(tmp_path)
+
+    memory.begin(b, ["up"], phase="overworld")
+    memory.finish((0x01, 5, 5), now=now)
+    assert memory.episode is None
+
+    memory, now, b = _activated_memory(tmp_path)
+    memory.note_progress()
+    assert memory.episode is None
+    assert NavigationMemory(memory.path).episode is None
+
+
+def test_edge_guidance_exposes_learned_directed_edges(tmp_path):
+    memory, now, b = _activated_memory(tmp_path)
+
+    edges = memory.edge_guidance(b)
+
+    assert edges is not None
+    assert {
+        "origin": [15, 11],
+        "direction": "down",
+        "destination": [0xC9, 15, 13],
+        "outcome": "moved",
+        "count": 1,
+    } in edges
+    assert memory.edge_guidance(None) is None
+
+
 def test_collision_direction_gate_accepts_only_open_adjacent_tiles():
     collision = "\n".join(
         [
@@ -635,7 +826,6 @@ def test_crowd_hint_is_prompted_only_when_stuck_and_collision_safe(
     runner.youtube_chat_hints_enabled = True
     runner.status = {"phase": "overworld"}
     position = (0xC9, 15, 11)
-    runner.decision_positions = pokemon_module.deque([position] * 4, maxlen=6)
     runner.last_crowd_advisory_position = None
     runner.last_crowd_advisory_sequence = -1
     collision = "\n".join(
@@ -644,9 +834,19 @@ def test_crowd_hint_is_prompted_only_when_stuck_and_collision_safe(
         + ["##########"] * 4
     )
 
+    waiting = runner._crowd_route_advisory(
+        position=position,
+        collision_map=collision,
+        stuck_active=False,
+    )
+
+    assert waiting is None
+    assert runner.status["crowd_hints_state"] == "armed"
+
     advisory = runner._crowd_route_advisory(
         position=position,
         collision_map=collision,
+        stuck_active=True,
     )
 
     assert advisory == {
@@ -659,12 +859,52 @@ def test_crowd_hint_is_prompted_only_when_stuck_and_collision_safe(
         runner._crowd_route_advisory(
             position=position,
             collision_map=collision,
+            stuck_active=True,
         )
         is None
     )
 
 
-def test_navigation_failure_autonomously_starts_bounded_web_research(
+def _research_runner(tmp_path):
+    runner = PokemonRunner.__new__(PokemonRunner)
+    runner.stuck_web_research_enabled = True
+    runner.web_research_result = {}
+    runner.web_research_lock = threading.Lock()
+    runner.web_research_inflight = False
+    runner.web_research_started = {}
+    runner.control_generation = 0
+    runner.status = {
+        "objective": "Find another route",
+        "web_research_state": "idle",
+        "web_research_source_count": 0,
+    }
+    runner.runtime_dir = tmp_path
+    runner.args = SimpleNamespace(model="gpt-5.6-sol")
+    runner.navigation_memory = NavigationMemory(
+        tmp_path / "navigation-memory.json"
+    )
+    return runner
+
+
+def _stuck_episode(**overrides):
+    episode = {
+        "map_id": 0xC9,
+        "maps": [0xC9],
+        "started_at": datetime.now(timezone.utc).isoformat(),
+        "settled_transitions": 4,
+        "repeated_edges": 0,
+        "discovery_streak": 0,
+        "region": [],
+    }
+    episode.update(overrides)
+    return {
+        "active": True,
+        "reasons": ["room_cycle"],
+        "episode": episode,
+    }
+
+
+def test_stuck_puzzle_escalates_research_despite_route_guidance(
     monkeypatch,
     tmp_path,
 ):
@@ -685,20 +925,7 @@ def test_navigation_failure_autonomously_starts_bounded_web_research(
             started[-1]["started"] = True
 
     monkeypatch.setattr(pokemon_module.threading, "Thread", ThreadSpy)
-    runner = PokemonRunner.__new__(PokemonRunner)
-    runner.stuck_web_research_enabled = True
-    runner.web_research_result = {}
-    runner.web_research_lock = threading.Lock()
-    runner.web_research_inflight = False
-    runner.web_research_started = {}
-    runner.control_generation = 0
-    runner.status = {
-        "objective": "Find another route",
-        "web_research_state": "idle",
-        "web_research_source_count": 0,
-    }
-    runner.runtime_dir = tmp_path
-    runner.args = SimpleNamespace(model="gpt-5.6-sol")
+    runner = _research_runner(tmp_path)
     screenshot = tmp_path / "frame.png"
     screenshot.write_bytes(b"synthetic")
     game_state = {
@@ -707,24 +934,26 @@ def test_navigation_failure_autonomously_starts_bounded_web_research(
         "coordinates": {"x": 15, "y": 11},
     }
 
-    navigation_guidance = {
-        "loop_detected": True,
-        "avoid_repeating": [],
-        "directive": "Choose another route.",
-    }
     runner._maybe_start_web_research(
         screenshot=screenshot,
         game_state=game_state,
         route_guidance="Authoritative local route.",
-        navigation_guidance=navigation_guidance,
+        navigation_guidance=None,
+        stuck_assessment=_stuck_episode(
+            settled_transitions=1,
+            repeated_edges=0,
+        ),
     )
     assert started == []
 
+    # Coarse route guidance is context now, never a veto; four settled
+    # stuck transitions in puzzle mode start the bounded researcher.
     runner._maybe_start_web_research(
         screenshot=screenshot,
         game_state=game_state,
-        route_guidance=None,
-        navigation_guidance=navigation_guidance,
+        route_guidance="Authoritative local route.",
+        navigation_guidance=None,
+        stuck_assessment=_stuck_episode(settled_transitions=4),
     )
 
     assert runner.web_research_inflight is True
@@ -732,6 +961,538 @@ def test_navigation_failure_autonomously_starts_bounded_web_research(
     assert started[0]["name"] == "pokemon-web-research"
     assert started[0]["daemon"] is True
     assert started[0]["started"] is True
+    context = started[0]["args"][1]
+    assert context["trusted_route_guidance"] == "Authoritative local route."
+    assert context["stuck_reasons"] == ["room_cycle"]
+
+
+def test_loaded_repeated_edge_episode_starts_research_immediately(
+    monkeypatch,
+    tmp_path,
+):
+    started = []
+
+    class ThreadSpy:
+        def __init__(self, *, target, args, name, daemon):
+            started.append(name)
+
+        def start(self):
+            pass
+
+    monkeypatch.setattr(pokemon_module.threading, "Thread", ThreadSpy)
+    runner = _research_runner(tmp_path)
+    screenshot = tmp_path / "frame.png"
+    screenshot.write_bytes(b"synthetic")
+    game_state = {
+        "map_id": 0xC9,
+        "location": "Rocket Hideout B3F",
+        "coordinates": {"x": 15, "y": 11},
+    }
+
+    runner._maybe_start_web_research(
+        screenshot=screenshot,
+        game_state=game_state,
+        route_guidance=None,
+        navigation_guidance=None,
+        stuck_assessment=_stuck_episode(
+            settled_transitions=0,
+            repeated_edges=2,
+        ),
+    )
+
+    assert started == ["pokemon-web-research"]
+
+
+def test_web_research_cooldown_is_keyed_by_map_and_episode(
+    monkeypatch,
+    tmp_path,
+):
+    started = []
+
+    class ThreadSpy:
+        def __init__(self, *, target, args, name, daemon):
+            started.append(args[1]["coordinates"])
+
+        def start(self):
+            pass
+
+    monkeypatch.setattr(pokemon_module.threading, "Thread", ThreadSpy)
+    runner = _research_runner(tmp_path)
+    screenshot = tmp_path / "frame.png"
+    screenshot.write_bytes(b"synthetic")
+    first_episode = _stuck_episode(started_at="2026-07-21T10:00:00+00:00")
+
+    def attempt(x, y, stuck):
+        runner._maybe_start_web_research(
+            screenshot=screenshot,
+            game_state={
+                "map_id": 0xC9,
+                "location": "Rocket Hideout B3F",
+                "coordinates": {"x": x, "y": y},
+            },
+            route_guidance=None,
+            navigation_guidance=None,
+            stuck_assessment=stuck,
+        )
+        runner.web_research_inflight = False
+
+    attempt(15, 11, first_episode)
+    # Wandering inside the same stuck episode never re-triggers research,
+    # even from a different exact coordinate.
+    attempt(3, 4, first_episode)
+    assert started == [[15, 11]]
+
+    attempt(
+        3,
+        4,
+        _stuck_episode(started_at="2026-07-21T11:00:00+00:00"),
+    )
+    assert started == [[15, 11], [3, 4]]
+
+
+def test_settled_position_gate_requires_stable_samples_over_interval():
+    runner = PokemonRunner.__new__(PokemonRunner)
+    runner.settle_candidate = None
+    runner.settle_samples = 0
+    runner.settle_started_at = 0.0
+    runner.settle_generation = -1
+    runner.control_generation = 0
+    position = (0xC9, 15, 11)
+
+    assert runner._movement_settled(position, now=100.0) is False
+    for index in range(1, pokemon_module.SETTLE_SAMPLE_COUNT):
+        # The 12th unchanged sample lands at 0.55s: sample count alone is
+        # not enough before SETTLE_MIN_SECONDS has elapsed.
+        assert (
+            runner._movement_settled(position, now=100.0 + index * 0.05)
+            is False
+        )
+    assert runner._movement_settled(position, now=100.61) is True
+
+    # Any coordinate change restarts the candidate.
+    assert runner._movement_settled((0xC9, 16, 11), now=100.65) is False
+    assert runner.settle_samples == 1
+    for index in range(1, 20):
+        runner._movement_settled((0xC9, 16, 11), now=100.65 + index * 0.05)
+    assert runner._movement_settled((0xC9, 16, 11), now=102.0) is True
+
+    # A control-generation change restarts even a stable position.
+    runner.control_generation += 1
+    assert runner._movement_settled((0xC9, 16, 11), now=102.05) is False
+
+    # Dialogue/non-overworld samples are ungated and clear the candidate.
+    assert runner._movement_settled(None, now=102.1) is True
+    assert runner.settle_candidate is None
+
+
+def test_puzzle_mode_rejects_non_cardinal_with_structured_feedback(tmp_path):
+    runner = PokemonRunner.__new__(PokemonRunner)
+    runner.brain_results = queue.Queue()
+    runner.pending_decision_id = 1
+    runner.decision_pending = True
+    runner.control_generation = 0
+    runner.control_mode = "ai"
+    runner.emulator_pause_requested = False
+    runner.last_decision_requested = 10.0
+    runner.last_decision_finished = 5.0
+    runner.status = {}
+    runner.navigation_memory = NavigationMemory(
+        tmp_path / "navigation-memory.json"
+    )
+    runner.puzzle_feedback = None
+    runner.player = None  # any attempt to apply buttons would fail loudly
+    runner.brain_results.put(
+        {
+            "decision_id": 1,
+            "generation": 0,
+            "navigation_mode": "puzzle",
+            "decision": {
+                "phase": "overworld",
+                "observation": "spinner maze",
+                "objective": "reach the stairs",
+                "reason": "guess",
+                "buttons": ["up", "up"],
+                "checkpoint": False,
+                "action_mode": "precision",
+            },
+        }
+    )
+
+    runner._apply_brain_result()
+
+    assert runner.decision_pending is False
+    assert runner.last_decision_finished == 0
+    assert runner.puzzle_feedback["rejected_buttons"] == ["up", "up"]
+    assert "exactly one of" in runner.puzzle_feedback["reason"]
+    assert runner.status["puzzle_rejections"] == 1
+    assert runner.status["brain_status"] == "idle"
+    assert runner.status.get("last_action") is None
+
+
+def test_puzzle_mode_applies_single_cardinal_decision(tmp_path):
+    class PlayerSpy:
+        def __init__(self):
+            self.replaced = []
+
+        def replace(self, buttons):
+            self.replaced.append(buttons)
+
+    runner = PokemonRunner.__new__(PokemonRunner)
+    runner.brain_results = queue.Queue()
+    runner.pending_decision_id = 2
+    runner.decision_pending = True
+    runner.control_generation = 0
+    runner.control_mode = "ai"
+    runner.emulator_pause_requested = False
+    runner.last_decision_requested = 10.0
+    runner.last_decision_finished = 5.0
+    runner.status = {"game_state": {}}
+    runner.navigation_memory = NavigationMemory(
+        tmp_path / "navigation-memory.json"
+    )
+    runner.puzzle_feedback = None
+    runner.player = PlayerSpy()
+    runner.history = []
+    runner.total_decisions = 0
+    runner.runtime_dir = tmp_path
+    runner.brain_results.put(
+        {
+            "decision_id": 2,
+            "generation": 0,
+            "navigation_mode": "puzzle",
+            "navigation_origin": None,
+            "force_precision": True,
+            "movement_context": True,
+            "decision": {
+                "phase": "overworld",
+                "observation": "spinner maze",
+                "objective": "reach the stairs",
+                "reason": "learned edge",
+                "buttons": ["left"],
+                "checkpoint": False,
+                "action_mode": "precision",
+            },
+        }
+    )
+
+    runner._apply_brain_result()
+
+    assert runner.player.replaced == [["left"]]
+    assert runner.status["last_action"] == ["left"]
+    assert runner.puzzle_feedback is None
+    assert runner.status["gameplay_progress_at"]
+
+
+def test_puzzle_contract_exempts_non_overworld_phase(tmp_path):
+    class PlayerSpy:
+        def __init__(self):
+            self.replaced = []
+
+        def replace(self, buttons):
+            self.replaced.append(buttons)
+
+    runner = PokemonRunner.__new__(PokemonRunner)
+    runner.brain_results = queue.Queue()
+    runner.pending_decision_id = 3
+    runner.decision_pending = True
+    runner.control_generation = 0
+    runner.control_mode = "ai"
+    runner.emulator_pause_requested = False
+    runner.last_decision_requested = 10.0
+    runner.last_decision_finished = 5.0
+    runner.status = {"game_state": {}}
+    runner.navigation_memory = NavigationMemory(
+        tmp_path / "navigation-memory.json"
+    )
+    runner.puzzle_feedback = None
+    runner.player = PlayerSpy()
+    runner.history = []
+    runner.total_decisions = 0
+    runner.runtime_dir = tmp_path
+    runner.brain_results.put(
+        {
+            "decision_id": 3,
+            "generation": 0,
+            "navigation_mode": "puzzle",
+            "navigation_origin": None,
+            "force_precision": False,
+            "movement_context": False,
+            "decision": {
+                "phase": "battle",
+                "observation": "a Rocket grunt sent out Zubat",
+                "objective": "win the trainer battle",
+                "reason": "select Fight",
+                "buttons": ["a"],
+                "checkpoint": False,
+                "action_mode": "precision",
+            },
+        }
+    )
+
+    runner._apply_brain_result()
+
+    # A battle that begins mid-decision must keep pressing a even while a
+    # puzzle episode is active: the one-cardinal contract is overworld-only.
+    assert runner.player.replaced == [["a"]]
+    assert runner.status["last_action"] == ["a"]
+    assert runner.puzzle_feedback is None
+    assert "puzzle_rejections" not in runner.status
+
+
+def test_request_decision_keeps_episode_but_drops_puzzle_off_route(tmp_path):
+    memory, now, b = _activated_memory(tmp_path)
+    runner = PokemonRunner.__new__(PokemonRunner)
+    runner.screens_dir = tmp_path
+    runner.run_id = "test"
+    runner.decision_sequence = 0
+    runner.control_generation = 0
+    runner.control_mode = "ai"
+    runner.emulator_pause_requested = False
+    runner.status = {"phase": "battle", "model_calls": 0}
+    runner.navigation_memory = memory
+    runner.decision_positions = []
+    runner.stuck_decision_count = 5
+    runner.puzzle_feedback = {"reason": "pending"}
+    runner.navigation_mode = "puzzle"
+    runner.stuck_web_research_enabled = False
+    runner.history = []
+    runner.pending_decision_id = None
+    runner.decision_pending = False
+    runner.brain_requests = queue.Queue()
+    runner._maybe_start_web_research = lambda **kwargs: None
+    runner._crowd_route_advisory = lambda **kwargs: None
+    image = SimpleNamespace(
+        save=lambda path, format=None: Path(path).write_bytes(b"png")
+    )
+    game_state = {
+        "map_id": 0xC9,
+        "x": b[1],
+        "y": b[2],
+        "screen_text": "ROCKET: I will not lose!",
+    }
+
+    runner._request_decision(image, game_state, None)
+
+    request = runner.brain_requests.get_nowait()
+    # A battle on the episode map is issued in normal mode so the brain can
+    # press a/b freely, while the stuck episode itself stays persisted for
+    # the next settled overworld decision.
+    assert request["navigation_mode"] == "normal"
+    assert runner.navigation_mode == "normal"
+    assert runner.status["navigation_mode"] == "normal"
+    assert memory.episode is not None
+    assert runner.stuck_decision_count == 5
+    assert runner.puzzle_feedback == {"reason": "pending"}
+
+
+def test_control_cursor_initializes_at_eof_and_never_replays(tmp_path):
+    control = tmp_path / "control.jsonl"
+    control.write_text('{"action":"pause"}\n', encoding="utf-8")
+
+    def make_runner():
+        runner = PokemonRunner.__new__(PokemonRunner)
+        runner.runtime_dir = tmp_path
+        runner.control_path = control
+        runner.control_cursor_path = (
+            tmp_path / pokemon_module.CONTROL_CURSOR_NAME
+        )
+        runner.controls = queue.Queue()
+        runner.status = {}
+        runner.control_offset = runner._load_control_cursor()
+        return runner
+
+    runner = make_runner()
+
+    assert runner.control_offset == control.stat().st_size
+    runner._read_external_controls()
+    assert runner.controls.empty()  # the historical pause never replays
+
+    with control.open("a", encoding="utf-8") as handle:
+        handle.write('{"action":"resume"}\n')
+    runner._read_external_controls()
+    assert runner.controls.get_nowait()["action"] == "resume"
+
+    # A restarted process resumes from the durable cursor: the processed
+    # resume is not replayed either.
+    restarted = make_runner()
+    restarted._read_external_controls()
+    assert restarted.controls.empty()
+
+
+def _control_runner(monkeypatch):
+    pyboy_module = ModuleType("pyboy")
+    utils_module = ModuleType("pyboy.utils")
+
+    class WindowEvent:
+        PAUSE = "pause"
+        UNPAUSE = "unpause"
+
+    utils_module.WindowEvent = WindowEvent
+    pyboy_module.utils = utils_module
+    monkeypatch.setitem(sys.modules, "pyboy", pyboy_module)
+    monkeypatch.setitem(sys.modules, "pyboy.utils", utils_module)
+
+    class PlayerSpy:
+        def release(self, pyboy):
+            del pyboy
+
+    class EmulatorSpy:
+        def __init__(self):
+            self.events = []
+            self.speed = None
+
+        def send_input(self, event):
+            self.events.append(event)
+
+        def set_emulation_speed(self, speed):
+            self.speed = speed
+
+    runner = PokemonRunner.__new__(PokemonRunner)
+    runner.controls = queue.Queue()
+    runner.control_mode = "ai"
+    runner.resume_mode = "ai"
+    runner.control_generation = 0
+    runner.paused = False
+    runner.emulator_pause_requested = False
+    runner.decision_pending = False
+    runner.last_decision_finished = 0
+    runner.player = PlayerSpy()
+    runner.pyboy = EmulatorSpy()
+    runner.status = {}
+    runner.pause_kind = None
+    runner.pause_owner = None
+    runner.pause_expires_at = None
+    runner.last_crowd_advisory_position = None
+    return runner
+
+
+def test_ambiguous_and_unbounded_pauses_are_rejected_with_report(monkeypatch):
+    runner = _control_runner(monkeypatch)
+
+    runner.controls.put({"action": "pause"})
+    runner._process_controls()
+    assert runner.control_mode == "ai"
+    report = runner.status["last_rejected_control"]
+    assert report["action"] == "pause"
+    assert "kind" in report["reason"]
+
+    runner.controls.put({"action": "pause", "kind": "automation"})
+    runner._process_controls()
+    assert runner.control_mode == "ai"
+
+    far_future = datetime.now(timezone.utc) + timedelta(hours=5)
+    runner.controls.put(
+        {
+            "action": "pause",
+            "kind": "automation",
+            "expires_at": far_future.isoformat(),
+        }
+    )
+    runner._process_controls()
+    assert runner.control_mode == "ai"
+    assert "exceeds" in runner.status["last_rejected_control"]["reason"]
+
+    stale = datetime.now(timezone.utc) - timedelta(seconds=30)
+    runner.controls.put(
+        {
+            "action": "pause",
+            "kind": "automation",
+            "expires_at": stale.isoformat(),
+        }
+    )
+    runner._process_controls()
+    assert runner.control_mode == "ai"  # replayed/expired leases never apply
+
+
+def test_automation_pause_lease_expires_and_auto_resumes(
+    monkeypatch,
+    tmp_path,
+):
+    runner = _control_runner(monkeypatch)
+    runner.navigation_memory = NavigationMemory(
+        tmp_path / "navigation-memory.json"
+    )
+    runner.navigation_memory.episode = {
+        "map_id": 0xC9,
+        "maps": [0xC9],
+        "started_at": datetime.now(timezone.utc).isoformat(),
+        "settled_transitions": 4,
+        "repeated_edges": 1,
+        "discovery_streak": 0,
+        "region": [],
+    }
+    expires = datetime.now(timezone.utc) + timedelta(seconds=60)
+    runner.controls.put(
+        {
+            "action": "pause",
+            "kind": "automation",
+            "expires_at": expires.isoformat(),
+            "owner": "recovery-bot",
+        }
+    )
+    runner._process_controls()
+
+    assert runner.control_mode == "paused"
+    assert runner.status["pause_kind"] == "automation"
+    assert runner.status["pause_owner"] == "recovery-bot"
+    assert runner.status["pause_expires_at"] is not None
+
+    runner._expire_automation_pause()
+    assert runner.control_mode == "paused"  # lease not yet due
+
+    runner.pause_expires_at = datetime.now(timezone.utc) - timedelta(
+        seconds=1
+    )
+    runner._expire_automation_pause()
+
+    assert runner.control_mode == "ai"
+    assert runner.pause_kind is None
+    assert runner.status["pause_kind"] is None
+    assert runner.status["pause_autoresumed_at"]
+    # Auto-resume never erases the persisted stuck episode.
+    assert runner.navigation_memory.episode is not None
+
+
+def test_operator_hold_is_never_auto_resumed(monkeypatch):
+    runner = _control_runner(monkeypatch)
+
+    runner.controls.put(
+        {"action": "pause", "kind": "operator_hold", "owner": "kody"}
+    )
+    runner._process_controls()
+    assert runner.control_mode == "ai"  # persistent intent must be explicit
+
+    runner.controls.put(
+        {
+            "action": "pause",
+            "kind": "operator_hold",
+            "persistent": True,
+            "owner": "kody",
+        }
+    )
+    runner._process_controls()
+    assert runner.control_mode == "paused"
+    assert runner.status["pause_kind"] == "operator_hold"
+
+    runner._expire_automation_pause()
+    assert runner.control_mode == "paused"
+
+    expires = datetime.now(timezone.utc) + timedelta(seconds=60)
+    runner.controls.put(
+        {
+            "action": "pause",
+            "kind": "automation",
+            "expires_at": expires.isoformat(),
+        }
+    )
+    runner._process_controls()
+    assert runner.status["pause_kind"] == "operator_hold"
+
+    runner.controls.put({"action": "resume"})
+    runner._process_controls()
+    assert runner.control_mode == "ai"
+    assert runner.status["pause_kind"] is None
+    assert runner.pause_owner is None
 
 
 @pytest.mark.parametrize(
@@ -771,6 +1532,56 @@ def test_agent_rejects_control_when_not_running(tmp_path):
 
     assert result["status"] == "error"
     assert "not running" in result["message"]
+
+
+def test_agent_pause_defaults_to_bounded_automation_lease(tmp_path):
+    (tmp_path / "status.json").write_text(
+        json.dumps({"running": True, "pid": os.getpid(), "port": 9999})
+    )
+
+    result = json.loads(
+        PokemonAgent().perform(action="pause", runtime_dir=str(tmp_path))
+    )
+
+    assert result["status"] == "success"
+    command = json.loads(
+        (tmp_path / "control.jsonl").read_text().splitlines()[-1]
+    )
+    assert command["action"] == "pause"
+    assert command["kind"] == "automation"
+    assert command["owner"] == "agent-cli"
+    # A forgotten agent pause auto-resumes: the lease carries an absolute
+    # expiry within the watchdog-enforced automation maximum.
+    expires_at = datetime.fromisoformat(
+        command["expires_at"].replace("Z", "+00:00")
+    )
+    remaining = (expires_at - datetime.now(timezone.utc)).total_seconds()
+    assert 0 < remaining <= pokemon_module.AGENT_PAUSE_LEASE_SECONDS
+    assert (
+        pokemon_module.AGENT_PAUSE_LEASE_SECONDS
+        <= pokemon_module.AUTOMATION_PAUSE_MAX_SECONDS
+    )
+
+
+def test_agent_pause_hold_requires_explicit_intent(tmp_path):
+    (tmp_path / "status.json").write_text(
+        json.dumps({"running": True, "pid": os.getpid(), "port": 9999})
+    )
+
+    result = json.loads(
+        PokemonAgent().perform(
+            action="pause", hold=True, runtime_dir=str(tmp_path)
+        )
+    )
+
+    assert result["status"] == "success"
+    command = json.loads(
+        (tmp_path / "control.jsonl").read_text().splitlines()[-1]
+    )
+    assert command["kind"] == "operator_hold"
+    assert command["persistent"] is True
+    assert command["owner"] == "agent-cli"
+    assert "expires_at" not in command
 
 
 def test_runtime_lock_rejects_second_owner(tmp_path):
@@ -2132,6 +2943,108 @@ def test_failed_child_termination_requests_restart(tmp_path):
     ) == (1, True)
     assert child.terminated is True
     assert not stop_requested.is_set()
+
+
+def _paused_child_status(tmp_path, *, kind, expires_at):
+    (tmp_path / "desired.json").write_text(json.dumps({"running": True}))
+    (tmp_path / "status.json").write_text(
+        json.dumps(
+            {
+                "lifecycle": "ready",
+                "pid": 1234,
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+                "paused": True,
+                "pause_kind": kind,
+                "pause_owner": "someone",
+                "pause_expires_at": expires_at,
+            }
+        )
+    )
+
+
+class _SupervisedChildSpy:
+    pid = 1234
+
+    def __init__(self, stop_after=None, stop_requested=None):
+        self.returncode = None
+        self.terminated = False
+        self.waits = 0
+        self.stop_after = stop_after
+        self.stop_requested = stop_requested
+
+    def poll(self):
+        return self.returncode
+
+    def wait(self, timeout):
+        self.waits += 1
+        if (
+            self.stop_after is not None
+            and self.waits >= self.stop_after
+            and self.stop_requested is not None
+        ):
+            self.stop_requested.set()
+        if self.returncode is None:
+            raise pokemon_module.subprocess.TimeoutExpired("child", timeout)
+        return self.returncode
+
+    def terminate(self):
+        self.terminated = True
+        self.returncode = 1
+
+    def kill(self):
+        self.returncode = -9
+
+
+def test_supervisor_restarts_overdue_automation_pause_despite_heartbeat(
+    tmp_path,
+):
+    stop_requested = threading.Event()
+    overdue = datetime.now(timezone.utc) - timedelta(seconds=120)
+    _paused_child_status(
+        tmp_path,
+        kind="automation",
+        expires_at=overdue.isoformat(),
+    )
+    child = _SupervisedChildSpy()
+
+    assert wait_for_supervised_child(
+        child,
+        stop_requested,
+        tmp_path,
+    ) == (1, True)
+
+    assert child.terminated is True
+    request = json.loads(
+        (tmp_path / pokemon_module.RESTART_REQUEST_NAME).read_text()
+    )
+    assert request["reason"] == "expired automation pause"
+
+
+def test_supervisor_never_restarts_operator_hold_or_live_lease(tmp_path):
+    for kind, expires_at in (
+        ("operator_hold", None),
+        (
+            "automation",
+            (
+                datetime.now(timezone.utc) + timedelta(seconds=120)
+            ).isoformat(),
+        ),
+    ):
+        stop_requested = threading.Event()
+        _paused_child_status(tmp_path, kind=kind, expires_at=expires_at)
+        child = _SupervisedChildSpy(
+            stop_after=3,
+            stop_requested=stop_requested,
+        )
+
+        exit_code, restart_required = wait_for_supervised_child(
+            child,
+            stop_requested,
+            tmp_path,
+        )
+
+        assert restart_required is False
+        assert not (tmp_path / pokemon_module.RESTART_REQUEST_NAME).exists()
 
 
 def test_failure_lifecycle_returns_nonzero_to_supervisor(monkeypatch, tmp_path):
