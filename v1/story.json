@@ -1,7 +1,7 @@
 {
   "coverage": {
     "continuous_source": false,
-    "event_count": 469,
+    "event_count": 470,
     "first_observed_at": "2026-07-17T04:22:13.529703Z",
     "incomplete_before": true,
     "last_observed_at": "2026-07-21T04:31:07.203940Z"
@@ -11893,6 +11893,35 @@
         "Rainbow"
       ],
       "chapter": "Beyond the Rainbow Badge",
+      "coverage_gap_before": true,
+      "highest_level": 41,
+      "id": "event-000851",
+      "kind": "journey",
+      "location": "Lavender Town",
+      "observed_at": "2026-07-20T13:12:09.781632Z",
+      "party_size": 3,
+      "play_time_seconds": 225060,
+      "pokedex": {
+        "caught": 5,
+        "seen": 62
+      },
+      "sequence": 851,
+      "summary": "By the next retained checkpoint, the run had moved from Celadon City to Lavender Town. The retained state shows 4 badges, 5 caught Pokémon, and a party of 3.",
+      "title": "Reaching Lavender Town",
+      "video": {
+        "end_seconds": 134208,
+        "start_seconds": 134058,
+        "youtube_id": "lAi3T3V_-50"
+      }
+    },
+    {
+      "badges": [
+        "Boulder",
+        "Cascade",
+        "Thunder",
+        "Rainbow"
+      ],
+      "chapter": "Beyond the Rainbow Badge",
       "coverage_gap_before": false,
       "highest_level": 41,
       "id": "event-000854",
@@ -12843,10 +12872,10 @@
       }
     }
   ],
-  "revision": "sha256:2251b84171e19fe7051949789f6e2484c1534ea4151577f43606c5d30ca2cee7",
+  "revision": "sha256:656cf42e6b47c5a132daed752780bf209cba7ead52c7ca5cc094b497a9c61d63",
   "schema_version": 1,
   "status": "in_progress",
   "story_id": "rappter-plays-pokemon-main-run",
-  "summary": "The archive starts with the earliest retained evidence in Pewter City and follows 469 verified key events. It currently records 4 badges. The latest published chapter reaches Rocket Hideout B2F.",
+  "summary": "The archive starts with the earliest retained evidence in Pewter City and follows 470 verified key events. It currently records 4 badges. The latest published chapter reaches Rocket Hideout B2F.",
   "updated_at": "2026-07-21T04:31:07.203940Z"
 }
