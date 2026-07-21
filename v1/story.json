@@ -103,30 +103,6 @@
         "Thunder"
       ],
       "chapter": "Beyond the Thunder Badge",
-      "coverage_gap_before": true,
-      "highest_level": 37,
-      "id": "event-000275",
-      "kind": "pokedex",
-      "location": "Celadon City",
-      "observed_at": "2026-07-18T05:39:45.148767Z",
-      "party_size": 3,
-      "play_time_seconds": 25240,
-      "pokedex": {
-        "caught": 5,
-        "seen": 54
-      },
-      "sequence": 275,
-      "summary": "The verified caught count increased from 4 to 5 by this retained checkpoint. The retained state shows 3 badges, 5 caught Pokémon, and a party of 3.",
-      "title": "Pokédex progress in Celadon City",
-      "video": null
-    },
-    {
-      "badges": [
-        "Boulder",
-        "Cascade",
-        "Thunder"
-      ],
-      "chapter": "Beyond the Thunder Badge",
       "coverage_gap_before": false,
       "highest_level": 37,
       "id": "event-000277",
@@ -13412,6 +13388,31 @@
         "Rainbow"
       ],
       "chapter": "Beyond the Rainbow Badge",
+      "coverage_gap_before": true,
+      "highest_level": 41,
+      "id": "event-001018",
+      "kind": "journey",
+      "location": "Game Corner",
+      "observed_at": "2026-07-21T02:28:28.183485Z",
+      "party_size": 3,
+      "play_time_seconds": 272815,
+      "pokedex": {
+        "caught": 5,
+        "seen": 62
+      },
+      "sequence": 1018,
+      "summary": "By the next retained checkpoint, the run had moved from Celadon City to Game Corner. The retained state shows 4 badges, 5 caught Pokémon, and a party of 3.",
+      "title": "Reaching Game Corner",
+      "video": null
+    },
+    {
+      "badges": [
+        "Boulder",
+        "Cascade",
+        "Thunder",
+        "Rainbow"
+      ],
+      "chapter": "Beyond the Rainbow Badge",
       "coverage_gap_before": false,
       "highest_level": 41,
       "id": "event-001024",
@@ -14333,7 +14334,7 @@
       }
     }
   ],
-  "revision": "sha256:43b5797f9cd173eca3dcb2c37a4256c39f05faf1397904b60dcfbec74b7f19fc",
+  "revision": "sha256:b2dd10ec9841985b37ee7b229ffd860409458cc2a9a7a127d457286b1780de37",
   "schema_version": 1,
   "status": "in_progress",
   "story_id": "rappter-plays-pokemon-main-run",
