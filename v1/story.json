@@ -80,29 +80,6 @@
       "chapter": "Beyond the Cascade Badge",
       "coverage_gap_before": true,
       "highest_level": 30,
-      "id": "event-000201",
-      "kind": "party",
-      "location": "Cerulean City",
-      "observed_at": "2026-07-17T21:22:48.918777Z",
-      "party_size": 3,
-      "play_time_seconds": 12527,
-      "pokedex": {
-        "caught": 4,
-        "seen": 44
-      },
-      "sequence": 201,
-      "summary": "The recorded party size increased from 1 to 3 while the run was in Cerulean City. The retained state shows 2 badges, 4 caught Pokémon, and a party of 3.",
-      "title": "The party grows in Cerulean City",
-      "video": null
-    },
-    {
-      "badges": [
-        "Boulder",
-        "Cascade"
-      ],
-      "chapter": "Beyond the Cascade Badge",
-      "coverage_gap_before": true,
-      "highest_level": 30,
       "id": "event-000202",
       "kind": "party",
       "location": "Cerulean City",
@@ -13255,6 +13232,35 @@
         "Rainbow"
       ],
       "chapter": "Beyond the Rainbow Badge",
+      "coverage_gap_before": true,
+      "highest_level": 41,
+      "id": "event-000952",
+      "kind": "journey",
+      "location": "Rocket Hideout B1F",
+      "observed_at": "2026-07-20T22:07:36.120341Z",
+      "party_size": 3,
+      "play_time_seconds": 257170,
+      "pokedex": {
+        "caught": 5,
+        "seen": 62
+      },
+      "sequence": 952,
+      "summary": "By the next retained checkpoint, the run had moved from Celadon City to Rocket Hideout B1F. The retained state shows 4 badges, 5 caught Pokémon, and a party of 3.",
+      "title": "Reaching Rocket Hideout B1F",
+      "video": {
+        "end_seconds": 166335,
+        "start_seconds": 166185,
+        "youtube_id": "lAi3T3V_-50"
+      }
+    },
+    {
+      "badges": [
+        "Boulder",
+        "Cascade",
+        "Thunder",
+        "Rainbow"
+      ],
+      "chapter": "Beyond the Rainbow Badge",
       "coverage_gap_before": false,
       "highest_level": 41,
       "id": "event-000956",
@@ -14205,7 +14211,7 @@
       }
     }
   ],
-  "revision": "sha256:676c172d783f626350fa2addc017b73bad5aa147e611c11b553db5c96b479201",
+  "revision": "sha256:6afb1538b58ccaa3b72cea07015c411e7a2cc73ee0d67b273d8471335b29af9a",
   "schema_version": 1,
   "status": "in_progress",
   "story_id": "rappter-plays-pokemon-main-run",
