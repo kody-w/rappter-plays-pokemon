@@ -4,7 +4,7 @@
     "event_count": 512,
     "first_observed_at": "2026-07-17T04:22:13.529703Z",
     "incomplete_before": true,
-    "last_observed_at": "2026-07-21T13:56:39.507899Z"
+    "last_observed_at": "2026-07-21T15:04:41.629948Z"
   },
   "events": [
     {
@@ -70,52 +70,6 @@
       "sequence": 109,
       "summary": "The recorded state now includes Cascade Badge in Cerulean Gym, bringing the verified total to 2. The retained state shows 2 badges, 2 caught Pokémon, and a party of 1.",
       "title": "Cascade Badge observed",
-      "video": null
-    },
-    {
-      "badges": [
-        "Boulder",
-        "Cascade"
-      ],
-      "chapter": "Beyond the Cascade Badge",
-      "coverage_gap_before": true,
-      "highest_level": 30,
-      "id": "event-000207",
-      "kind": "party",
-      "location": "Map 0x3E",
-      "observed_at": "2026-07-17T21:32:04.888163Z",
-      "party_size": 3,
-      "play_time_seconds": 12563,
-      "pokedex": {
-        "caught": 4,
-        "seen": 44
-      },
-      "sequence": 207,
-      "summary": "The recorded party size increased from 1 to 3 while the run was in Map 0x3E. The retained state shows 2 badges, 4 caught Pokémon, and a party of 3.",
-      "title": "The party grows in Map 0x3E",
-      "video": null
-    },
-    {
-      "badges": [
-        "Boulder",
-        "Cascade"
-      ],
-      "chapter": "Beyond the Cascade Badge",
-      "coverage_gap_before": true,
-      "highest_level": 30,
-      "id": "event-000208",
-      "kind": "party",
-      "location": "Map 0x3E",
-      "observed_at": "2026-07-17T21:33:24.646956Z",
-      "party_size": 3,
-      "play_time_seconds": 12566,
-      "pokedex": {
-        "caught": 4,
-        "seen": 44
-      },
-      "sequence": 208,
-      "summary": "The recorded party size increased from 1 to 3 while the run was in Map 0x3E. The retained state shows 2 badges, 4 caught Pokémon, and a party of 3.",
-      "title": "The party grows in Map 0x3E",
       "video": null
     },
     {
@@ -13314,6 +13268,31 @@
         "Rainbow"
       ],
       "chapter": "Beyond the Rainbow Badge",
+      "coverage_gap_before": true,
+      "highest_level": 41,
+      "id": "event-000958",
+      "kind": "progress",
+      "location": "Rocket Hideout B2F",
+      "observed_at": "2026-07-20T22:47:04.572160Z",
+      "party_size": 3,
+      "play_time_seconds": 259538,
+      "pokedex": {
+        "caught": 5,
+        "seen": 62
+      },
+      "sequence": 958,
+      "summary": "A retained progress checkpoint records the autonomous run in Rocket Hideout B2F. The retained state shows 4 badges, 5 caught Pokémon, and a party of 3.",
+      "title": "Checkpoint in Rocket Hideout B2F",
+      "video": null
+    },
+    {
+      "badges": [
+        "Boulder",
+        "Cascade",
+        "Thunder",
+        "Rainbow"
+      ],
+      "chapter": "Beyond the Rainbow Badge",
       "coverage_gap_before": false,
       "highest_level": 41,
       "id": "event-000959",
@@ -14233,12 +14212,41 @@
         "start_seconds": 223128,
         "youtube_id": "lAi3T3V_-50"
       }
+    },
+    {
+      "badges": [
+        "Boulder",
+        "Cascade",
+        "Thunder",
+        "Rainbow"
+      ],
+      "chapter": "Beyond the Rainbow Badge",
+      "coverage_gap_before": false,
+      "highest_level": 41,
+      "id": "event-001145",
+      "kind": "journey",
+      "location": "Game Corner",
+      "observed_at": "2026-07-21T15:04:41.629948Z",
+      "party_size": 3,
+      "play_time_seconds": 318172,
+      "pokedex": {
+        "caught": 5,
+        "seen": 62
+      },
+      "sequence": 1145,
+      "summary": "The run had moved from Rocket Hideout B2F to Game Corner. The retained state shows 4 badges, 5 caught Pokémon, and a party of 3.",
+      "title": "Reaching Game Corner",
+      "video": {
+        "end_seconds": 214,
+        "start_seconds": 64,
+        "youtube_id": "xJttw4139FU"
+      }
     }
   ],
-  "revision": "sha256:5226d8adcb8e2e6b2cfebd6256219b2df6ba538f909feef6a533963537859f69",
+  "revision": "sha256:fcbe453ce2802cbf0e876f45c7f667f6d5d4427f77770b7a350defdfc2e4f290",
   "schema_version": 1,
   "status": "in_progress",
   "story_id": "rappter-plays-pokemon-main-run",
-  "summary": "The archive starts with the earliest retained evidence in Pewter City and follows 512 verified key events. It currently records 4 badges. The latest published chapter reaches Rocket Hideout B2F.",
-  "updated_at": "2026-07-21T13:56:39.507899Z"
+  "summary": "The archive starts with the earliest retained evidence in Pewter City and follows 512 verified key events. It currently records 4 badges. The latest published chapter reaches Game Corner.",
+  "updated_at": "2026-07-21T15:04:41.629948Z"
 }
