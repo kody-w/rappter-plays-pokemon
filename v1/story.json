@@ -103,54 +103,6 @@
         "Thunder"
       ],
       "chapter": "Beyond the Thunder Badge",
-      "coverage_gap_before": true,
-      "highest_level": 36,
-      "id": "event-000268",
-      "kind": "pokedex",
-      "location": "Route 8",
-      "observed_at": "2026-07-18T04:31:38.958966Z",
-      "party_size": 3,
-      "play_time_seconds": 21156,
-      "pokedex": {
-        "caught": 5,
-        "seen": 52
-      },
-      "sequence": 268,
-      "summary": "The verified caught count increased from 4 to 5 by this retained checkpoint. The retained state shows 3 badges, 5 caught Pokémon, and a party of 3.",
-      "title": "Pokédex progress in Route 8",
-      "video": null
-    },
-    {
-      "badges": [
-        "Boulder",
-        "Cascade",
-        "Thunder"
-      ],
-      "chapter": "Beyond the Thunder Badge",
-      "coverage_gap_before": true,
-      "highest_level": 36,
-      "id": "event-000269",
-      "kind": "pokedex",
-      "location": "Route 8",
-      "observed_at": "2026-07-18T04:41:38.991259Z",
-      "party_size": 3,
-      "play_time_seconds": 21756,
-      "pokedex": {
-        "caught": 5,
-        "seen": 53
-      },
-      "sequence": 269,
-      "summary": "The verified caught count increased from 4 to 5 by this retained checkpoint. The retained state shows 3 badges, 5 caught Pokémon, and a party of 3.",
-      "title": "Pokédex progress in Route 8",
-      "video": null
-    },
-    {
-      "badges": [
-        "Boulder",
-        "Cascade",
-        "Thunder"
-      ],
-      "chapter": "Beyond the Thunder Badge",
       "coverage_gap_before": false,
       "highest_level": 37,
       "id": "event-000271",
@@ -13404,6 +13356,31 @@
         "Rainbow"
       ],
       "chapter": "Beyond the Rainbow Badge",
+      "coverage_gap_before": true,
+      "highest_level": 41,
+      "id": "event-001013",
+      "kind": "journey",
+      "location": "Rocket Hideout B3F",
+      "observed_at": "2026-07-21T02:05:46.763754Z",
+      "party_size": 3,
+      "play_time_seconds": 271455,
+      "pokedex": {
+        "caught": 5,
+        "seen": 62
+      },
+      "sequence": 1013,
+      "summary": "By the next retained checkpoint, the run had moved from Celadon City to Rocket Hideout B3F. The retained state shows 4 badges, 5 caught Pokémon, and a party of 3.",
+      "title": "Reaching Rocket Hideout B3F",
+      "video": null
+    },
+    {
+      "badges": [
+        "Boulder",
+        "Cascade",
+        "Thunder",
+        "Rainbow"
+      ],
+      "chapter": "Beyond the Rainbow Badge",
       "coverage_gap_before": false,
       "highest_level": 41,
       "id": "event-001016",
@@ -13424,6 +13401,31 @@
         "start_seconds": 181341,
         "youtube_id": "lAi3T3V_-50"
       }
+    },
+    {
+      "badges": [
+        "Boulder",
+        "Cascade",
+        "Thunder",
+        "Rainbow"
+      ],
+      "chapter": "Beyond the Rainbow Badge",
+      "coverage_gap_before": false,
+      "highest_level": 41,
+      "id": "event-001017",
+      "kind": "journey",
+      "location": "Celadon City",
+      "observed_at": "2026-07-21T02:25:18.406777Z",
+      "party_size": 3,
+      "play_time_seconds": 272626,
+      "pokedex": {
+        "caught": 5,
+        "seen": 62
+      },
+      "sequence": 1017,
+      "summary": "The run had moved from Rocket Hideout B3F to Celadon City. The retained state shows 4 badges, 5 caught Pokémon, and a party of 3.",
+      "title": "Reaching Celadon City",
+      "video": null
     },
     {
       "badges": [
@@ -14325,7 +14327,7 @@
       }
     }
   ],
-  "revision": "sha256:3623760624d1c389d1827a4582e7dc8ec503bb9938358d0528259d1b508c290a",
+  "revision": "sha256:a8f2a926765d34b62cce2e68bf063d49ca17ebf808ccee74fd1dbdc8d61dfcfa",
   "schema_version": 1,
   "status": "in_progress",
   "story_id": "rappter-plays-pokemon-main-run",
