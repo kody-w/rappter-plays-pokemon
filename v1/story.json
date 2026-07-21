@@ -105,30 +105,6 @@
       "chapter": "Beyond the Thunder Badge",
       "coverage_gap_before": false,
       "highest_level": 37,
-      "id": "event-000286",
-      "kind": "progress",
-      "location": "Celadon City",
-      "observed_at": "2026-07-18T07:29:45.714107Z",
-      "party_size": 3,
-      "play_time_seconds": 31839,
-      "pokedex": {
-        "caught": 5,
-        "seen": 54
-      },
-      "sequence": 286,
-      "summary": "A retained progress checkpoint records the autonomous run in Celadon City. The retained state shows 3 badges, 5 caught Pokémon, and a party of 3.",
-      "title": "Checkpoint in Celadon City",
-      "video": null
-    },
-    {
-      "badges": [
-        "Boulder",
-        "Cascade",
-        "Thunder"
-      ],
-      "chapter": "Beyond the Thunder Badge",
-      "coverage_gap_before": false,
-      "highest_level": 37,
       "id": "event-000287",
       "kind": "progress",
       "location": "Celadon City",
@@ -13321,6 +13297,31 @@
         "Rainbow"
       ],
       "chapter": "Beyond the Rainbow Badge",
+      "coverage_gap_before": true,
+      "highest_level": 41,
+      "id": "event-001023",
+      "kind": "progress",
+      "location": "Rocket Hideout B2F",
+      "observed_at": "2026-07-21T03:00:26.924164Z",
+      "party_size": 3,
+      "play_time_seconds": 274734,
+      "pokedex": {
+        "caught": 5,
+        "seen": 62
+      },
+      "sequence": 1023,
+      "summary": "A retained progress checkpoint records the autonomous run in Rocket Hideout B2F. The retained state shows 4 badges, 5 caught Pokémon, and a party of 3.",
+      "title": "Checkpoint in Rocket Hideout B2F",
+      "video": null
+    },
+    {
+      "badges": [
+        "Boulder",
+        "Cascade",
+        "Thunder",
+        "Rainbow"
+      ],
+      "chapter": "Beyond the Rainbow Badge",
       "coverage_gap_before": false,
       "highest_level": 41,
       "id": "event-001024",
@@ -14346,7 +14347,7 @@
       }
     }
   ],
-  "revision": "sha256:f1c761b52ad70a1255db0fbe0f5518ae4499b37ca954865c6f2b0bf340215156",
+  "revision": "sha256:1b563f9a841c39afbf8fac1054cd87a9f5792cd0a25cca6321501a21c64a00f4",
   "schema_version": 1,
   "status": "in_progress",
   "story_id": "rappter-plays-pokemon-main-run",
