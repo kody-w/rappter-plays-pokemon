@@ -75,52 +75,6 @@
     {
       "badges": [
         "Boulder",
-        "Cascade"
-      ],
-      "chapter": "Beyond the Cascade Badge",
-      "coverage_gap_before": true,
-      "highest_level": 30,
-      "id": "event-000227",
-      "kind": "party",
-      "location": "Vermilion Gym",
-      "observed_at": "2026-07-17T23:48:17.475657Z",
-      "party_size": 3,
-      "play_time_seconds": 13499,
-      "pokedex": {
-        "caught": 4,
-        "seen": 45
-      },
-      "sequence": 227,
-      "summary": "The recorded party size increased from 1 to 3 while the run was in Vermilion Gym. The retained state shows 2 badges, 4 caught Pokémon, and a party of 3.",
-      "title": "The party grows in Vermilion Gym",
-      "video": null
-    },
-    {
-      "badges": [
-        "Boulder",
-        "Cascade"
-      ],
-      "chapter": "Beyond the Cascade Badge",
-      "coverage_gap_before": false,
-      "highest_level": 30,
-      "id": "event-000228",
-      "kind": "progress",
-      "location": "Vermilion Gym",
-      "observed_at": "2026-07-17T23:51:27.874113Z",
-      "party_size": 3,
-      "play_time_seconds": 13526,
-      "pokedex": {
-        "caught": 4,
-        "seen": 45
-      },
-      "sequence": 228,
-      "summary": "A retained progress checkpoint records the autonomous run in Vermilion Gym. The retained state shows 2 badges, 4 caught Pokémon, and a party of 3.",
-      "title": "Checkpoint in Vermilion Gym",
-      "video": null
-    },
-    {
-      "badges": [
-        "Boulder",
         "Cascade",
         "Thunder"
       ],
@@ -13250,6 +13204,31 @@
         "Rainbow"
       ],
       "chapter": "Beyond the Rainbow Badge",
+      "coverage_gap_before": true,
+      "highest_level": 41,
+      "id": "event-000974",
+      "kind": "journey",
+      "location": "Lavender Town",
+      "observed_at": "2026-07-20T23:34:03.866681Z",
+      "party_size": 3,
+      "play_time_seconds": 262356,
+      "pokedex": {
+        "caught": 5,
+        "seen": 62
+      },
+      "sequence": 974,
+      "summary": "By the next retained checkpoint, the run had moved from Celadon City to Lavender Town. The retained state shows 4 badges, 5 caught Pokémon, and a party of 3.",
+      "title": "Reaching Lavender Town",
+      "video": null
+    },
+    {
+      "badges": [
+        "Boulder",
+        "Cascade",
+        "Thunder",
+        "Rainbow"
+      ],
+      "chapter": "Beyond the Rainbow Badge",
       "coverage_gap_before": false,
       "highest_level": 41,
       "id": "event-000977",
@@ -13320,6 +13299,31 @@
         "start_seconds": 172210,
         "youtube_id": "lAi3T3V_-50"
       }
+    },
+    {
+      "badges": [
+        "Boulder",
+        "Cascade",
+        "Thunder",
+        "Rainbow"
+      ],
+      "chapter": "Beyond the Rainbow Badge",
+      "coverage_gap_before": false,
+      "highest_level": 41,
+      "id": "event-000982",
+      "kind": "journey",
+      "location": "Pokémon Tower 1F",
+      "observed_at": "2026-07-20T23:49:04.196225Z",
+      "party_size": 3,
+      "play_time_seconds": 263255,
+      "pokedex": {
+        "caught": 5,
+        "seen": 62
+      },
+      "sequence": 982,
+      "summary": "The run had moved from Lavender Town to Pokémon Tower 1F. The retained state shows 4 badges, 5 caught Pokémon, and a party of 3.",
+      "title": "Reaching Pokémon Tower 1F",
+      "video": null
     },
     {
       "badges": [
@@ -14271,7 +14275,7 @@
       }
     }
   ],
-  "revision": "sha256:1c95851f20b5c02d8f98a1a8ee936a11a2ff3d7495e8532a2d5d37b5e5ac2f43",
+  "revision": "sha256:6e64025b537e35f09be1d0e3727ccc4b6a84e6723c2e96e5b083150e8c2dc0dc",
   "schema_version": 1,
   "status": "in_progress",
   "story_id": "rappter-plays-pokemon-main-run",
