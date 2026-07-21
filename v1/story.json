@@ -80,52 +80,6 @@
       "chapter": "Beyond the Cascade Badge",
       "coverage_gap_before": true,
       "highest_level": 30,
-      "id": "event-000202",
-      "kind": "party",
-      "location": "Cerulean City",
-      "observed_at": "2026-07-17T21:26:52.317929Z",
-      "party_size": 3,
-      "play_time_seconds": 12542,
-      "pokedex": {
-        "caught": 4,
-        "seen": 44
-      },
-      "sequence": 202,
-      "summary": "The recorded party size increased from 1 to 3 while the run was in Cerulean City. The retained state shows 2 badges, 4 caught Pokémon, and a party of 3.",
-      "title": "The party grows in Cerulean City",
-      "video": null
-    },
-    {
-      "badges": [
-        "Boulder",
-        "Cascade"
-      ],
-      "chapter": "Beyond the Cascade Badge",
-      "coverage_gap_before": true,
-      "highest_level": 30,
-      "id": "event-000203",
-      "kind": "party",
-      "location": "Map 0x3E",
-      "observed_at": "2026-07-17T21:29:59.702513Z",
-      "party_size": 3,
-      "play_time_seconds": 12555,
-      "pokedex": {
-        "caught": 4,
-        "seen": 44
-      },
-      "sequence": 203,
-      "summary": "The recorded party size increased from 1 to 3 while the run was in Map 0x3E. The retained state shows 2 badges, 4 caught Pokémon, and a party of 3.",
-      "title": "The party grows in Map 0x3E",
-      "video": null
-    },
-    {
-      "badges": [
-        "Boulder",
-        "Cascade"
-      ],
-      "chapter": "Beyond the Cascade Badge",
-      "coverage_gap_before": true,
-      "highest_level": 30,
       "id": "event-000204",
       "kind": "party",
       "location": "Map 0x3E",
@@ -13261,6 +13215,35 @@
         "Rainbow"
       ],
       "chapter": "Beyond the Rainbow Badge",
+      "coverage_gap_before": true,
+      "highest_level": 41,
+      "id": "event-000953",
+      "kind": "journey",
+      "location": "Rocket Hideout B2F",
+      "observed_at": "2026-07-20T22:13:06.899055Z",
+      "party_size": 3,
+      "play_time_seconds": 257501,
+      "pokedex": {
+        "caught": 5,
+        "seen": 62
+      },
+      "sequence": 953,
+      "summary": "By the next retained checkpoint, the run had moved from Celadon City to Rocket Hideout B2F. The retained state shows 4 badges, 5 caught Pokémon, and a party of 3.",
+      "title": "Reaching Rocket Hideout B2F",
+      "video": {
+        "end_seconds": 166665,
+        "start_seconds": 166515,
+        "youtube_id": "lAi3T3V_-50"
+      }
+    },
+    {
+      "badges": [
+        "Boulder",
+        "Cascade",
+        "Thunder",
+        "Rainbow"
+      ],
+      "chapter": "Beyond the Rainbow Badge",
       "coverage_gap_before": false,
       "highest_level": 41,
       "id": "event-000956",
@@ -13279,6 +13262,35 @@
       "video": {
         "end_seconds": 168077,
         "start_seconds": 167927,
+        "youtube_id": "lAi3T3V_-50"
+      }
+    },
+    {
+      "badges": [
+        "Boulder",
+        "Cascade",
+        "Thunder",
+        "Rainbow"
+      ],
+      "chapter": "Beyond the Rainbow Badge",
+      "coverage_gap_before": false,
+      "highest_level": 41,
+      "id": "event-000957",
+      "kind": "journey",
+      "location": "Rocket Hideout B1F",
+      "observed_at": "2026-07-20T22:37:04.517793Z",
+      "party_size": 3,
+      "play_time_seconds": 258938,
+      "pokedex": {
+        "caught": 5,
+        "seen": 62
+      },
+      "sequence": 957,
+      "summary": "The run had moved from Rocket Hideout B2F to Rocket Hideout B1F. The retained state shows 4 badges, 5 caught Pokémon, and a party of 3.",
+      "title": "Reaching Rocket Hideout B1F",
+      "video": {
+        "end_seconds": 168103,
+        "start_seconds": 167953,
         "youtube_id": "lAi3T3V_-50"
       }
     },
@@ -14211,7 +14223,7 @@
       }
     }
   ],
-  "revision": "sha256:6afb1538b58ccaa3b72cea07015c411e7a2cc73ee0d67b273d8471335b29af9a",
+  "revision": "sha256:6961e2881cb7420ae153deb17bd0c353e7fe36fa80b4b4b4c21cbfb704786d84",
   "schema_version": 1,
   "status": "in_progress",
   "story_id": "rappter-plays-pokemon-main-run",
