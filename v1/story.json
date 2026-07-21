@@ -78,52 +78,6 @@
         "Cascade"
       ],
       "chapter": "Beyond the Cascade Badge",
-      "coverage_gap_before": false,
-      "highest_level": 30,
-      "id": "event-000218",
-      "kind": "journey",
-      "location": "Vermilion City",
-      "observed_at": "2026-07-17T22:42:32.702753Z",
-      "party_size": 3,
-      "play_time_seconds": 12918,
-      "pokedex": {
-        "caught": 4,
-        "seen": 44
-      },
-      "sequence": 218,
-      "summary": "The run had moved from Route 5 to Vermilion City. The retained state shows 2 badges, 4 caught Pokémon, and a party of 3.",
-      "title": "Reaching Vermilion City",
-      "video": null
-    },
-    {
-      "badges": [
-        "Boulder",
-        "Cascade"
-      ],
-      "chapter": "Beyond the Cascade Badge",
-      "coverage_gap_before": false,
-      "highest_level": 30,
-      "id": "event-000220",
-      "kind": "journey",
-      "location": "Vermilion City",
-      "observed_at": "2026-07-17T22:57:03.388056Z",
-      "party_size": 3,
-      "play_time_seconds": 13008,
-      "pokedex": {
-        "caught": 4,
-        "seen": 44
-      },
-      "sequence": 220,
-      "summary": "The run had moved from Route 6 to Vermilion City. The retained state shows 2 badges, 4 caught Pokémon, and a party of 3.",
-      "title": "Reaching Vermilion City",
-      "video": null
-    },
-    {
-      "badges": [
-        "Boulder",
-        "Cascade"
-      ],
-      "chapter": "Beyond the Cascade Badge",
       "coverage_gap_before": true,
       "highest_level": 30,
       "id": "event-000221",
@@ -13261,6 +13215,31 @@
         "Rainbow"
       ],
       "chapter": "Beyond the Rainbow Badge",
+      "coverage_gap_before": true,
+      "highest_level": 41,
+      "id": "event-000968",
+      "kind": "journey",
+      "location": "Lavender Town",
+      "observed_at": "2026-07-20T23:23:12.426798Z",
+      "party_size": 3,
+      "play_time_seconds": 261705,
+      "pokedex": {
+        "caught": 5,
+        "seen": 62
+      },
+      "sequence": 968,
+      "summary": "By the next retained checkpoint, the run had moved from Celadon City to Lavender Town. The retained state shows 4 badges, 5 caught Pokémon, and a party of 3.",
+      "title": "Reaching Lavender Town",
+      "video": null
+    },
+    {
+      "badges": [
+        "Boulder",
+        "Cascade",
+        "Thunder",
+        "Rainbow"
+      ],
+      "chapter": "Beyond the Rainbow Badge",
       "coverage_gap_before": false,
       "highest_level": 41,
       "id": "event-000971",
@@ -13281,6 +13260,31 @@
         "start_seconds": 171100,
         "youtube_id": "lAi3T3V_-50"
       }
+    },
+    {
+      "badges": [
+        "Boulder",
+        "Cascade",
+        "Thunder",
+        "Rainbow"
+      ],
+      "chapter": "Beyond the Rainbow Badge",
+      "coverage_gap_before": false,
+      "highest_level": 41,
+      "id": "event-000977",
+      "kind": "journey",
+      "location": "Route 8",
+      "observed_at": "2026-07-20T23:38:35.038091Z",
+      "party_size": 3,
+      "play_time_seconds": 262627,
+      "pokedex": {
+        "caught": 5,
+        "seen": 62
+      },
+      "sequence": 977,
+      "summary": "The run had moved from Lavender Town to Route 8. The retained state shows 4 badges, 5 caught Pokémon, and a party of 3.",
+      "title": "Reaching Route 8",
+      "video": null
     },
     {
       "badges": [
@@ -14257,7 +14261,7 @@
       }
     }
   ],
-  "revision": "sha256:b08cf5e53b5b1cbf2fbcfaa6c75fb2fe0f4c56c9337124e932505606f1c61b91",
+  "revision": "sha256:540203d4938df0982aef97d35a910cdf3aaebd4ebf050bcb37b4f452fd0e1c21",
   "schema_version": 1,
   "status": "in_progress",
   "story_id": "rappter-plays-pokemon-main-run",
