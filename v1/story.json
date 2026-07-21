@@ -1,10 +1,10 @@
 {
   "coverage": {
     "continuous_source": false,
-    "event_count": 501,
+    "event_count": 502,
     "first_observed_at": "2026-07-17T04:22:13.529703Z",
     "incomplete_before": true,
-    "last_observed_at": "2026-07-21T09:19:05.768094Z"
+    "last_observed_at": "2026-07-21T09:40:11.283540Z"
   },
   "events": [
     {
@@ -13769,12 +13769,41 @@
         "start_seconds": 206474,
         "youtube_id": "lAi3T3V_-50"
       }
+    },
+    {
+      "badges": [
+        "Boulder",
+        "Cascade",
+        "Thunder",
+        "Rainbow"
+      ],
+      "chapter": "Beyond the Rainbow Badge",
+      "coverage_gap_before": false,
+      "highest_level": 41,
+      "id": "event-001099",
+      "kind": "journey",
+      "location": "Rocket Hideout B3F",
+      "observed_at": "2026-07-21T09:40:11.283540Z",
+      "party_size": 3,
+      "play_time_seconds": 298707,
+      "pokedex": {
+        "caught": 5,
+        "seen": 62
+      },
+      "sequence": 1099,
+      "summary": "The run had moved from Game Corner to Rocket Hideout B3F. The retained state shows 4 badges, 5 caught Pokémon, and a party of 3.",
+      "title": "Reaching Rocket Hideout B3F",
+      "video": {
+        "end_seconds": 207890,
+        "start_seconds": 207740,
+        "youtube_id": "lAi3T3V_-50"
+      }
     }
   ],
-  "revision": "sha256:0ff8875a4f1897c107f5f6e89fd44c766e41ad0ac58e79eea1a0f9cf5f9aaef9",
+  "revision": "sha256:bf7a48853004633b2a183ff7af8b0ed509e0589624b81d7a0ee69ef93ceb3e87",
   "schema_version": 1,
   "status": "in_progress",
   "story_id": "rappter-plays-pokemon-main-run",
-  "summary": "The archive starts with the earliest retained evidence in Pewter City and follows 501 verified key events. It currently records 4 badges. The latest published chapter reaches Game Corner.",
-  "updated_at": "2026-07-21T09:19:05.768094Z"
+  "summary": "The archive starts with the earliest retained evidence in Pewter City and follows 502 verified key events. It currently records 4 badges. The latest published chapter reaches Rocket Hideout B3F.",
+  "updated_at": "2026-07-21T09:40:11.283540Z"
 }
