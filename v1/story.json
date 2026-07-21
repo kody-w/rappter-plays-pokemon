@@ -1,10 +1,10 @@
 {
   "coverage": {
     "continuous_source": false,
-    "event_count": 490,
+    "event_count": 491,
     "first_observed_at": "2026-07-17T04:22:13.529703Z",
     "incomplete_before": true,
-    "last_observed_at": "2026-07-21T07:13:13.384155Z"
+    "last_observed_at": "2026-07-21T08:11:48.991545Z"
   },
   "events": [
     {
@@ -13450,12 +13450,41 @@
         "start_seconds": 198922,
         "youtube_id": "lAi3T3V_-50"
       }
+    },
+    {
+      "badges": [
+        "Boulder",
+        "Cascade",
+        "Thunder",
+        "Rainbow"
+      ],
+      "chapter": "Beyond the Rainbow Badge",
+      "coverage_gap_before": false,
+      "highest_level": 41,
+      "id": "event-001085",
+      "kind": "journey",
+      "location": "Game Corner",
+      "observed_at": "2026-07-21T08:11:48.991545Z",
+      "party_size": 3,
+      "play_time_seconds": 293406,
+      "pokedex": {
+        "caught": 5,
+        "seen": 62
+      },
+      "sequence": 1085,
+      "summary": "The run had moved from Rocket Hideout B2F to Game Corner. The retained state shows 4 badges, 5 caught Pokémon, and a party of 3.",
+      "title": "Reaching Game Corner",
+      "video": {
+        "end_seconds": 202587,
+        "start_seconds": 202437,
+        "youtube_id": "lAi3T3V_-50"
+      }
     }
   ],
-  "revision": "sha256:13532025fce866acb39b3ed94bb8e1e73e6d36279595b1898cf3259e21d10b87",
+  "revision": "sha256:cfeeea91c1b2d47ca4ea0e9d144aa0ab39885b5cb0fb5b360e5f6b1fd34b19dd",
   "schema_version": 1,
   "status": "in_progress",
   "story_id": "rappter-plays-pokemon-main-run",
-  "summary": "The archive starts with the earliest retained evidence in Pewter City and follows 490 verified key events. It currently records 4 badges. The latest published chapter reaches Rocket Hideout B2F.",
-  "updated_at": "2026-07-21T07:13:13.384155Z"
+  "summary": "The archive starts with the earliest retained evidence in Pewter City and follows 491 verified key events. It currently records 4 badges. The latest published chapter reaches Game Corner.",
+  "updated_at": "2026-07-21T08:11:48.991545Z"
 }
