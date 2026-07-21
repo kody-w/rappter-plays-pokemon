@@ -35,7 +35,9 @@ from openrappter.agents.pokemon_agent import (
     list_clips,
     normalize_brain_decision,
     normalize_web_research,
+    overworld_action_buttons,
     parse_agent_action,
+    precision_route_buttons,
     public_runtime_status,
     read_youtube_chat_advisory,
     rock_tunnel_route_guidance,
@@ -103,11 +105,50 @@ def test_normalize_brain_decision_filters_buttons():
     assert decision["buttons"] == ["up", "a"]
     assert decision["checkpoint"] is True
     assert decision["objective"] == "Reach Viridian City"
+    assert decision["action_mode"] == "precision"
 
 
 def test_normalize_brain_decision_requires_valid_button():
     with pytest.raises(ValueError, match="valid button"):
         normalize_brain_decision('{"buttons":["x"],"checkpoint":false}')
+
+
+def test_normalize_brain_decision_normalizes_phase_and_action_mode():
+    normalized = normalize_brain_decision(
+        '{"phase":"Overworld","action_mode":"CORRIDOR","buttons":["up"]}'
+    )
+    assert normalized["phase"] == "overworld"
+    assert normalized["action_mode"] == "corridor"
+
+    invalid = normalize_brain_decision(
+        '{"phase":"hostile","action_mode":"hostile","buttons":["up"]}'
+    )
+    assert invalid["phase"] == "other"
+    assert invalid["action_mode"] == "precision"
+
+
+@pytest.mark.parametrize(
+    ("buttons", "expected"),
+    [
+        (["right"] * 6, ["right"] * 3),
+        (["right", "right", "down", "down"], ["right", "right"]),
+        (["a", "up"], ["a"]),
+        (["b"] * 6, ["b"]),
+    ],
+)
+def test_precision_route_buttons_force_short_reobservation(buttons, expected):
+    assert precision_route_buttons(buttons) == expected
+
+
+def test_overworld_action_mode_is_generic_not_route_specific():
+    assert overworld_action_buttons(["right"] * 6, precision=False) == [
+        "right"
+    ] * 6
+    assert overworld_action_buttons(
+        ["right", "right", "down", "down"],
+        precision=False,
+    ) == ["right", "right"]
+    assert overworld_action_buttons(["up"] * 6, precision=True) == ["up"] * 3
 
 
 def test_copilot_prompt_keeps_static_rules_in_system_message():
@@ -276,16 +317,108 @@ def test_celadon_route_guidance_targets_exact_gym_warps():
     assert celadon_route_guidance({"map_id": 6, "badges": ["Rainbow"]}) is None
 
 
-def test_rocket_hideout_guidance_marks_exit_only_door_and_real_b4f_warp():
+@pytest.mark.parametrize(
+    ("map_id", "key_items", "expected"),
+    [
+        (0xC7, {"lift_key": False, "silph_scope": False}, "(23,2)"),
+        (0xC8, {"lift_key": False, "silph_scope": False}, "(21,8)"),
+        (0xC9, {"lift_key": False, "silph_scope": False}, "(19,18)"),
+        (0xCA, {"lift_key": False, "silph_scope": False}, "(10,2)"),
+        (0xC8, {"lift_key": True, "silph_scope": False}, "(24,19)/(25,19)"),
+        (0xCB, {"lift_key": True, "silph_scope": False}, "(1,1)"),
+        (0xCA, {"lift_key": True, "silph_scope": False}, "(19,10)"),
+        (0xC7, {"lift_key": True, "silph_scope": True}, "(21,2)"),
+    ],
+)
+def test_rocket_hideout_guidance_locks_inventory_aware_waypoints(
+    map_id,
+    key_items,
+    expected,
+):
     guidance = rocket_hideout_route_guidance(
-        {"map_id": 0xC9, "coordinates": {"x": 15, "y": 11}}
+        {
+            "map_id": map_id,
+            "coordinates": {"x": 15, "y": 11},
+            "key_items": key_items,
+        }
     )
+    assert expected in guidance
+    assert "required" in guidance
 
+
+def test_rocket_hideout_b3f_guidance_blocks_known_loops():
+    guidance = rocket_hideout_route_guidance(
+        {
+            "map_id": 0xC9,
+            "coordinates": {"x": 25, "y": 6},
+            "key_items": {"lift_key": False, "silph_scope": False},
+        }
+    )
+    assert "down once, west to (20,7), then south to (20,9)" in guidance
+    assert "never descend at x>=22" in guidance
     assert "exit-only" in guidance
-    assert "never retry it" in guidance
-    assert "B4F stairs at (19,18)" in guidance
-    assert "matches the current objective" in guidance
-    assert rocket_hideout_route_guidance({"map_id": 0xCA}) is None
+    assert rocket_hideout_route_guidance({"map_id": 0xC6}) is None
+
+
+def test_rocket_hideout_b4f_east_region_targets_giovanni():
+    guidance = rocket_hideout_route_guidance(
+        {
+            "map_id": 0xCA,
+            "coordinates": {"x": 24, "y": 14},
+            "key_items": {"lift_key": True, "silph_scope": False},
+        }
+    )
+    assert "Giovanni at (25,3)" in guidance
+    assert "Silph Scope at (25,2)" in guidance
+
+
+@pytest.mark.parametrize(
+    ("coordinates", "previous_map_id", "expected"),
+    [
+        ({"x": 19, "y": 17}, 0xCB, "Giovanni at (25,3)"),
+        ({"x": 20, "y": 10}, 0xC9, "(19,10)"),
+        ({"x": 12, "y": 20}, 0xC9, "(19,10)"),
+    ],
+)
+def test_rocket_hideout_b4f_uses_entry_region_connectivity(
+    coordinates,
+    previous_map_id,
+    expected,
+):
+    guidance = rocket_hideout_route_guidance(
+        {
+            "map_id": 0xCA,
+            "previous_map_id": previous_map_id,
+            "coordinates": coordinates,
+            "key_items": {"lift_key": True, "silph_scope": False},
+        }
+    )
+    assert expected in guidance
+
+
+def test_rocket_hideout_lower_b1f_does_not_target_unreachable_upper_region():
+    guidance = rocket_hideout_route_guidance(
+        {
+            "map_id": 0xC7,
+            "previous_map_id": 0xC8,
+            "coordinates": {"x": 21, "y": 24},
+            "key_items": {"lift_key": False, "silph_scope": False},
+        }
+    )
+    assert "(21,24)" in guidance
+    assert "disconnected lower B1F landing" in guidance
+
+
+def test_rocket_hideout_b3f_with_scope_backtracks_to_b2f():
+    guidance = rocket_hideout_route_guidance(
+        {
+            "map_id": 0xC9,
+            "coordinates": {"x": 19, "y": 18},
+            "key_items": {"lift_key": True, "silph_scope": True},
+        }
+    )
+    assert "(25,6)" in guidance
+    assert "B2F" in guidance
 
 
 def test_navigation_memory_persists_repeated_failed_attempts(tmp_path):
@@ -308,8 +441,22 @@ def test_navigation_memory_persists_repeated_failed_attempts(tmp_path):
         }
     ]
     assert guidance["loop_detected"] is False
-    assert "materially different route" in guidance["directive"]
+    assert "Changing only button count or order" in guidance["directive"]
     assert reloaded.guidance(position) == guidance
+
+
+def test_navigation_memory_aggregates_button_count_variants(tmp_path):
+    memory = NavigationMemory(tmp_path / "navigation-memory.json")
+    position = (0xC9, 15, 11)
+    now = datetime.now(timezone.utc)
+    for buttons in (["right"], ["right"] * 6):
+        memory.begin(position, buttons, phase="overworld")
+        memory.finish(position, now=now)
+
+    guidance = memory.guidance(position)
+
+    assert guidance["avoid_repeating"][0]["attempts"] == 2
+    assert guidance["avoid_repeating"][0]["buttons"] == ["right"]
 
 
 def test_navigation_trail_does_not_turn_one_failed_step_into_a_cycle(tmp_path):
@@ -327,13 +474,30 @@ def test_navigation_trail_does_not_turn_one_failed_step_into_a_cycle(tmp_path):
     assert memory.guidance(b) is None
 
 
+def test_navigation_memory_does_not_cycle_with_distinct_steps_in_one_zone(
+    tmp_path,
+):
+    memory = NavigationMemory(tmp_path / "navigation-memory.json")
+    now = datetime.now(timezone.utc)
+    positions = [
+        (0xC9, 0, 0),
+        (0xC9, 1, 0),
+        (0xC9, 2, 0),
+        (0xC9, 2, 1),
+    ]
+    for origin, destination in zip(positions, positions[1:], strict=False):
+        memory.begin(origin, ["right"], phase="overworld")
+        memory.finish(destination, now=now)
+    assert memory.guidance(positions[-1]) is None
+
+
 def test_navigation_memory_discards_expired_attempts_and_trail(tmp_path):
     old = datetime.now(timezone.utc) - timedelta(hours=3)
     path = tmp_path / "navigation-memory.json"
     path.write_text(
         json.dumps(
             {
-                "schema_version": 1,
+                "schema_version": pokemon_module.NAVIGATION_MEMORY_SCHEMA_VERSION,
                 "updated_at": old.isoformat(),
                 "attempts": [
                     {
@@ -355,6 +519,31 @@ def test_navigation_memory_discards_expired_attempts_and_trail(tmp_path):
 
     assert memory.guidance((0xC9, 15, 11)) is None
     assert memory.trail == []
+
+
+def test_navigation_memory_detects_cross_floor_cycle_and_survives_reload(
+    tmp_path,
+):
+    path = tmp_path / "navigation-memory.json"
+    memory = NavigationMemory(path)
+    now = datetime.now(timezone.utc)
+    transitions = [
+        ((0xC7, 23, 3), (0xC8, 27, 8)),
+        ((0xC8, 27, 8), (0xC7, 23, 3)),
+        ((0xC7, 23, 3), (0xC8, 27, 8)),
+        ((0xC8, 27, 8), (0xC7, 23, 3)),
+    ]
+    for origin, destination in transitions:
+        memory.begin(origin, ["up"], phase="overworld")
+        memory.finish(destination, now=now)
+
+    guidance = memory.guidance((0xC7, 23, 3))
+    reloaded = NavigationMemory(path)
+
+    assert guidance["loop_detected"] is True
+    assert guidance["loop_kind"] == "cross_floor_cycle"
+    assert guidance["cycle_maps"] == [0xC7, 0xC8]
+    assert reloaded.floor_trail[-4:] == [0xC8, 0xC7, 0xC8, 0xC7]
 
 
 def test_collision_direction_gate_accepts_only_open_adjacent_tiles():

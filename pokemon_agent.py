@@ -153,7 +153,7 @@ PEERJS_ICE_CONFIG = {
     ],
 }
 RTC_CONFIG = PEERJS_ICE_CONFIG
-MAX_BUTTONS_PER_DECISION = 16
+MAX_BUTTONS_PER_DECISION = 6
 MAX_DECISIONS_PER_SESSION = 24
 REASONING_EFFORTS = ("low", "medium", "high", "max")
 DEFAULT_REASONING_EFFORT = "medium"
@@ -177,6 +177,12 @@ RESTART_REQUEST_NAME = "restart-request.json"
 YOUTUBE_CHAT_ADVISORY_NAME = "youtube-chat-advisory.json"
 NAVIGATION_MEMORY_NAME = "navigation-memory.json"
 WEB_RESEARCH_NAME = "web-research.json"
+NAVIGATION_MEMORY_SCHEMA_VERSION = 2
+W_NUM_BAG_ITEMS = 0xD31D
+W_BAG_ITEMS = 0xD31E
+BAG_ITEM_CAPACITY = 20
+SILPH_SCOPE_ITEM_ID = 0x48
+LIFT_KEY_ITEM_ID = 0x4A
 YOUTUBE_VIDEO_ID_RE = re.compile(r"^[A-Za-z0-9_-]{11}$")
 CHAT_ADVISORY_STALE_SECONDS = 90
 MAX_CHAT_ADVISORY_BYTES = 2048
@@ -6342,18 +6348,20 @@ class NavigationMemory:
         self.path = path
         self.attempts: list[dict[str, Any]] = []
         self.trail: list[tuple[int, int, int]] = []
+        self.floor_trail: list[int] = []
         self.pending: Optional[dict[str, Any]] = None
         self._load()
 
     def _load(self) -> None:
         value = read_json(self.path)
-        if value.get("schema_version") != 1:
+        if value.get("schema_version") != NAVIGATION_MEMORY_SCHEMA_VERSION:
             return
         current = datetime.now(timezone.utc)
         cutoff = current - timedelta(seconds=NAVIGATION_MEMORY_MAX_AGE_SECONDS)
         updated_at = _strict_utc_timestamp(value.get("updated_at"))
         attempts = value.get("attempts")
         trail = value.get("trail")
+        floor_trail = value.get("floor_trail")
         if isinstance(attempts, list):
             for item in attempts[-NAVIGATION_MEMORY_MAX_ATTEMPTS:]:
                 if not isinstance(item, dict):
@@ -6375,7 +6383,12 @@ class NavigationMemory:
                     or not isinstance(item.get("map_id"), int)
                     or not isinstance(origin, list)
                     or len(origin) != 2
-                    or any(isinstance(value, bool) or not isinstance(value, int) for value in origin)
+                    or any(
+                        isinstance(value, bool)
+                        or not isinstance(value, int)
+                        or not 0 <= value <= 255
+                        for value in origin
+                    )
                     or not isinstance(buttons, list)
                     or not 1 <= len(buttons) <= MAX_BUTTONS_PER_DECISION
                     or any(button not in VALID_BUTTONS for button in buttons)
@@ -6393,7 +6406,7 @@ class NavigationMemory:
             and updated_at is not None
             and updated_at >= cutoff
         ):
-            for item in trail[-12:]:
+            for item in trail[-64:]:
                 if (
                     isinstance(item, list)
                     and len(item) == 3
@@ -6405,6 +6418,20 @@ class NavigationMemory:
                     )
                 ):
                     self.trail.append(tuple(item))
+        if (
+            isinstance(floor_trail, list)
+            and updated_at is not None
+            and updated_at >= cutoff
+        ):
+            self.floor_trail = [
+                item
+                for item in floor_trail[-32:]
+                if (
+                    not isinstance(item, bool)
+                    and isinstance(item, int)
+                    and 0 <= item <= 255
+                )
+            ]
 
     def begin(
         self,
@@ -6448,31 +6475,31 @@ class NavigationMemory:
         if pending is None or destination is None:
             return
         origin = pending["origin"]
+        for position in (origin, destination):
+            if not self.trail or self.trail[-1] != position:
+                self.trail.append(position)
+            if not self.floor_trail or self.floor_trail[-1] != position[0]:
+                self.floor_trail.append(position[0])
+        self.trail = self.trail[-64:]
+        self.floor_trail = self.floor_trail[-32:]
         if destination[0] != origin[0]:
-            self.trail = [destination]
             self._write(now=now)
             return
-        recent = self.trail[-8:]
+        recent = self.trail[:-1][-16:]
         outcome = None
         if destination == origin:
             outcome = "no_progress"
         elif destination in recent:
             outcome = "cycle"
-        if not self.trail:
-            self.trail.append(origin)
-        elif self.trail[-1] != origin:
-            self.trail.append(origin)
-        if self.trail[-1] != destination:
-            self.trail.append(destination)
-        self.trail = self.trail[-12:]
         if outcome is not None:
+            first_button = pending["buttons"][0]
             existing = next(
                 (
                     item
                     for item in self.attempts
                     if item["map_id"] == origin[0]
                     and item["origin"] == [origin[1], origin[2]]
-                    and item["buttons"] == pending["buttons"]
+                    and item["buttons"][0] == first_button
                     and item["outcome"] == outcome
                 ),
                 None,
@@ -6483,7 +6510,7 @@ class NavigationMemory:
                     {
                         "map_id": origin[0],
                         "origin": [origin[1], origin[2]],
-                        "buttons": pending["buttons"],
+                        "buttons": pending["buttons"][:6],
                         "outcome": outcome,
                         "count": 1,
                         "last_at": timestamp,
@@ -6492,6 +6519,8 @@ class NavigationMemory:
             else:
                 existing["count"] = min(999, existing["count"] + 1)
                 existing["last_at"] = timestamp
+                if len(pending["buttons"]) < len(existing["buttons"]):
+                    existing["buttons"] = pending["buttons"][:6]
         self._write(now=now)
 
     def _write(self, *, now: Optional[datetime] = None) -> None:
@@ -6508,10 +6537,11 @@ class NavigationMemory:
         atomic_write_json(
             self.path,
             {
-                "schema_version": 1,
+                "schema_version": NAVIGATION_MEMORY_SCHEMA_VERSION,
                 "updated_at": _utc_text(current),
                 "attempts": self.attempts,
-                "trail": [list(position) for position in self.trail[-12:]],
+                "trail": [list(position) for position in self.trail[-64:]],
+                "floor_trail": self.floor_trail[-32:],
             },
         )
 
@@ -6539,15 +6569,50 @@ class NavigationMemory:
             ) is not None
             and parsed >= cutoff
         ][-4:]
-        loop_detected = self.trail[-8:].count(current) >= 3
+        zones = [
+            (map_id, x // 3, y // 3)
+            for map_id, x, y in self.trail[-24:]
+        ]
+        room_cycle = False
+        for period in range(2, min(6, len(zones) // 2) + 1):
+            candidate = zones[-period:]
+            if (
+                len(set(candidate)) >= 2
+                and candidate == zones[-2 * period : -period]
+            ):
+                room_cycle = True
+                break
+        floors = self.floor_trail[-12:]
+        floor_cycle = bool(
+            len(floors) >= 4
+            and floors[-4] == floors[-2]
+            and floors[-3] == floors[-1]
+            and floors[-4] != floors[-3]
+        )
+        if not floor_cycle and len(floors) >= 6:
+            floor_cycle = floors[-6:-3] == floors[-3:]
+        loop_detected = (
+            self.trail[-16:].count(current) >= 3
+            or room_cycle
+            or floor_cycle
+        )
         if not relevant and not loop_detected:
             return None
         return {
             "loop_detected": loop_detected,
+            "loop_kind": (
+                "cross_floor_cycle"
+                if floor_cycle
+                else "room_cycle" if room_cycle else "semantic_retry"
+            ),
+            "cycle_maps": list(dict.fromkeys(floors[-6:])) if floor_cycle else [],
+            "recent_floor_trail": floors,
             "avoid_repeating": relevant,
             "directive": (
-                "Do not repeat listed failed or cycling attempts. Choose a "
-                "materially different route and verify that coordinates change."
+                "Changing only button count or order is still repetition. Do "
+                "not repeat listed attempts or floor transitions. Follow the "
+                "authoritative waypoint with 1-3 inputs and verify the resulting "
+                "map and coordinates."
             ),
         }
 
@@ -7529,14 +7594,44 @@ def normalize_brain_decision(text: str) -> dict[str, Any]:
     if not buttons:
         raise ValueError("Copilot response did not contain a valid button")
 
+    phase = str(raw.get("phase", "other")).lower()
+    if phase not in {"intro", "menu", "dialogue", "overworld", "battle", "other"}:
+        phase = "other"
+    action_mode = str(raw.get("action_mode", "precision")).lower()
+    if action_mode not in {"precision", "corridor"}:
+        action_mode = "precision"
     return {
-        "phase": str(raw.get("phase", "unknown"))[:80],
+        "phase": phase,
         "observation": str(raw.get("observation", ""))[:500],
         "objective": str(raw.get("objective", ""))[:500],
         "reason": str(raw.get("reason", ""))[:500],
         "buttons": buttons,
         "checkpoint": raw.get("checkpoint") is True,
+        "action_mode": action_mode,
     }
+
+
+def overworld_action_buttons(
+    buttons: Any,
+    *,
+    precision: bool,
+) -> list[str]:
+    if not isinstance(buttons, list) or not buttons:
+        return []
+    first = buttons[0]
+    if first in {"up", "down", "left", "right"}:
+        output = []
+        for button in buttons:
+            if button != first:
+                break
+            output.append(button)
+        limit = 3 if precision or len(output) != len(buttons) else 6
+        return output[:limit]
+    return [first] if first in {"a", "b", "start", "select"} else []
+
+
+def precision_route_buttons(buttons: Any) -> list[str]:
+    return overworld_action_buttons(buttons, precision=True)
 
 
 def parse_agent_action(query: str) -> tuple[str, Optional[str]]:
@@ -8961,6 +9056,30 @@ class PokemonMemoryReader:
             "seen": self._bitfield_count(0xD30A),
         }
 
+    def key_items(self) -> dict[str, Optional[bool]]:
+        count = self._read_optional(W_NUM_BAG_ITEMS)
+        if count is None or not 0 <= count <= BAG_ITEM_CAPACITY:
+            return {"silph_scope": None, "lift_key": None}
+        item_ids: list[int] = []
+        for index in range(count):
+            item_id = self._read_optional(W_BAG_ITEMS + index * 2)
+            quantity = self._read_optional(W_BAG_ITEMS + index * 2 + 1)
+            if (
+                item_id is None
+                or item_id in {0, 0xFF}
+                or quantity is None
+                or not 1 <= quantity <= 99
+            ):
+                return {"silph_scope": None, "lift_key": None}
+            item_ids.append(item_id)
+        terminator = self._read_optional(W_BAG_ITEMS + count * 2)
+        if terminator != 0xFF:
+            return {"silph_scope": None, "lift_key": None}
+        return {
+            "silph_scope": SILPH_SCOPE_ITEM_ID in item_ids,
+            "lift_key": LIFT_KEY_ITEM_ID in item_ids,
+        }
+
     def play_time(self) -> Optional[dict[str, Any]]:
         values = [
             self._read_optional(address)
@@ -9106,6 +9225,7 @@ class PokemonMemoryReader:
                 **self.pokedex_counts(),
                 "total": 151,
             },
+            "key_items": self.key_items(),
             "play_time": self.play_time(),
             "screen_text": self._screen_text(),
             "hall_of_fame": map_id == 0x76 if map_id is not None else False,
@@ -9196,7 +9316,8 @@ def celadon_route_guidance(game_state: dict[str, Any]) -> Optional[str]:
 def rocket_hideout_route_guidance(
     game_state: dict[str, Any],
 ) -> Optional[str]:
-    if game_state.get("map_id") != 0xC9:
+    map_id = game_state.get("map_id")
+    if map_id not in {0xC7, 0xC8, 0xC9, 0xCA, 0xCB}:
         return None
     coordinates = game_state.get("coordinates")
     position = (
@@ -9204,14 +9325,145 @@ def rocket_hideout_route_guidance(
         if isinstance(coordinates, dict)
         else (None, None)
     )
-    return (
-        "Authoritative Rocket Hideout B3F route facts: the only real warps are "
-        "the B2F stairs at (25,6) and the B4F stairs at (19,18). The tall black "
-        "eastern doorway beside the spinner lanes is exit-only from this "
-        "approach and cannot be entered here; never retry it. "
-        f"Current coordinates are {position}. Choose the real warp that matches "
-        "the current objective, and backtrack to a materially different spinner "
-        "branch after any repeated loop."
+    previous_map_id = game_state.get("previous_map_id")
+    key_items = game_state.get("key_items")
+    lift_key = (
+        key_items.get("lift_key") if isinstance(key_items, dict) else None
+    )
+    silph_scope = (
+        key_items.get("silph_scope") if isinstance(key_items, dict) else None
+    )
+    prefix = (
+        "Authoritative Rocket Hideout route. This objective and waypoint are "
+        "required; do not replace them with search, exploration, items, or NPCs. "
+        f"Current map is 0x{map_id:02X}, coordinates {position}. "
+    )
+    if lift_key is None or silph_scope is None:
+        return prefix + (
+            "Bag ownership is unavailable, so do not claim a key item is owned "
+            "or missing. Reobserve, keep inputs to 1-3 near warps/spinners, and "
+            "use these immutable topology facts: B1F descends at (23,2), B2F "
+            "descends at (21,8), B3F reaches B4F at (19,18), and B3F returns "
+            "to B2F at (25,6)."
+        )
+    if silph_scope:
+        if map_id == 0xCB:
+            return prefix + (
+                "Interact once with the elevator panel at (1,1), choose B1F, "
+                "then reobserve the resulting map."
+            )
+        if map_id == 0xC7:
+            return prefix + (
+                "Silph Scope is owned. Exit to the Game Corner warp at (21,2); "
+                "do not descend again."
+            )
+        if map_id == 0xCA:
+            return prefix + (
+                "Silph Scope is owned. Enter the elevator at either (24,15) or "
+                "(25,15), then choose B1F."
+            )
+        if map_id == 0xC9:
+            return prefix + (
+                "Silph Scope is owned. Return to B2F using the stairs at "
+                "(25,6), then use the B2F elevator."
+            )
+        if map_id == 0xC8:
+            return prefix + (
+                "Silph Scope is owned. Target the elevator doors at "
+                "(24,19)/(25,19), enter, and choose B1F."
+            )
+        return prefix + (
+            "Silph Scope is owned. Stop exploring deeper floors and return "
+            "toward the nearest known exit."
+        )
+    if not lift_key:
+        if map_id == 0xC7:
+            if position[1] is not None and position[1] >= 20:
+                return prefix + (
+                    "This is the disconnected lower B1F landing. Return through "
+                    "the B2F warp at (21,24); do not target the unreachable upper "
+                    "stairs, elevator, NPCs, or furniture from this region."
+                )
+            return prefix + (
+                "Stage: descend to B2F. Target the progress stairs at (23,2). "
+                "The Game Corner warp (21,2), lower B2F warp (21,24), elevator "
+                "doors (24,19)/(25,19), furniture, items, and Rockets are not "
+                "the current objective."
+            )
+        if map_id == 0xC8:
+            return prefix + (
+                "Stage: descend to B3F. Target the B3F stairs at (21,8). "
+                "Warps (27,8) and (21,22) return to B1F; elevator doors "
+                "(24,19)/(25,19) are not useful before the Lift Key. The spinner "
+                "at (4,9) forces left and returns to (2,9), so never retry it."
+            )
+        if map_id == 0xC9:
+            return prefix + (
+                "Stage: reach B4F for the Lift Key. The required stairs are "
+                "(19,18); (25,6) returns to B2F. From the entrance at (25,6), "
+                "go down once, west to (20,7), then south to (20,9); never "
+                "descend at x>=22. The tall eastern doorway is exit-only and "
+                "cannot be entered. Near the final stairs, use one input then "
+                "reobserve until (19,18) transitions to B4F."
+            )
+        if map_id == 0xCA:
+            return prefix + (
+                "Stage: obtain the Lift Key. Defeat the Rocket at (11,2), then "
+                "pick up the dropped Lift Key at (10,2). Do not leave B4F until "
+                "key_items.lift_key becomes true."
+            )
+        return prefix + (
+            "The Lift Key is not owned. Exit the elevator and resume the fixed "
+            "B1F (23,2) -> B2F (21,8) -> B3F (19,18) route."
+        )
+    if map_id == 0xC9:
+        return prefix + (
+            "Lift Key is owned. Return to B2F using the real stairs at (25,6); "
+            "do not use the exit-only eastern doorway."
+        )
+    if map_id in {0xC7, 0xC8}:
+        if (
+            map_id == 0xC7
+            and position[1] is not None
+            and position[1] >= 20
+        ):
+            return prefix + (
+                "This is the disconnected lower B1F landing. Return through "
+                "(21,24) to B2F, then use the B2F elevator at "
+                "(24,19)/(25,19)."
+            )
+        return prefix + (
+            "Lift Key is owned. Target the elevator doors at (24,19)/(25,19), "
+            "enter, interact with the panel at (1,1), and choose B4F."
+        )
+    if map_id == 0xCB:
+        return prefix + (
+            "Lift Key is owned. Interact once with the panel at (1,1), choose "
+            "B4F, then reobserve before any further input."
+        )
+    west_key_region = bool(
+        previous_map_id == 0xC9
+        or (
+            position[0] is not None
+            and position[1] is not None
+            and (
+                position[0] <= 13
+                or (position[0] <= 20 and position[1] <= 12)
+            )
+        )
+    )
+    if west_key_region and previous_map_id != 0xCB:
+        return prefix + (
+            "Lift Key is owned, but this is the disconnected western key wing. "
+            "Backtrack through the stairs at (19,10), then use B3F (25,6) to "
+            "B2F and the elevator at (24,19)/(25,19) to re-enter B4F on the "
+            "eastern Giovanni side."
+        )
+    return prefix + (
+        "Stage: defeat Giovanni and obtain the Silph Scope. On B4F defeat the "
+        "two guards at (23,12) and (26,12), reach Giovanni at (25,3), then pick "
+        "up the Silph Scope at (25,2). Do not leave until "
+        "key_items.silph_scope becomes true."
     )
 
 
@@ -9442,9 +9694,20 @@ Make progress deliberately:
   B1F (3,33) is not an exit; do not route there.
 - Do not issue more than {MAX_BUTTONS_PER_DECISION} buttons. Repeated directions
   are allowed, but avoid long blind walks.
-- Keep the broadcast moving. In safe overworld corridors, return enough inputs
-  to make meaningful progress, usually 6-12 buttons. Use short sequences only
-  for battles, menus, dialogue, uncertain terrain, or precision movement.
+- Route guidance marked authoritative locks the current objective and waypoint.
+  Do not replace it with search, exploration, optional items, or unrelated NPCs.
+- In a collision-verified straight corridor, batch only 2-6 identical direction
+  inputs. Use 1-3 inputs and reobserve before every turn, NPC, spinner, door,
+  warp, obstacle, or unseen tile. Never issue long mixed-direction macros.
+- Set action_mode to precision whenever the route is uncertain, a puzzle or
+  transition is nearby, movement has failed, or you want immediate
+  re-observation. Use corridor only for a clearly verified straight segment.
+- A black/fade screen does not prove a transition. After forced movement or a
+  map change, use one conservative input at most and verify the new map and
+  coordinates before continuing.
+- Interact only with an NPC required by the authoritative objective. If an
+  interaction produced no battle, item, map, or story-state change, do not
+  repeat it.
 - Never pad a sequence with repeated B presses or other no-op inputs while
   waiting for forced movement. Return at most one conservative input, then
   reobserve quickly.
@@ -9706,6 +9969,7 @@ Return only one JSON object with exactly this shape:
 "observation":"what is visibly happening",
 "objective":"the immediate goal and relevant longer-term plan",
 "reason":"brief reason for this input sequence",
+"action_mode":"precision|corridor",
 "buttons":["a","up"],
 "checkpoint":false}}"""
 
@@ -11943,6 +12207,14 @@ class PokemonRunner:
                             "navigation_origin": request.get(
                                 "navigation_origin"
                             ),
+                            "force_precision": request.get(
+                                "force_precision",
+                                False,
+                            ),
+                            "movement_context": request.get(
+                                "movement_context",
+                                False,
+                            ),
                         }
                     )
                 except ValueError as error:
@@ -12863,10 +13135,18 @@ class PokemonRunner:
             self.navigation_memory.attempts
         )
         decision_state = dict(game_state)
+        route_state = dict(game_state)
+        floor_trail = self.navigation_memory.floor_trail
+        if (
+            position is not None
+            and len(floor_trail) >= 2
+            and floor_trail[-1] == position[0]
+        ):
+            route_state["previous_map_id"] = floor_trail[-2]
         route_guidance = (
             rock_tunnel_route_guidance(game_state)
             or celadon_route_guidance(game_state)
-            or rocket_hideout_route_guidance(game_state)
+            or rocket_hideout_route_guidance(route_state)
         )
         if route_guidance:
             decision_state["route_guidance"] = route_guidance
@@ -12900,6 +13180,13 @@ class PokemonRunner:
             "navigation_origin": list(position) if route_context else None,
             "crowd_advisory": crowd_advisory,
             "web_research": web_research,
+            "force_precision": bool(
+                route_guidance
+                or navigation_guidance
+                or crowd_advisory
+                or web_research
+            ),
+            "movement_context": route_context,
         }
         self.decision_sequence += 1
         self.pending_decision_id = request["decision_id"]
@@ -12969,6 +13256,18 @@ class PokemonRunner:
             return
 
         decision = result["decision"]
+        if (
+            result.get("force_precision") is True
+            or result.get("movement_context") is True
+            or decision.get("phase") == "overworld"
+        ):
+            decision["buttons"] = overworld_action_buttons(
+                decision.get("buttons"),
+                precision=(
+                    result.get("force_precision") is True
+                    or decision.get("action_mode") != "corridor"
+                ),
+            )
         self.status["brain_status"] = "acting"
         self.status["last_error"] = None
         self.status["observation"] = decision["observation"]

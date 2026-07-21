@@ -11,10 +11,13 @@ from types import SimpleNamespace
 
 import pytest
 from openrappter.agents.pokemon_agent import (
+    BAG_ITEM_CAPACITY,
+    LIFT_KEY_ITEM_ID,
     LIVESTREAM_HEARTBEAT_SECONDS,
     LIVESTREAM_LEASE_TTL_SECONDS,
     LIVESTREAM_REPORT_STALE_SECONDS,
     MAX_TELEMETRY_BYTES,
+    SILPH_SCOPE_ITEM_ID,
     SPECTATOR_CSS,
     SPECTATOR_HTML,
     SPECTATOR_JS,
@@ -34,6 +37,56 @@ from openrappter.agents.pokemon_agent import (
 def set_dex_bit(memory: bytearray, start: int, dex_number: int) -> None:
     index = dex_number - 1
     memory[start + index // 8] |= 1 << (index % 8)
+
+
+def set_bag(memory: bytearray, items: list[tuple[int, int]]) -> None:
+    memory[0xD31D] = len(items)
+    for index, (item_id, quantity) in enumerate(items):
+        memory[0xD31E + index * 2] = item_id
+        memory[0xD31F + index * 2] = quantity
+    memory[0xD31E + len(items) * 2] = 0xFF
+
+
+def test_key_item_state_uses_validated_bag_pairs_and_terminator():
+    memory = bytearray(65536)
+    set_bag(
+        memory,
+        [
+            (0x14, 74),
+            (LIFT_KEY_ITEM_ID, 1),
+            (SILPH_SCOPE_ITEM_ID, 1),
+        ],
+    )
+
+    assert PokemonMemoryReader(memory).key_items() == {
+        "silph_scope": True,
+        "lift_key": True,
+    }
+
+    memory[0xD31E + 6] = LIFT_KEY_ITEM_ID
+    assert PokemonMemoryReader(memory).key_items() == {
+        "silph_scope": None,
+        "lift_key": None,
+    }
+
+
+def test_key_item_state_handles_capacity_and_invalid_bags():
+    memory = bytearray(65536)
+    items = [(1 + index, 1) for index in range(BAG_ITEM_CAPACITY)]
+    items[-1] = (LIFT_KEY_ITEM_ID, 1)
+    set_bag(memory, items)
+    memory[0xD347] = SILPH_SCOPE_ITEM_ID
+
+    assert PokemonMemoryReader(memory).key_items() == {
+        "silph_scope": False,
+        "lift_key": True,
+    }
+
+    memory[0xD31D] = BAG_ITEM_CAPACITY + 1
+    assert PokemonMemoryReader(memory).key_items() == {
+        "silph_scope": None,
+        "lift_key": None,
+    }
 
 
 def test_pokedex_counts_ignore_padding_and_include_dex_151():
