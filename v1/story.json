@@ -1,7 +1,7 @@
 {
   "coverage": {
     "continuous_source": false,
-    "event_count": 466,
+    "event_count": 468,
     "first_observed_at": "2026-07-17T04:22:13.529703Z",
     "incomplete_before": true,
     "last_observed_at": "2026-07-21T03:46:51.433023Z"
@@ -11864,6 +11864,35 @@
         "Rainbow"
       ],
       "chapter": "Beyond the Rainbow Badge",
+      "coverage_gap_before": true,
+      "highest_level": 41,
+      "id": "event-000850",
+      "kind": "journey",
+      "location": "Route 8",
+      "observed_at": "2026-07-20T13:09:15.821084Z",
+      "party_size": 3,
+      "play_time_seconds": 224886,
+      "pokedex": {
+        "caught": 5,
+        "seen": 62
+      },
+      "sequence": 850,
+      "summary": "By the next retained checkpoint, the run had moved from Celadon City to Route 8. The retained state shows 4 badges, 5 caught Pokémon, and a party of 3.",
+      "title": "Reaching Route 8",
+      "video": {
+        "end_seconds": 134034,
+        "start_seconds": 133884,
+        "youtube_id": "lAi3T3V_-50"
+      }
+    },
+    {
+      "badges": [
+        "Boulder",
+        "Cascade",
+        "Thunder",
+        "Rainbow"
+      ],
+      "chapter": "Beyond the Rainbow Badge",
       "coverage_gap_before": false,
       "highest_level": 41,
       "id": "event-000854",
@@ -11882,6 +11911,35 @@
       "video": {
         "end_seconds": 134840,
         "start_seconds": 134690,
+        "youtube_id": "lAi3T3V_-50"
+      }
+    },
+    {
+      "badges": [
+        "Boulder",
+        "Cascade",
+        "Thunder",
+        "Rainbow"
+      ],
+      "chapter": "Beyond the Rainbow Badge",
+      "coverage_gap_before": false,
+      "highest_level": 41,
+      "id": "event-000855",
+      "kind": "journey",
+      "location": "Pokémon Tower 1F",
+      "observed_at": "2026-07-20T13:27:13.566194Z",
+      "party_size": 3,
+      "play_time_seconds": 225963,
+      "pokedex": {
+        "caught": 5,
+        "seen": 62
+      },
+      "sequence": 855,
+      "summary": "The run had moved from Route 8 to Pokémon Tower 1F. The retained state shows 4 badges, 5 caught Pokémon, and a party of 3.",
+      "title": "Reaching Pokémon Tower 1F",
+      "video": {
+        "end_seconds": 135112,
+        "start_seconds": 134962,
         "youtube_id": "lAi3T3V_-50"
       }
     },
@@ -12756,10 +12814,10 @@
       }
     }
   ],
-  "revision": "sha256:f92e3ec6245d947d3b017c79ac9d98351cf534cc8507a9a1311938d58838d731",
+  "revision": "sha256:056ab5d05a144c38a327996483b45484168194c0cba419a86ace4970bf6c1588",
   "schema_version": 1,
   "status": "in_progress",
   "story_id": "rappter-plays-pokemon-main-run",
-  "summary": "The archive starts with the earliest retained evidence in Pewter City and follows 466 verified key events. It currently records 4 badges. The latest published chapter reaches Rocket Hideout B3F.",
+  "summary": "The archive starts with the earliest retained evidence in Pewter City and follows 468 verified key events. It currently records 4 badges. The latest published chapter reaches Rocket Hideout B3F.",
   "updated_at": "2026-07-21T03:46:51.433023Z"
 }
