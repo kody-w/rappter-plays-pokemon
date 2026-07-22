@@ -356,9 +356,10 @@ def test_rocket_hideout_b3f_guidance_blocks_known_loops():
             "key_items": {"lift_key": False, "silph_scope": False},
         }
     )
-    assert "down once, west to (20,7), then south to (20,9)" in guidance
-    assert "never descend at x>=22" in guidance
-    assert "exit-only" in guidance
+    assert "SOUTHWEST spinner maze" in guidance
+    assert "east along the southern band to (19,18)" in guidance
+    assert "decoy" in guidance
+    assert "Never descend at x>=22" in guidance
     assert rocket_hideout_route_guidance({"map_id": 0xC6}) is None
 
 
