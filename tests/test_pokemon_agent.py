@@ -3875,3 +3875,37 @@ def test_clip_indices_continue_beyond_four_digits(tmp_path):
     recorder.clips_dir = clips_dir
 
     assert recorder._next_index() == 10001
+
+
+def test_session_tried_seeded_from_persisted_memory_across_restart(tmp_path):
+    path = tmp_path / "navigation-memory.json"
+    memory = NavigationMemory(path)
+    now = datetime.now(timezone.utc)
+    memory.begin((0xC9, 15, 11), ["down"], phase="overworld")
+    memory.finish((0xC9, 15, 12), now=now)
+    memory.begin((0xC9, 15, 12), ["right"], phase="overworld")
+    memory.finish((0xC9, 17, 13), now=now)
+    before = memory.distinct_edge_count()
+    assert before >= 2
+
+    # A fresh process must not see well-known tiles as "new" edges — the
+    # stall counter would never rise and auto-coverage would never engage.
+    reloaded = NavigationMemory(path)
+    assert reloaded.distinct_edge_count() == before
+    assert (0xC9, 15, 11, "down") in reloaded.session_tried
+
+
+def test_untried_frontier_waypoint_bias_targets_exit_corner(tmp_path):
+    memory = NavigationMemory(tmp_path / "navigation-memory.json")
+    now = datetime.now(timezone.utc)
+    # Two known tiles: one near the player, one near the trusted stairs.
+    memory.begin((0xC9, 10, 10), ["right"], phase="overworld")
+    memory.finish((0xC9, 11, 10), now=now)
+    memory.begin((0xC9, 18, 17), ["left"], phase="overworld")
+    memory.finish((0xC9, 17, 17), now=now)
+
+    near_player = memory.untried_frontier((0xC9, 11, 10))
+    assert near_player[0]["origin"] in ([10, 10], [11, 10])
+
+    toward_stairs = memory.untried_frontier((0xC9, 11, 10), toward=(19, 18))
+    assert toward_stairs[0]["origin"] in ([18, 17], [17, 17])

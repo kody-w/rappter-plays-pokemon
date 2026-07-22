@@ -192,8 +192,16 @@ FRONTIER_DIRECTIVE_CANDIDATES = 3
 FRONTIER_STALL_DECISIONS = 12
 NAVIGATION_SESSION_TRIED_LIMIT = 2048
 SOLVED_ROUTE_ATTEMPT_LIMIT = 64
-AUTO_COVERAGE_STALL_DECISIONS = 6
-AUTO_COVERAGE_EPISODE_LIMIT = 60
+AUTO_COVERAGE_STALL_DECISIONS = 3
+AUTO_COVERAGE_EPISODE_LIMIT = 400
+PUZZLE_COVERAGE_WAYPOINTS = {
+    # Trusted stair/exit waypoints (same coordinates the authoritative
+    # rocket_hideout_route_guidance text already asserts): coverage probes
+    # concentrate on the entries closest to where the solution must be,
+    # instead of nearest-to-player thrashing.
+    0xC8: (21, 8),
+    0xC9: (19, 18),
+}
 SOLVED_ROUTE_ATTEMPT_BLOCK_LIMIT = 64
 GRAPH_NEIGHBORHOOD_LINE_LIMIT = 24
 EDGE_LEARNING_WINDOW_DECISIONS = 10
@@ -6457,6 +6465,20 @@ class NavigationMemory:
         self._load_macro_edges(value.get("macro_edges"))
         self._load_solved_routes(value.get("solved_routes"))
         self._load_episode(value.get("episode"), cutoff)
+        # Seed the session tried-store from every persisted (origin,
+        # direction) fact. Without this, a process restart makes well-known
+        # tiles look "new" again: the stall counter never rises and
+        # auto-frontier-coverage never engages (observed live).
+        for item in self.transitions:
+            origin = item["origin"]
+            self.session_tried[
+                (origin[0], origin[1], origin[2], item["direction"])
+            ] = None
+        for item in self.macro_edges:
+            origin = item["origin"]
+            self.session_tried[
+                (origin[0], origin[1], origin[2], item["direction"])
+            ] = None
         if isinstance(attempts, list):
             for item in attempts[-NAVIGATION_MEMORY_MAX_ATTEMPTS:]:
                 if not isinstance(item, dict):
@@ -7288,6 +7310,7 @@ class NavigationMemory:
     def untried_frontier(
         self,
         current: Optional[tuple[int, int, int]],
+        toward: Optional[tuple[int, int]] = None,
     ) -> list[dict[str, Any]]:
         """Nearby known tiles whose (tile, direction) has no learned edge.
 
@@ -7331,7 +7354,19 @@ class NavigationMemory:
         entries = []
         for x, y in known:
             distance = abs(x - center_x) + abs(y - center_y)
-            if distance > NAVIGATION_FRONTIER_RADIUS:
+            waypoint_distance = (
+                abs(x - toward[0]) + abs(y - toward[1])
+                if toward is not None
+                else None
+            )
+            # With a trusted waypoint, entries near the WAYPOINT qualify even
+            # when far from the player — the exit corner must stay probeable
+            # from anywhere on the floor (BFS reachability is checked at
+            # commit time; unreachable entries are skipped there).
+            if distance > NAVIGATION_FRONTIER_RADIUS and (
+                waypoint_distance is None
+                or waypoint_distance > NAVIGATION_FRONTIER_RADIUS
+            ):
                 continue
             for direction in CARDINAL_BUTTONS:
                 if (x, y, direction) in tried:
@@ -7343,13 +7378,27 @@ class NavigationMemory:
                         "distance": distance,
                     }
                 )
-        entries.sort(
-            key=lambda entry: (
-                entry["distance"],
-                entry["origin"],
-                entry["direction"],
+        if toward is not None:
+            # Waypoint bias: probe the entries closest to where the trusted
+            # guidance says the exit is — the attractor corner a nearest-to-
+            # player sort keeps deferring.
+            entries.sort(
+                key=lambda entry: (
+                    abs(entry["origin"][0] - toward[0])
+                    + abs(entry["origin"][1] - toward[1]),
+                    entry["distance"],
+                    entry["origin"],
+                    entry["direction"],
+                )
             )
-        )
+        else:
+            entries.sort(
+                key=lambda entry: (
+                    entry["distance"],
+                    entry["origin"],
+                    entry["direction"],
+                )
+            )
         return entries[:NAVIGATION_FRONTIER_LIMIT]
 
     def route_to(
@@ -14786,7 +14835,10 @@ class PokemonRunner:
             self.auto_coverage_rides = 0
         if self.auto_coverage_rides >= AUTO_COVERAGE_EPISODE_LIMIT:
             return None
-        for entry in self.navigation_memory.untried_frontier(position):
+        toward = PUZZLE_COVERAGE_WAYPOINTS.get(position[0])
+        for entry in self.navigation_memory.untried_frontier(
+            position, toward=toward
+        ):
             target = entry["origin"]
             probe = {
                 "origin": [position[0], target[0], target[1]],
