@@ -3931,3 +3931,27 @@ def test_auto_coverage_falls_back_when_waypoint_entries_unreachable(tmp_path):
     # commits a probe from the player's own reachable neighborhood.
     assert issued is True
     assert runner.status["auto_coverage_rides"] == 1
+
+
+def test_walk_edges_survive_transition_fifo_churn(tmp_path):
+    path = tmp_path / "navigation-memory.json"
+    memory = NavigationMemory(path)
+    now = datetime.now(timezone.utc)
+    # Walk a two-step path, then churn the transition FIFO far past capacity.
+    memory.begin((0xC9, 5, 5), ["right"], phase="overworld")
+    memory.finish((0xC9, 6, 5), now=now)
+    memory.begin((0xC9, 6, 5), ["right"], phase="overworld")
+    memory.finish((0xC9, 7, 5), now=now)
+    for i in range(50):
+        memory.begin((0xC9, 20, 20 + (i % 3)), ["up"], phase="overworld")
+        memory.finish((0xC9, 20, 19 + (i % 3)), now=now)
+
+    # The FIFO no longer holds the original steps, but routing still works.
+    route = memory.route_to((0xC9, 5, 5), [7, 5])
+    assert route is not None and len(route) == 2
+
+    # And it survives a process restart.
+    reloaded = NavigationMemory(path)
+    route = reloaded.route_to((0xC9, 5, 5), [7, 5])
+    assert route is not None and len(route) == 2
+    assert (0xC9, 5, 5, "right") in reloaded.session_tried

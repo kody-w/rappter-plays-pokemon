@@ -192,6 +192,7 @@ NAVIGATION_ROUTE_STEP_LIMIT = 24
 FRONTIER_DIRECTIVE_CANDIDATES = 3
 FRONTIER_STALL_DECISIONS = 12
 NAVIGATION_SESSION_TRIED_LIMIT = 2048
+NAVIGATION_WALK_EDGE_LIMIT = 768
 SOLVED_ROUTE_ATTEMPT_LIMIT = 64
 AUTO_COVERAGE_STALL_DECISIONS = 3
 AUTO_COVERAGE_EPISODE_LIMIT = 400
@@ -6442,6 +6443,12 @@ class NavigationMemory:
         self.floor_trail: list[int] = []
         self.transitions: list[dict[str, Any]] = []
         self.macro_edges: list[dict[str, Any]] = []
+        # Single-step walk edges: (map, origin, direction) -> destination for
+        # confirmed one-tile moves. Persisted like macro-edges (bounded,
+        # never age-expired) — the transition FIFO alone destroys BFS
+        # routability as coverage grows: a tile walked once becomes known-
+        # but-unreachable the moment its inbound edge ages out of the window.
+        self.walk_edges: dict[tuple[int, int, int, str], list[int]] = {}
         self.solved_routes: list[dict[str, Any]] = []
         self.episode: Optional[dict[str, Any]] = None
         self.pending: Optional[dict[str, Any]] = None
@@ -6469,6 +6476,7 @@ class NavigationMemory:
         floor_trail = value.get("floor_trail")
         self._load_transitions(value.get("transitions"), cutoff)
         self._load_macro_edges(value.get("macro_edges"))
+        self._load_walk_edges(value.get("walk_edges"))
         self._load_solved_routes(value.get("solved_routes"))
         self._load_episode(value.get("episode"), cutoff)
         # Seed the session tried-store from every persisted (origin,
@@ -6485,6 +6493,8 @@ class NavigationMemory:
             self.session_tried[
                 (origin[0], origin[1], origin[2], item["direction"])
             ] = None
+        for key in self.walk_edges:
+            self.session_tried[key] = None
         if isinstance(attempts, list):
             for item in attempts[-NAVIGATION_MEMORY_MAX_ATTEMPTS:]:
                 if not isinstance(item, dict):
@@ -6595,6 +6605,36 @@ class NavigationMemory:
             ):
                 continue
             self.transitions.append(item)
+
+    def _load_walk_edges(self, walk_edges: Any) -> None:
+        # Same permanence rules as macro-edges; stored as a flat list of
+        # {origin: [map,x,y], direction, destination: [x,y]} records.
+        if not isinstance(walk_edges, list):
+            return
+        for item in walk_edges[-NAVIGATION_WALK_EDGE_LIMIT:]:
+            if not isinstance(item, dict) or set(item) != {
+                "origin",
+                "direction",
+                "destination",
+            }:
+                continue
+            origin = item.get("origin")
+            destination = item.get("destination")
+            if (
+                not _valid_position_triplet(origin)
+                or item.get("direction") not in CARDINAL_BUTTONS
+                or not isinstance(destination, list)
+                or len(destination) != 2
+                or any(
+                    isinstance(v, bool) or not isinstance(v, int)
+                    or not 0 <= v <= 255
+                    for v in destination
+                )
+            ):
+                continue
+            self.walk_edges[
+                (origin[0], origin[1], origin[2], item["direction"])
+            ] = list(destination)
 
     def _load_macro_edges(self, macro_edges: Any) -> None:
         # Macro-edges are deterministic Gen-1 spinner facts: size-bounded
@@ -6882,6 +6922,14 @@ class NavigationMemory:
             if destination[0] == origin[0]
             else 0
         )
+        if same_map_displacement == 1 and press_count == 1:
+            # Permanent single-step walk edge (last-wins on re-observation).
+            if len(self.walk_edges) >= NAVIGATION_WALK_EDGE_LIMIT:
+                oldest = next(iter(self.walk_edges))
+                del self.walk_edges[oldest]
+            self.walk_edges[
+                (origin[0], origin[1], origin[2], direction)
+            ] = [destination[1], destination[2]]
         if same_map_displacement > 1 and press_count == 1:
             # A settled same-map displacement beyond one tile from a SINGLE
             # press is forced movement (spinner chain): learn it as a
@@ -7099,6 +7147,16 @@ class NavigationMemory:
                 "floor_trail": self.floor_trail[-32:],
                 "transitions": self.transitions,
                 "macro_edges": self.macro_edges[-NAVIGATION_MACRO_EDGE_LIMIT:],
+                "walk_edges": [
+                    {
+                        "origin": [key[0], key[1], key[2]],
+                        "direction": key[3],
+                        "destination": destination,
+                    }
+                    for key, destination in list(self.walk_edges.items())[
+                        -NAVIGATION_WALK_EDGE_LIMIT:
+                    ]
+                ],
                 "solved_routes": self.solved_routes[
                     -NAVIGATION_SOLVED_ROUTE_LIMIT:
                 ],
@@ -7354,6 +7412,11 @@ class NavigationMemory:
             # so the frontier converges instead of reverting to UNTRIED.
             if key_map == map_id:
                 tried.add((key_x, key_y, key_direction))
+        for key, destination in self.walk_edges.items():
+            if key[0] == map_id:
+                tried.add((key[1], key[2], key[3]))
+                known.add((key[1], key[2]))
+                known.add((destination[0], destination[1]))
         for position in self.trail:
             if position[0] == map_id:
                 known.add((position[1], position[2]))
@@ -7436,6 +7499,16 @@ class NavigationMemory:
         if start == goal:
             return None
         adjacency: dict[tuple[int, int], dict[str, tuple[int, int]]] = {}
+        # Permanent walk edges are the routing substrate — the transition
+        # FIFO alone loses inbound edges as coverage grows, leaving known
+        # tiles unreachable (observed live: (20,15) unroutable for hours).
+        for key, destination in self.walk_edges.items():
+            if key[0] != map_id:
+                continue
+            adjacency.setdefault((key[1], key[2]), {})[key[3]] = (
+                destination[0],
+                destination[1],
+            )
         for item in self.transitions:
             origin = item["origin"]
             destination = item["destination"]
