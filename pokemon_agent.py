@@ -186,6 +186,7 @@ NAVIGATION_MACRO_EDGE_LIMIT = 64
 NAVIGATION_SOLVED_ROUTE_LIMIT = 8
 NAVIGATION_SOLVED_ROUTE_STEP_LIMIT = 48
 NAVIGATION_FRONTIER_RADIUS = 6
+NAVIGATION_FRONTIER_WAYPOINT_RADIUS = 12
 NAVIGATION_FRONTIER_LIMIT = 12
 NAVIGATION_ROUTE_STEP_LIMIT = 24
 FRONTIER_DIRECTIVE_CANDIDATES = 3
@@ -7365,7 +7366,7 @@ class NavigationMemory:
             # commit time; unreachable entries are skipped there).
             if distance > NAVIGATION_FRONTIER_RADIUS and (
                 waypoint_distance is None
-                or waypoint_distance > NAVIGATION_FRONTIER_RADIUS
+                or waypoint_distance > NAVIGATION_FRONTIER_WAYPOINT_RADIUS
             ):
                 continue
             for direction in CARDINAL_BUTTONS:
