@@ -201,11 +201,12 @@ PUZZLE_COVERAGE_WAYPOINTS = {
     # concentrate on the entries closest to where the solution must be,
     # instead of nearest-to-player thrashing.
     0xC8: (21, 8),
-    # B3F: the corridor to the (19,18) stairs runs through the southwest
-    # maze then east along the southern band (walkthrough topology). The
-    # mouth at ~(13,18) is the bias point; (19,18) itself stays inside the
-    # waypoint radius of it, so the whole approach band qualifies.
-    0xC9: (13, 18),
+    # B3F: bias straight at the stairs. With the 12-tile waypoint radius the
+    # whole southern approach band qualifies — including the southwest pocket
+    # at (13,17) — while the entries adjacent to the stairs column (e.g. the
+    # long-untried (20,15)+down) rank first instead of drowning behind
+    # closer-to-mouth wall probes.
+    0xC9: (19, 18),
 }
 SOLVED_ROUTE_ATTEMPT_BLOCK_LIMIT = 64
 GRAPH_NEIGHBORHOOD_LINE_LIMIT = 24
