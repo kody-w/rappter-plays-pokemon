@@ -4,7 +4,7 @@
     "event_count": 512,
     "first_observed_at": "2026-07-17T04:22:13.529703Z",
     "incomplete_before": true,
-    "last_observed_at": "2026-07-22T00:14:29.693325Z"
+    "last_observed_at": "2026-07-22T01:14:30.016223Z"
   },
   "events": [
     {
@@ -119,56 +119,6 @@
       "sequence": 301,
       "summary": "The recorded state now includes Rainbow Badge in Celadon Gym, bringing the verified total to 4. The retained state shows 4 badges, 5 caught Pokémon, and a party of 3.",
       "title": "Rainbow Badge observed",
-      "video": null
-    },
-    {
-      "badges": [
-        "Boulder",
-        "Cascade",
-        "Thunder",
-        "Rainbow"
-      ],
-      "chapter": "Beyond the Rainbow Badge",
-      "coverage_gap_before": true,
-      "highest_level": 39,
-      "id": "event-000309",
-      "kind": "journey",
-      "location": "Rocket Hideout B1F",
-      "observed_at": "2026-07-18T10:43:31.321843Z",
-      "party_size": 3,
-      "play_time_seconds": 43460,
-      "pokedex": {
-        "caught": 5,
-        "seen": 59
-      },
-      "sequence": 309,
-      "summary": "By the next retained checkpoint, the run had moved from Celadon Gym to Rocket Hideout B1F. The retained state shows 4 badges, 5 caught Pokémon, and a party of 3.",
-      "title": "Reaching Rocket Hideout B1F",
-      "video": null
-    },
-    {
-      "badges": [
-        "Boulder",
-        "Cascade",
-        "Thunder",
-        "Rainbow"
-      ],
-      "chapter": "Beyond the Rainbow Badge",
-      "coverage_gap_before": true,
-      "highest_level": 39,
-      "id": "event-000311",
-      "kind": "progress",
-      "location": "Rocket Hideout B1F",
-      "observed_at": "2026-07-18T11:03:31.411885Z",
-      "party_size": 3,
-      "play_time_seconds": 44660,
-      "pokedex": {
-        "caught": 5,
-        "seen": 59
-      },
-      "sequence": 311,
-      "summary": "A retained progress checkpoint records the autonomous run in Rocket Hideout B1F. The retained state shows 4 badges, 5 caught Pokémon, and a party of 3.",
-      "title": "Checkpoint in Rocket Hideout B1F",
       "video": null
     },
     {
@@ -13290,6 +13240,31 @@
         "Rainbow"
       ],
       "chapter": "Beyond the Rainbow Badge",
+      "coverage_gap_before": true,
+      "highest_level": 41,
+      "id": "event-001033",
+      "kind": "journey",
+      "location": "Rocket Hideout B3F",
+      "observed_at": "2026-07-21T03:49:34.248445Z",
+      "party_size": 3,
+      "play_time_seconds": 277679,
+      "pokedex": {
+        "caught": 5,
+        "seen": 62
+      },
+      "sequence": 1033,
+      "summary": "By the next retained checkpoint, the run had moved from Celadon City to Rocket Hideout B3F. The retained state shows 4 badges, 5 caught Pokémon, and a party of 3.",
+      "title": "Reaching Rocket Hideout B3F",
+      "video": null
+    },
+    {
+      "badges": [
+        "Boulder",
+        "Cascade",
+        "Thunder",
+        "Rainbow"
+      ],
+      "chapter": "Beyond the Rainbow Badge",
       "coverage_gap_before": false,
       "highest_level": 41,
       "id": "event-001036",
@@ -14359,12 +14334,41 @@
         "start_seconds": 33052,
         "youtube_id": "xJttw4139FU"
       }
+    },
+    {
+      "badges": [
+        "Boulder",
+        "Cascade",
+        "Thunder",
+        "Rainbow"
+      ],
+      "chapter": "Beyond the Rainbow Badge",
+      "coverage_gap_before": false,
+      "highest_level": 41,
+      "id": "event-001222",
+      "kind": "progress",
+      "location": "Rocket Hideout B3F",
+      "observed_at": "2026-07-22T01:14:30.016223Z",
+      "party_size": 3,
+      "play_time_seconds": 345619,
+      "pokedex": {
+        "caught": 5,
+        "seen": 62
+      },
+      "sequence": 1222,
+      "summary": "A retained progress checkpoint records the autonomous run in Rocket Hideout B3F. The retained state shows 4 badges, 5 caught Pokémon, and a party of 3.",
+      "title": "Checkpoint in Rocket Hideout B3F",
+      "video": {
+        "end_seconds": 36803,
+        "start_seconds": 36653,
+        "youtube_id": "xJttw4139FU"
+      }
     }
   ],
-  "revision": "sha256:bd02b9bc81daf6baec3dcafd6a7a8f8b461fe6336dc3006867938240043e5f02",
+  "revision": "sha256:e58315c5c922e152e1b71953ebc47b50cf04f75aeabe48389794431332ebad3f",
   "schema_version": 1,
   "status": "in_progress",
   "story_id": "rappter-plays-pokemon-main-run",
   "summary": "The archive starts with the earliest retained evidence in Pewter City and follows 512 verified key events. It currently records 4 badges. The latest published chapter reaches Rocket Hideout B3F.",
-  "updated_at": "2026-07-22T00:14:29.693325Z"
+  "updated_at": "2026-07-22T01:14:30.016223Z"
 }
