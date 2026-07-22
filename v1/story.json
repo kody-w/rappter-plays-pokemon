@@ -131,56 +131,6 @@
       "chapter": "Beyond the Rainbow Badge",
       "coverage_gap_before": true,
       "highest_level": 40,
-      "id": "event-000339",
-      "kind": "progress",
-      "location": "Rocket Hideout B2F",
-      "observed_at": "2026-07-18T15:20:53.424171Z",
-      "party_size": 3,
-      "play_time_seconds": 60099,
-      "pokedex": {
-        "caught": 5,
-        "seen": 59
-      },
-      "sequence": 339,
-      "summary": "A retained progress checkpoint records the autonomous run in Rocket Hideout B2F. The retained state shows 4 badges, 5 caught Pokémon, and a party of 3.",
-      "title": "Checkpoint in Rocket Hideout B2F",
-      "video": null
-    },
-    {
-      "badges": [
-        "Boulder",
-        "Cascade",
-        "Thunder",
-        "Rainbow"
-      ],
-      "chapter": "Beyond the Rainbow Badge",
-      "coverage_gap_before": false,
-      "highest_level": 40,
-      "id": "event-000341",
-      "kind": "journey",
-      "location": "Rocket Hideout B3F",
-      "observed_at": "2026-07-18T15:40:29.399152Z",
-      "party_size": 3,
-      "play_time_seconds": 61275,
-      "pokedex": {
-        "caught": 5,
-        "seen": 59
-      },
-      "sequence": 341,
-      "summary": "The run had moved from Rocket Hideout B2F to Rocket Hideout B3F. The retained state shows 4 badges, 5 caught Pokémon, and a party of 3.",
-      "title": "Reaching Rocket Hideout B3F",
-      "video": null
-    },
-    {
-      "badges": [
-        "Boulder",
-        "Cascade",
-        "Thunder",
-        "Rainbow"
-      ],
-      "chapter": "Beyond the Rainbow Badge",
-      "coverage_gap_before": true,
-      "highest_level": 40,
       "id": "event-000343",
       "kind": "progress",
       "location": "Rocket Hideout B3F",
@@ -13348,6 +13298,31 @@
         "Rainbow"
       ],
       "chapter": "Beyond the Rainbow Badge",
+      "coverage_gap_before": true,
+      "highest_level": 41,
+      "id": "event-001049",
+      "kind": "progress",
+      "location": "Rocket Hideout B2F",
+      "observed_at": "2026-07-21T05:26:42.618189Z",
+      "party_size": 3,
+      "play_time_seconds": 283506,
+      "pokedex": {
+        "caught": 5,
+        "seen": 62
+      },
+      "sequence": 1049,
+      "summary": "A retained progress checkpoint records the autonomous run in Rocket Hideout B2F. The retained state shows 4 badges, 5 caught Pokémon, and a party of 3.",
+      "title": "Checkpoint in Rocket Hideout B2F",
+      "video": null
+    },
+    {
+      "badges": [
+        "Boulder",
+        "Cascade",
+        "Thunder",
+        "Rainbow"
+      ],
+      "chapter": "Beyond the Rainbow Badge",
       "coverage_gap_before": false,
       "highest_level": 41,
       "id": "event-001050",
@@ -13361,6 +13336,31 @@
         "seen": 62
       },
       "sequence": 1050,
+      "summary": "The run had moved from Rocket Hideout B2F to Celadon City. The retained state shows 4 badges, 5 caught Pokémon, and a party of 3.",
+      "title": "Reaching Celadon City",
+      "video": null
+    },
+    {
+      "badges": [
+        "Boulder",
+        "Cascade",
+        "Thunder",
+        "Rainbow"
+      ],
+      "chapter": "Beyond the Rainbow Badge",
+      "coverage_gap_before": false,
+      "highest_level": 41,
+      "id": "event-001052",
+      "kind": "journey",
+      "location": "Celadon City",
+      "observed_at": "2026-07-21T05:47:53.359011Z",
+      "party_size": 3,
+      "play_time_seconds": 284775,
+      "pokedex": {
+        "caught": 5,
+        "seen": 62
+      },
+      "sequence": 1052,
       "summary": "The run had moved from Rocket Hideout B2F to Celadon City. The retained state shows 4 badges, 5 caught Pokémon, and a party of 3.",
       "title": "Reaching Celadon City",
       "video": null
@@ -14373,7 +14373,7 @@
       }
     }
   ],
-  "revision": "sha256:011392329edef17e4dae99012b3ee40934583abdd95528f41b96acd47645fe62",
+  "revision": "sha256:21109398d63400a28da91368ed82d8f1857ffb7f062b628967f411670ad2eea7",
   "schema_version": 1,
   "status": "in_progress",
   "story_id": "rappter-plays-pokemon-main-run",
