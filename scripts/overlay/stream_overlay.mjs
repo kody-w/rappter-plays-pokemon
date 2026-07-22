@@ -9,6 +9,8 @@
 // Usage:
 //   node scripts/overlay/stream_overlay.mjs --key-file ~/.openrappter/pokemon-red/rtmp-key.txt
 //   node scripts/overlay/stream_overlay.mjs --test-output /tmp/overlay.flv --duration 15
+//   node scripts/overlay/stream_overlay.mjs --key-file key.txt \
+//     --mirror-url 'udp://127.0.0.1:23000?pkt_size=1316'
 //
 // Requires: ffmpeg on PATH, and `playwright` resolvable from the working
 // directory (npm install playwright).
@@ -41,6 +43,7 @@ function parseArgs(argv) {
     rtmp: '',
     keyFile: '',
     testOutput: '',
+    mirrorUrl: '',
     duration: 0,
     scale: 1.5
   };
@@ -52,6 +55,7 @@ function parseArgs(argv) {
       case '--rtmp': args.rtmp = value(); break;
       case '--key-file': args.keyFile = value(); break;
       case '--test-output': args.testOutput = value(); break;
+      case '--mirror-url': args.mirrorUrl = value(); break;
       case '--duration': args.duration = Number(value()); break;
       case '--scale': args.scale = Number(value()); break;
       default:
@@ -86,6 +90,24 @@ if (!existsSync(path.join(runtimeDir, 'latest.png'))) {
   process.exit(1);
 }
 const target = resolveTarget(args);
+
+function outputTargetArgs(primaryTarget, mirrorUrl) {
+  if (!mirrorUrl) return ['-f', 'flv', primaryTarget];
+  return [
+    '-map', '0:v:0',
+    '-map', '1:a:0',
+    '-f', 'tee',
+    // use_fifo decouples the branches: without it tee writes synchronously,
+    // so RTMP backpressure makes the UDP mirror bursty — OBS then hits "max
+    // audio buffering / restarting source audio" and the relayed stream
+    // crackles. The primary branch still fails ffmpeg on YouTube ingest
+    // death so run_forever's restart loop re-triggers auto-start; only the
+    // mirror is onfail=ignore.
+    `[f=flv:use_fifo=1]${primaryTarget}|` +
+      `[f=mpegts:use_fifo=1:onfail=ignore]${mirrorUrl}`
+  ];
+}
+
 const overlayHtml = await readFile(path.join(SCRIPT_DIR, 'overlay.html'));
 const qriousRuntime = await readFile(
   path.join(
@@ -317,8 +339,7 @@ const ffmpeg = spawn('ffmpeg', [
   '-c:a', 'aac',
   '-b:a', '128k',
   '-shortest',
-  '-f', 'flv',
-  target
+  ...outputTargetArgs(target, args.mirrorUrl)
 ], {stdio: ['pipe', 'inherit', 'inherit', 'pipe']});
 encoderMetrics.encoderStartedAt = Date.now();
 
@@ -424,7 +445,9 @@ await cdp.send('Page.startScreencast', {
 console.error(
   args.testOutput
     ? 'rendering overlay (pipeline test)'
-    : 'streaming overlay to RTMP ingest'
+    : args.mirrorUrl
+      ? 'streaming overlay to RTMP ingest and local mirror'
+      : 'streaming overlay to RTMP ingest'
 );
 
 const startedAt = Date.now();

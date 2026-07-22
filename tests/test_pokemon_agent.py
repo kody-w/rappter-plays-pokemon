@@ -1588,6 +1588,9 @@ def _route_runner(tmp_path, memory=None):
     runner.committed_route = None
     runner.solved_route_attempts = {}
     runner.navigation_mode = "puzzle"
+    runner.steps_since_new_edge = 0
+    runner.auto_coverage_rides = 0
+    runner.auto_coverage_episode = None
     runner.control_generation = 0
     runner.player = _PlayerSpy()
     runner.settle_candidate = None
@@ -1596,6 +1599,80 @@ def _route_runner(tmp_path, memory=None):
     runner.last_decision_finished = 0.0
     runner.status = {}
     return runner
+
+
+def _coverage_runner(tmp_path, memory):
+    runner = _route_runner(tmp_path, memory=memory)
+    runner.steps_since_new_edge = pokemon_module.AUTO_COVERAGE_STALL_DECISIONS
+    runner.auto_coverage_rides = 0
+    runner.auto_coverage_episode = None
+    memory.episode = {
+        "maps": [0xC9],
+        "region": [[15, 11]],
+        "settled_transitions": 8,
+        "repeated_edges": 3,
+        "discovery_streak": 0,
+        "started_at": "2026-07-22T10:00:00+00:00",
+    }
+    return runner
+
+
+def test_auto_coverage_rides_adjacent_untried_entry_when_stalled(tmp_path):
+    memory = NavigationMemory(tmp_path / "navigation-memory.json")
+    runner = _coverage_runner(tmp_path, memory)
+
+    issued = runner._advance_committed_route(
+        {"map_id": 0xC9, "coordinates": {"x": 15, "y": 11}}
+    )
+
+    # The harness itself commits a probe ride on an UNTRIED entry at the
+    # current tile — no brain decision consumed.
+    assert issued is True
+    assert runner.player.replaced and len(runner.player.replaced[0]) == 1
+    assert runner.status["committed_route"] is None  # single probe completes
+    assert runner.status["auto_coverage_rides"] == 1
+
+
+def test_auto_coverage_requires_stall_and_puzzle_mode(tmp_path):
+    memory = NavigationMemory(tmp_path / "navigation-memory.json")
+    runner = _coverage_runner(tmp_path, memory)
+    runner.steps_since_new_edge = 0
+    assert (
+        runner._advance_committed_route(
+            {"map_id": 0xC9, "coordinates": {"x": 15, "y": 11}}
+        )
+        is False
+    )
+    runner.steps_since_new_edge = pokemon_module.AUTO_COVERAGE_STALL_DECISIONS
+    runner.navigation_mode = "normal"
+    assert (
+        runner._advance_committed_route(
+            {"map_id": 0xC9, "coordinates": {"x": 15, "y": 11}}
+        )
+        is False
+    )
+
+
+def test_auto_coverage_episode_cap_and_reset(tmp_path):
+    memory = NavigationMemory(tmp_path / "navigation-memory.json")
+    runner = _coverage_runner(tmp_path, memory)
+    runner.auto_coverage_episode = "2026-07-22T10:00:00+00:00"
+    runner.auto_coverage_rides = pokemon_module.AUTO_COVERAGE_EPISODE_LIMIT
+    assert (
+        runner._advance_committed_route(
+            {"map_id": 0xC9, "coordinates": {"x": 15, "y": 11}}
+        )
+        is False
+    )
+    # A new episode identity resets the ride budget.
+    memory.episode["started_at"] = "2026-07-22T11:00:00+00:00"
+    assert (
+        runner._advance_committed_route(
+            {"map_id": 0xC9, "coordinates": {"x": 15, "y": 11}}
+        )
+        is True
+    )
+    assert runner.auto_coverage_rides == 1
 
 
 def test_committed_route_executes_stepwise_and_aborts_on_surprise(tmp_path):

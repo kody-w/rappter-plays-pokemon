@@ -192,6 +192,8 @@ FRONTIER_DIRECTIVE_CANDIDATES = 3
 FRONTIER_STALL_DECISIONS = 12
 NAVIGATION_SESSION_TRIED_LIMIT = 2048
 SOLVED_ROUTE_ATTEMPT_LIMIT = 64
+AUTO_COVERAGE_STALL_DECISIONS = 6
+AUTO_COVERAGE_EPISODE_LIMIT = 60
 SOLVED_ROUTE_ATTEMPT_BLOCK_LIMIT = 64
 GRAPH_NEIGHBORHOOD_LINE_LIMIT = 24
 EDGE_LEARNING_WINDOW_DECISIONS = 10
@@ -12385,6 +12387,9 @@ class PokemonRunner:
         # Process-lifetime replay guard: one solved-route attempt per
         # (map, entrance), deliberately not reset by map changes.
         self.solved_route_attempts: dict[tuple[int, int, int], None] = {}
+        # Auto-frontier-coverage bookkeeping: rides used this episode.
+        self.auto_coverage_rides = 0
+        self.auto_coverage_episode: Optional[str] = None
         self.last_edge_count = 0
         self.steps_since_new_edge = 0
         self.edge_count_history: deque[int] = deque(
@@ -14753,6 +14758,60 @@ class PokemonRunner:
         self.committed_route = route
         return route
 
+    def _maybe_commit_frontier_route(
+        self,
+        position: tuple[int, int, int],
+    ) -> Optional[dict[str, Any]]:
+        """Auto-frontier-coverage: the harness rides UNTRIED entries itself.
+
+        Research finding (Claude/Gemini Plays Pokemon): models narrate
+        coverage but keep re-riding known edges under goal-direction bias —
+        systematic frontier exhaustion must be harness-driven. Once puzzle
+        coverage stalls (no new learned edge for AUTO_COVERAGE_STALL_DECISIONS
+        decisions), BFS to the nearest reachable UNTRIED entry and ride it.
+        Every ride either learns a new edge or records a blocked attempt, so
+        the frontier strictly shrinks — a terminating mapping procedure.
+        Bounded per episode; puzzle mode only.
+        """
+        if self.navigation_mode != "puzzle":
+            return None
+        if self.steps_since_new_edge < AUTO_COVERAGE_STALL_DECISIONS:
+            return None
+        episode = self.navigation_memory.episode
+        if episode is None:
+            return None
+        episode_id = str(episode.get("started_at", ""))
+        if episode_id != self.auto_coverage_episode:
+            self.auto_coverage_episode = episode_id
+            self.auto_coverage_rides = 0
+        if self.auto_coverage_rides >= AUTO_COVERAGE_EPISODE_LIMIT:
+            return None
+        for entry in self.navigation_memory.untried_frontier(position):
+            target = entry["origin"]
+            probe = {
+                "origin": [position[0], target[0], target[1]],
+                "direction": entry["direction"],
+                "destination": None,
+            }
+            if [position[1], position[2]] == target:
+                steps = [probe]
+            else:
+                path = self.navigation_memory.route_to(position, target)
+                if path is None:
+                    continue
+                steps = path + [probe]
+            self.auto_coverage_rides += 1
+            self.status["auto_coverage_rides"] = self.auto_coverage_rides
+            route = {
+                "steps": steps,
+                "index": 0,
+                "generation": self.control_generation,
+                "source": "frontier_coverage",
+            }
+            self.committed_route = route
+            return route
+        return None
+
     def _advance_committed_route(self, game_state: dict[str, Any]) -> bool:
         """Execute the next committed-route step through the settled gate.
 
@@ -14771,7 +14830,9 @@ class PokemonRunner:
         if route is None:
             if not route_context:
                 return False
-            route = self._maybe_commit_solved_route(position)
+            route = self._maybe_commit_solved_route(
+                position
+            ) or self._maybe_commit_frontier_route(position)
             if route is None:
                 return False
         if (

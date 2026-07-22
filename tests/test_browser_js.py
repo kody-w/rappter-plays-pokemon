@@ -252,3 +252,26 @@ def test_overlay_exposes_screenshot_safe_tuning_metrics_and_qr():
     ):
         assert field in encoder
     assert "innerHTML" not in overlay
+
+
+def test_overlay_keeps_youtube_primary_and_mirrors_locally_for_obs():
+    encoder = (
+        ROOT / "scripts" / "overlay" / "stream_overlay.mjs"
+    ).read_text(encoding="utf-8")
+    watchdog = (
+        ROOT / "scripts" / "overlay" / "run_forever.sh"
+    ).read_text(encoding="utf-8")
+
+    assert "case '--mirror-url': args.mirrorUrl = value()" in encoder
+    assert "'-map', '0:v:0'" in encoder
+    assert "'-map', '1:a:0'" in encoder
+    assert "'-f', 'tee'" in encoder
+    assert "[f=flv:use_fifo=1]${primaryTarget}" in encoder
+    assert "[f=mpegts:use_fifo=1:onfail=ignore]${mirrorUrl}" in encoder
+    # The primary branch must NOT be onfail=ignore: a dead YouTube ingest
+    # has to fail ffmpeg so run_forever restarts and re-triggers auto-start.
+    assert "[f=flv:onfail=ignore" not in encoder
+    assert "[f=flv:use_fifo=1:onfail=ignore" not in encoder
+    assert "'-c:v', 'libx264'" in encoder
+    assert "udp://127.0.0.1:23000?pkt_size=1316" in watchdog
+    assert "RPP_OBS_MIRROR_URL" in watchdog
