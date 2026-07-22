@@ -6,6 +6,7 @@ import sys
 import threading
 import urllib.error
 import urllib.request
+from collections import deque
 from datetime import datetime, timedelta, timezone
 from http.cookiejar import CookieJar
 from pathlib import Path
@@ -359,6 +360,22 @@ def test_rocket_hideout_b3f_guidance_blocks_known_loops():
     assert "never descend at x>=22" in guidance
     assert "exit-only" in guidance
     assert rocket_hideout_route_guidance({"map_id": 0xC6}) is None
+
+
+def test_rocket_hideout_b4f_lift_key_requires_second_talk():
+    guidance = rocket_hideout_route_guidance(
+        {
+            "map_id": 0xCA,
+            "coordinates": {"x": 12, "y": 3},
+            "key_items": {"lift_key": False, "silph_scope": False},
+        }
+    )
+    # Gen-1 bug: the defeated Grunt only hands over the Lift Key on a
+    # second interaction.
+    assert "TALK TO HIM AGAIN" in guidance
+    assert "second interaction" in guidance
+    assert "(11,2)" in guidance
+    assert "(10,2)" in guidance
 
 
 def test_rocket_hideout_b4f_east_region_targets_giovanni():
@@ -737,6 +754,269 @@ def test_edge_guidance_exposes_learned_directed_edges(tmp_path):
     assert memory.edge_guidance(None) is None
 
 
+def test_macro_edge_learns_confirms_and_invalidates_on_contradiction(tmp_path):
+    path = tmp_path / "navigation-memory.json"
+    memory = NavigationMemory(path)
+    now = datetime.now(timezone.utc)
+    origin = (0xC8, 4, 9)
+
+    memory.begin(origin, ["right"], phase="overworld")
+    memory.observe((0xC8, 6, 9))
+    memory.finish((0xC8, 9, 9), now=now)
+
+    assert len(memory.macro_edges) == 1
+    edge = memory.macro_edges[0]
+    assert edge["origin"] == [0xC8, 4, 9]
+    assert edge["direction"] == "right"
+    assert edge["destination"] == [0xC8, 9, 9]
+    assert edge["path"] == [[6, 9]]
+    assert edge["confirmed"] == 1
+
+    # Re-observation confirms the deterministic spinner chain.
+    memory.begin(origin, ["right"], phase="overworld")
+    memory.finish((0xC8, 9, 9), now=now)
+    assert memory.macro_edges[0]["confirmed"] == 2
+
+    # Single-tile moves never become macro-edges.
+    memory.begin((0xC8, 9, 9), ["down"], phase="overworld")
+    memory.finish((0xC8, 9, 10), now=now)
+    assert len(memory.macro_edges) == 1
+
+    # Only a contradicting settle destination invalidates the landing.
+    memory.begin(origin, ["right"], phase="overworld")
+    memory.finish((0xC8, 7, 9), now=now)
+    assert memory.macro_edges[0]["destination"] == [0xC8, 7, 9]
+    assert memory.macro_edges[0]["confirmed"] == 1
+
+    reloaded = NavigationMemory(path)
+    assert reloaded.macro_edges == memory.macro_edges
+
+
+def test_multi_press_corridor_walk_is_never_learned_as_macro_edge(tmp_path):
+    memory = NavigationMemory(tmp_path / "navigation-memory.json")
+    now = datetime.now(timezone.utc)
+
+    # A 3-press corridor walk legitimately moves 3 tiles; learning it as a
+    # FORCED edge would poison routing with a false spinner.
+    memory.begin((0xC8, 4, 9), ["up", "up", "up"], phase="overworld")
+    memory.finish((0xC8, 4, 6), now=now)
+    assert memory.macro_edges == []
+
+    # The same displacement from a SINGLE press is forced movement.
+    memory.begin((0xC8, 4, 9), ["up"], phase="overworld")
+    memory.finish((0xC8, 4, 6), now=now)
+    assert len(memory.macro_edges) == 1
+
+
+def test_single_tile_settle_clears_stale_macro_edge(tmp_path):
+    memory = NavigationMemory(tmp_path / "navigation-memory.json")
+    now = datetime.now(timezone.utc)
+    origin = (0xC8, 4, 9)
+
+    memory.begin(origin, ["right"], phase="overworld")
+    memory.finish((0xC8, 9, 9), now=now)
+    assert len(memory.macro_edges) == 1
+
+    # A later single-press settle moving one tile (or bumping a wall) at the
+    # same (origin, direction) contradicts the forced edge and must clear it
+    # — displacement <= 1 previously bypassed invalidation entirely.
+    memory.begin(origin, ["right"], phase="overworld")
+    memory.finish((0xC8, 5, 9), now=now)
+    assert memory.macro_edges == []
+
+
+def test_retreat_exit_is_not_memoized_as_solved_route(tmp_path):
+    memory = NavigationMemory(tmp_path / "navigation-memory.json")
+    now = datetime.now(timezone.utc)
+    memory.episode = {
+        "maps": [0xC9],
+        "region": [[15, 11]],
+        "settled_transitions": 5,
+        "repeated_edges": 2,
+        "discovery_streak": 0,
+        "started_at": now.isoformat(),
+    }
+    # Enter B3F (0xC9) from B2F (0xC8), wander, then withdraw to B2F.
+    memory.begin((0xC8, 5, 5), ["down"], phase="overworld")
+    memory.finish((0xC9, 15, 11), now=now)
+    memory.episode = {
+        "maps": [0xC9],
+        "region": [[15, 11]],
+        "settled_transitions": 5,
+        "repeated_edges": 2,
+        "discovery_streak": 0,
+        "started_at": now.isoformat(),
+    }
+    memory.begin((0xC9, 15, 11), ["down"], phase="overworld")
+    memory.finish((0xC9, 15, 12), now=now)
+    memory.begin((0xC9, 15, 12), ["up"], phase="overworld")
+    memory.finish((0xC8, 5, 5), now=now)
+
+    # Exiting back to the entry map is a withdrawal, not a solve.
+    assert memory.solved_routes == []
+    assert memory.episode is None
+
+
+def test_navigation_memory_migrates_v3_schema_and_persists_v4_sections(
+    tmp_path,
+):
+    now = datetime.now(timezone.utc)
+    path = tmp_path / "navigation-memory.json"
+    path.write_text(
+        json.dumps(
+            {
+                "schema_version": 3,
+                "updated_at": now.isoformat(),
+                "attempts": [],
+                "trail": [[0xC8, 2, 9]],
+                "floor_trail": [0xC8],
+                "transitions": [
+                    {
+                        "origin": [0xC8, 2, 9],
+                        "direction": "right",
+                        "destination": [0xC8, 8, 9],
+                        "path": [[4, 9], [6, 9]],
+                        "outcome": "moved",
+                        "at": now.isoformat(),
+                    }
+                ],
+                "episode": None,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    memory = NavigationMemory(path)
+
+    # v3 files migrate with the new sections defaulting empty.
+    assert len(memory.transitions) == 1
+    assert memory.macro_edges == []
+    assert memory.solved_routes == []
+
+    memory.begin((0xC8, 2, 9), ["right"], phase="overworld")
+    memory.finish((0xC8, 8, 9), now=now)
+    value = json.loads(path.read_text(encoding="utf-8"))
+
+    assert value["schema_version"] == 4
+    assert value["schema_version"] == (
+        pokemon_module.NAVIGATION_MEMORY_SCHEMA_VERSION
+    )
+    assert value["macro_edges"][0]["destination"] == [0xC8, 8, 9]
+    assert value["solved_routes"] == []
+
+    reloaded = NavigationMemory(path)
+    assert reloaded.macro_edges == memory.macro_edges
+
+    # Schemas older than v2 are still discarded entirely.
+    path.write_text(
+        json.dumps({"schema_version": 1, "macro_edges": value["macro_edges"]}),
+        encoding="utf-8",
+    )
+    discarded = NavigationMemory(path)
+    assert discarded.macro_edges == []
+    assert discarded.solved_routes == []
+
+
+def test_untried_frontier_lists_nearest_untried_entries_first(tmp_path):
+    memory = NavigationMemory(tmp_path / "navigation-memory.json")
+    now = datetime.now(timezone.utc)
+    memory.begin((0xC8, 10, 10), ["right"], phase="overworld")
+    memory.finish((0xC8, 11, 10), now=now)
+    memory.begin((0xC8, 10, 10), ["down"], phase="overworld")
+    memory.finish((0xC8, 10, 10), now=now)
+
+    frontier = memory.untried_frontier((0xC8, 10, 10))
+
+    entries = {(tuple(entry["origin"]), entry["direction"]) for entry in frontier}
+    assert ((10, 10), "right") not in entries
+    assert ((10, 10), "down") not in entries
+    assert ((10, 10), "up") in entries
+    assert ((10, 10), "left") in entries
+    assert ((11, 10), "up") in entries
+    assert frontier[0]["distance"] == 0
+    assert len(frontier) <= pokemon_module.NAVIGATION_FRONTIER_LIMIT
+    assert memory.untried_frontier(None) == []
+
+
+def test_route_to_composes_single_step_and_macro_edges(tmp_path):
+    memory = NavigationMemory(tmp_path / "navigation-memory.json")
+    now = datetime.now(timezone.utc)
+    memory.begin((0xC8, 5, 5), ["right"], phase="overworld")
+    memory.finish((0xC8, 6, 5), now=now)
+    memory.begin((0xC8, 6, 5), ["right"], phase="overworld")
+    memory.finish((0xC8, 12, 5), now=now)
+
+    steps = memory.route_to((0xC8, 5, 5), [12, 5])
+
+    assert steps == [
+        {
+            "origin": [0xC8, 5, 5],
+            "direction": "right",
+            "destination": [0xC8, 6, 5],
+        },
+        {
+            "origin": [0xC8, 6, 5],
+            "direction": "right",
+            "destination": [0xC8, 12, 5],
+        },
+    ]
+    assert memory.route_to((0xC8, 5, 5), [40, 40]) is None
+    assert memory.route_to((0xC8, 5, 5), [5, 5]) is None
+    assert memory.route_to((0xC8, 5, 5), [12]) is None
+    assert memory.route_to(None, [12, 5]) is None
+
+
+def test_graph_neighborhood_renders_forced_blocked_and_untried_lines(tmp_path):
+    memory = NavigationMemory(tmp_path / "navigation-memory.json")
+    now = datetime.now(timezone.utc)
+    memory.begin((0xC8, 2, 9), ["right"], phase="overworld")
+    memory.finish((0xC8, 8, 9), now=now)
+    memory.begin((0xC8, 2, 9), ["up"], phase="overworld")
+    memory.finish((0xC8, 2, 9), now=now)
+
+    frontier = memory.untried_frontier((0xC8, 2, 9))
+    text = memory.graph_neighborhood((0xC8, 2, 9), frontier)
+
+    assert "(2,9) +right: FORCED -> lands (8,9) [confirmed 1]" in text
+    assert "(2,9) +up: BLOCKED" in text
+    assert "(2,9) +down: UNTRIED" in text
+    assert memory.graph_neighborhood(None) is None
+
+
+def _solved_memory(tmp_path):
+    memory, now, b = _activated_memory(tmp_path)
+    memory.begin(b, ["down"], phase="overworld")
+    memory.finish((0xC9, 15, 14), now=now)
+    memory.begin((0xC9, 15, 14), ["down"], phase="overworld")
+    memory.finish((0xC9, 15, 16), now=now)
+    memory.begin((0xC9, 15, 16), ["down"], phase="overworld")
+    memory.finish((0x01, 5, 5), now=now)
+    return memory
+
+
+def test_solved_route_memoized_on_episode_exit_with_loop_erasure(tmp_path):
+    memory = _solved_memory(tmp_path)
+
+    assert memory.episode is None
+    assert len(memory.solved_routes) == 1
+    route = memory.solved_routes[0]
+    assert route["map_id"] == 0xC9
+    assert route["entrance"] == [15, 11]
+    # The a->b->a oscillation from the stuck phase is loop-erased; replay
+    # crosses the maze directly and ends with the exiting step.
+    assert [step["direction"] for step in route["steps"]] == ["down"] * 4
+    assert route["steps"][-1]["destination"] == [0x01, 5, 5]
+
+    steps = memory.solved_route_for((0xC9, 15, 11))
+    assert steps is not None
+    assert steps[0]["origin"] == [0xC9, 15, 11]
+    assert memory.solved_route_for((0xC9, 15, 13)) is None
+    assert memory.solved_route_for(None) is None
+
+    reloaded = NavigationMemory(memory.path)
+    assert reloaded.solved_routes == memory.solved_routes
+
+
 def test_collision_direction_gate_accepts_only_open_adjacent_tiles():
     collision = "\n".join(
         [
@@ -880,6 +1160,7 @@ def _research_runner(tmp_path):
     }
     runner.runtime_dir = tmp_path
     runner.args = SimpleNamespace(model="gpt-5.6-sol")
+    runner.steps_since_new_edge = 0
     runner.navigation_memory = NavigationMemory(
         tmp_path / "navigation-memory.json"
     )
@@ -1255,6 +1536,12 @@ def test_request_decision_keeps_episode_but_drops_puzzle_off_route(tmp_path):
     runner.puzzle_feedback = {"reason": "pending"}
     runner.navigation_mode = "puzzle"
     runner.stuck_web_research_enabled = False
+    runner.total_decisions = 0
+    runner.last_edge_count = 0
+    runner.steps_since_new_edge = 0
+    runner.edge_count_history = deque(
+        maxlen=pokemon_module.EDGE_LEARNING_WINDOW_DECISIONS + 1
+    )
     runner.history = []
     runner.pending_decision_id = None
     runner.decision_pending = False
@@ -1283,6 +1570,394 @@ def test_request_decision_keeps_episode_but_drops_puzzle_off_route(tmp_path):
     assert memory.episode is not None
     assert runner.stuck_decision_count == 5
     assert runner.puzzle_feedback == {"reason": "pending"}
+
+
+class _PlayerSpy:
+    def __init__(self):
+        self.replaced = []
+
+    def replace(self, buttons):
+        self.replaced.append(buttons)
+
+
+def _route_runner(tmp_path, memory=None):
+    runner = PokemonRunner.__new__(PokemonRunner)
+    runner.navigation_memory = memory or NavigationMemory(
+        tmp_path / "navigation-memory.json"
+    )
+    runner.committed_route = None
+    runner.solved_route_attempts = {}
+    runner.navigation_mode = "puzzle"
+    runner.control_generation = 0
+    runner.player = _PlayerSpy()
+    runner.settle_candidate = None
+    runner.settle_samples = 0
+    runner.position_settled = True
+    runner.last_decision_finished = 0.0
+    runner.status = {}
+    return runner
+
+
+def test_committed_route_executes_stepwise_and_aborts_on_surprise(tmp_path):
+    runner = _route_runner(tmp_path)
+    steps = [
+        {
+            "origin": [0xC8, 5, 5],
+            "direction": "right",
+            "destination": [0xC8, 6, 5],
+        },
+        {
+            "origin": [0xC8, 6, 5],
+            "direction": "up",
+            "destination": [0xC8, 6, 4],
+        },
+    ]
+    runner.committed_route = {
+        "steps": steps,
+        "index": 0,
+        "generation": 0,
+        "source": "route_target",
+    }
+
+    issued = runner._advance_committed_route(
+        {"map_id": 0xC8, "coordinates": {"x": 5, "y": 5}}
+    )
+
+    assert issued is True
+    assert runner.player.replaced == [["right"]]
+    assert runner.status["brain_status"] == "route"
+    assert runner.status["last_action"] == ["right"]
+    assert runner.status["committed_route"] == {
+        "source": "route_target",
+        "remaining": 1,
+    }
+    assert runner.position_settled is False
+    assert runner.last_decision_finished > 0
+
+    # An off-plan settled position (spinner surprise, wrong tile, wrong map)
+    # aborts so the same slot falls through to a fresh brain decision.
+    assert (
+        runner._advance_committed_route(
+            {"map_id": 0xC8, "coordinates": {"x": 9, "y": 5}}
+        )
+        is False
+    )
+    assert runner.committed_route is None
+    assert runner.status["committed_route"] is None
+
+    # Dialogue or battle text is a surprise even on the expected tile.
+    runner.committed_route = {
+        "steps": steps,
+        "index": 1,
+        "generation": 0,
+        "source": "route_target",
+    }
+    assert (
+        runner._advance_committed_route(
+            {
+                "map_id": 0xC8,
+                "coordinates": {"x": 6, "y": 5},
+                "screen_text": "A wild ZUBAT appeared!",
+            }
+        )
+        is False
+    )
+    assert runner.committed_route is None
+
+    # A control-generation change invalidates any committed plan.
+    runner.committed_route = {
+        "steps": steps,
+        "index": 1,
+        "generation": 0,
+        "source": "route_target",
+    }
+    runner.control_generation = 1
+    assert (
+        runner._advance_committed_route(
+            {"map_id": 0xC8, "coordinates": {"x": 6, "y": 5}}
+        )
+        is False
+    )
+    assert runner.committed_route is None
+
+
+def test_solved_route_replays_as_committed_route_once_per_visit(tmp_path):
+    memory = _solved_memory(tmp_path)
+    runner = _route_runner(tmp_path, memory=memory)
+    entered = {"map_id": 0xC9, "coordinates": {"x": 15, "y": 11}}
+
+    # Re-entry at the memoized entrance commits the stored route.
+    assert runner._advance_committed_route(entered) is True
+    assert runner.player.replaced == [["down"]]
+    assert runner.status["committed_route"]["source"] == "solved_route"
+
+    # A surprise aborts, and the same entrance never re-commits the route.
+    assert (
+        runner._advance_committed_route(
+            {"map_id": 0xC9, "coordinates": {"x": 3, "y": 3}}
+        )
+        is False
+    )
+    assert runner.committed_route is None
+    assert runner._advance_committed_route(entered) is False
+
+    # The block is process-lifetime: a map change (including the one a bad
+    # route's own eject would cause) must NOT re-arm replay at this entrance.
+    assert (
+        runner._advance_committed_route(
+            {"map_id": 0x01, "coordinates": {"x": 5, "y": 5}}
+        )
+        is False
+    )
+    assert runner._advance_committed_route(entered) is False
+
+    # Outside puzzle mode a stored route is never a control override.
+    runner.solved_route_attempts.clear()
+    runner.navigation_mode = "normal"
+    assert runner._advance_committed_route(entered) is False
+    runner.navigation_mode = "puzzle"
+    assert runner._advance_committed_route(entered) is True
+
+
+def test_route_target_decision_commits_verified_bfs_route(tmp_path):
+    memory = NavigationMemory(tmp_path / "navigation-memory.json")
+    now = datetime.now(timezone.utc)
+    memory.begin((0xC8, 5, 5), ["right"], phase="overworld")
+    memory.finish((0xC8, 6, 5), now=now)
+    memory.begin((0xC8, 6, 5), ["right"], phase="overworld")
+    memory.finish((0xC8, 12, 5), now=now)
+
+    runner = PokemonRunner.__new__(PokemonRunner)
+    runner.brain_results = queue.Queue()
+    runner.pending_decision_id = 4
+    runner.decision_pending = True
+    runner.control_generation = 0
+    runner.control_mode = "ai"
+    runner.emulator_pause_requested = False
+    runner.last_decision_requested = 10.0
+    runner.last_decision_finished = 5.0
+    runner.status = {
+        "game_state": {"map_id": 0xC8, "coordinates": {"x": 5, "y": 5}}
+    }
+    runner.navigation_memory = memory
+    runner.puzzle_feedback = None
+    runner.player = _PlayerSpy()
+    runner.history = []
+    runner.total_decisions = 0
+    runner.runtime_dir = tmp_path
+    runner.committed_route = None
+    runner.settle_candidate = None
+    runner.settle_samples = 0
+    runner.position_settled = False
+    runner.brain_results.put(
+        {
+            "decision_id": 4,
+            "generation": 0,
+            "navigation_mode": "puzzle",
+            "navigation_origin": [0xC8, 5, 5],
+            "force_precision": True,
+            "movement_context": True,
+            "decision": {
+                "phase": "overworld",
+                "observation": "spinner maze",
+                "objective": "ride to the learned far tile",
+                "reason": "frontier target",
+                "buttons": ["up"],
+                "checkpoint": False,
+                "action_mode": "precision",
+                "route_target": [12, 5],
+            },
+        }
+    )
+
+    runner._apply_brain_result()
+
+    # The brain named a graph tile; the harness committed the BFS route and
+    # issued only its first verified step.
+    assert runner.player.replaced == [["right"]]
+    assert runner.committed_route["index"] == 1
+    assert [
+        step["direction"] for step in runner.committed_route["steps"]
+    ] == ["right", "right"]
+    assert runner.status["committed_route"] == {
+        "source": "route_target",
+        "remaining": 1,
+    }
+
+
+def test_untried_frontier_outranks_web_research(monkeypatch, tmp_path):
+    started = []
+
+    class ThreadSpy:
+        def __init__(self, *, target, args, name, daemon):
+            started.append(name)
+
+        def start(self):
+            pass
+
+    monkeypatch.setattr(pokemon_module.threading, "Thread", ThreadSpy)
+    runner = _research_runner(tmp_path)
+    screenshot = tmp_path / "frame.png"
+    screenshot.write_bytes(b"synthetic")
+    game_state = {
+        "map_id": 0xC9,
+        "location": "Rocket Hideout B3F",
+        "coordinates": {"x": 15, "y": 11},
+    }
+
+    # R3: while nearby UNTRIED entries remain AND coverage is still learning
+    # new edges, the directive rung handles escalation and research waits.
+    runner._maybe_start_web_research(
+        screenshot=screenshot,
+        game_state=game_state,
+        route_guidance=None,
+        navigation_guidance=None,
+        stuck_assessment=_stuck_episode(settled_transitions=9),
+        frontier=[{"origin": [15, 10], "direction": "up", "distance": 1}],
+    )
+    assert started == []
+
+    # Coverage stall: a perpetually non-empty frontier must not starve the
+    # ladder — once no new edge has been learned for FRONTIER_STALL_DECISIONS
+    # decisions, research fires despite remaining UNTRIED entries.
+    runner.steps_since_new_edge = pokemon_module.FRONTIER_STALL_DECISIONS
+    runner._maybe_start_web_research(
+        screenshot=screenshot,
+        game_state=game_state,
+        route_guidance=None,
+        navigation_guidance=None,
+        stuck_assessment=_stuck_episode(settled_transitions=9),
+        frontier=[{"origin": [15, 10], "direction": "up", "distance": 1}],
+    )
+    assert len(started) == 1
+    runner.web_research_inflight = False
+    runner.web_research_started = {}
+    runner.steps_since_new_edge = 0
+
+    started.clear()
+    # An exhausted frontier lets the research rung fire.
+    runner._maybe_start_web_research(
+        screenshot=screenshot,
+        game_state=game_state,
+        route_guidance=None,
+        navigation_guidance=None,
+        stuck_assessment=_stuck_episode(settled_transitions=9),
+        frontier=[],
+    )
+    assert started == ["pokemon-web-research"]
+
+
+def test_puzzle_decision_state_carries_neighborhood_directive_and_counters(
+    tmp_path,
+):
+    memory, now, b = _activated_memory(tmp_path)
+    a = (0xC9, 15, 11)
+    # Two more oscillations make the endpoint revisit a second active signal.
+    memory.begin(b, ["up"], phase="overworld")
+    memory.finish(a, now=now)
+    memory.begin(a, ["down"], phase="overworld")
+    memory.finish(b, now=now)
+    runner = PokemonRunner.__new__(PokemonRunner)
+    runner.screens_dir = tmp_path
+    runner.run_id = "test"
+    runner.decision_sequence = 0
+    runner.control_generation = 0
+    runner.control_mode = "ai"
+    runner.emulator_pause_requested = False
+    runner.status = {"phase": "overworld", "model_calls": 0}
+    runner.navigation_memory = memory
+    runner.decision_positions = deque(maxlen=6)
+    runner.stuck_decision_count = 2
+    runner.puzzle_feedback = None
+    runner.navigation_mode = "puzzle"
+    runner.stuck_web_research_enabled = False
+    runner.total_decisions = 7
+    runner.last_edge_count = 0
+    runner.steps_since_new_edge = 3
+    runner.edge_count_history = deque(
+        maxlen=pokemon_module.EDGE_LEARNING_WINDOW_DECISIONS + 1
+    )
+    runner.history = []
+    runner.pending_decision_id = None
+    runner.decision_pending = False
+    runner.brain_requests = queue.Queue()
+    research_calls = []
+    runner._maybe_start_web_research = (
+        lambda **kwargs: research_calls.append(kwargs)
+    )
+    runner._crowd_route_advisory = lambda **kwargs: None
+    image = SimpleNamespace(
+        save=lambda path, format=None: Path(path).write_bytes(b"png")
+    )
+    collision = "\n".join(
+        "....P....." if index == 4 else ".........." for index in range(9)
+    )
+    game_state = {"map_id": 0xC9, "coordinates": {"x": b[1], "y": b[2]}}
+
+    runner._request_decision(image, game_state, collision)
+
+    request = runner.brain_requests.get_nowait()
+    state = request["game_state"]
+    assert state["navigation_mode"] == "puzzle"
+    counters = state["step_counters"]
+    assert counters["global_actions"] == 7
+    assert counters["decisions_this_episode"] == 3
+    # Two distinct learned edges against a zero baseline reset the stall
+    # counter this decision.
+    assert counters["steps_since_new_edge"] == 0
+    assert "UNTRIED" in state["graph_neighborhood"]
+    assert "steps this episode:" in state["graph_neighborhood"]
+    assert "new edges learned in last" in state["graph_neighborhood"]
+    assert state["frontier_directive"].startswith("DIRECTIVE")
+    assert "(" in state["frontier_directive"]
+    # The computed frontier reaches the research gate (R3 ordering).
+    assert research_calls and research_calls[0]["frontier"]
+
+
+def test_prompt_stamps_step_counters_with_time_blindness_line():
+    prompt = CopilotBrain._prompt(
+        {
+            "location": "Rocket Hideout B3F",
+            "step_counters": {
+                "global_actions": 4210,
+                "decisions_this_episode": 37,
+                "steps_since_new_edge": 22,
+            },
+        },
+        None,
+        [],
+    )
+
+    assert '"global_actions":4210' in prompt
+    assert "no sense of elapsed time" in prompt
+    assert "change strategy" in prompt
+    # The counters render once in their own section, not duplicated inside
+    # the RAM snapshot JSON.
+    assert prompt.count("4210") == 1
+
+    plain = CopilotBrain._prompt({"location": "Pallet Town"}, None, [])
+    assert "Step counters" not in plain
+
+
+def test_normalize_brain_decision_accepts_optional_route_target():
+    decision = normalize_brain_decision(
+        '{"buttons":["up"],"route_target":[12,5]}'
+    )
+    assert decision["route_target"] == [12, 5]
+
+    for bad in ("[12]", "[300,5]", '["12",5]', "true", "[true,false]"):
+        decision = normalize_brain_decision(
+            f'{{"buttons":["up"],"route_target":{bad}}}'
+        )
+        assert "route_target" not in decision
+
+
+def test_system_prompt_documents_frontier_and_route_target_contract():
+    assert "frontier_directive" in GAME_SYSTEM_PROMPT
+    assert "graph_neighborhood" in GAME_SYSTEM_PROMPT
+    assert '"route_target":[x,y]' in GAME_SYSTEM_PROMPT
+    assert "You have no sense of" in GAME_SYSTEM_PROMPT
+    assert "elapsed time" in GAME_SYSTEM_PROMPT
 
 
 def test_control_cursor_initializes_at_eof_and_never_replays(tmp_path):
