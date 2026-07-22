@@ -14836,32 +14836,42 @@ class PokemonRunner:
         if self.auto_coverage_rides >= AUTO_COVERAGE_EPISODE_LIMIT:
             return None
         toward = PUZZLE_COVERAGE_WAYPOINTS.get(position[0])
-        for entry in self.navigation_memory.untried_frontier(
-            position, toward=toward
-        ):
-            target = entry["origin"]
-            probe = {
-                "origin": [position[0], target[0], target[1]],
-                "direction": entry["direction"],
-                "destination": None,
-            }
-            if [position[1], position[2]] == target:
-                steps = [probe]
-            else:
-                path = self.navigation_memory.route_to(position, target)
-                if path is None:
-                    continue
-                steps = path + [probe]
-            self.auto_coverage_rides += 1
-            self.status["auto_coverage_rides"] = self.auto_coverage_rides
-            route = {
-                "steps": steps,
-                "index": 0,
-                "generation": self.control_generation,
-                "source": "frontier_coverage",
-            }
-            self.committed_route = route
-            return route
+        # Waypoint-biased candidates first; when every near-waypoint entry is
+        # an unreachable wall (the capped list can fill with them and starve
+        # coverage entirely), fall back to plain nearest-first exploration so
+        # the mapper keeps expanding the graph from wherever RED stands.
+        candidate_lists = [
+            self.navigation_memory.untried_frontier(position, toward=toward)
+        ]
+        if toward is not None:
+            candidate_lists.append(
+                self.navigation_memory.untried_frontier(position)
+            )
+        for entries in candidate_lists:
+            for entry in entries:
+                target = entry["origin"]
+                probe = {
+                    "origin": [position[0], target[0], target[1]],
+                    "direction": entry["direction"],
+                    "destination": None,
+                }
+                if [position[1], position[2]] == target:
+                    steps = [probe]
+                else:
+                    path = self.navigation_memory.route_to(position, target)
+                    if path is None:
+                        continue
+                    steps = path + [probe]
+                self.auto_coverage_rides += 1
+                self.status["auto_coverage_rides"] = self.auto_coverage_rides
+                route = {
+                    "steps": steps,
+                    "index": 0,
+                    "generation": self.control_generation,
+                    "source": "frontier_coverage",
+                }
+                self.committed_route = route
+                return route
         return None
 
     def _advance_committed_route(self, game_state: dict[str, Any]) -> bool:

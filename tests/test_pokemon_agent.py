@@ -3909,3 +3909,24 @@ def test_untried_frontier_waypoint_bias_targets_exit_corner(tmp_path):
 
     toward_stairs = memory.untried_frontier((0xC9, 11, 10), toward=(19, 18))
     assert toward_stairs[0]["origin"] in ([18, 17], [17, 17])
+
+
+def test_auto_coverage_falls_back_when_waypoint_entries_unreachable(tmp_path):
+    memory = NavigationMemory(tmp_path / "navigation-memory.json")
+    now = datetime.now(timezone.utc)
+    # One walked tile near the player; an isolated known tile near the trusted
+    # waypoint that BFS cannot reach (no connecting edges).
+    memory.begin((0xC9, 10, 10), ["right"], phase="overworld")
+    memory.finish((0xC9, 11, 10), now=now)
+    memory.begin((0xC9, 18, 17), ["down"], phase="overworld")
+    memory.finish((0xC9, 18, 17), now=now)  # no_progress: isolated tile
+
+    runner = _coverage_runner(tmp_path, memory)
+    issued = runner._advance_committed_route(
+        {"map_id": 0xC9, "coordinates": {"x": 11, "y": 10}}
+    )
+
+    # Near-waypoint entries are unreachable walls; the fallback list still
+    # commits a probe from the player's own reachable neighborhood.
+    assert issued is True
+    assert runner.status["auto_coverage_rides"] == 1
