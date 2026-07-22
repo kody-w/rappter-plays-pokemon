@@ -129,56 +129,6 @@
         "Rainbow"
       ],
       "chapter": "Beyond the Rainbow Badge",
-      "coverage_gap_before": true,
-      "highest_level": 40,
-      "id": "event-000344",
-      "kind": "progress",
-      "location": "Rocket Hideout B3F",
-      "observed_at": "2026-07-18T16:10:29.551920Z",
-      "party_size": 3,
-      "play_time_seconds": 63075,
-      "pokedex": {
-        "caught": 5,
-        "seen": 59
-      },
-      "sequence": 344,
-      "summary": "A retained progress checkpoint records the autonomous run in Rocket Hideout B3F. The retained state shows 4 badges, 5 caught Pokémon, and a party of 3.",
-      "title": "Checkpoint in Rocket Hideout B3F",
-      "video": null
-    },
-    {
-      "badges": [
-        "Boulder",
-        "Cascade",
-        "Thunder",
-        "Rainbow"
-      ],
-      "chapter": "Beyond the Rainbow Badge",
-      "coverage_gap_before": false,
-      "highest_level": 40,
-      "id": "event-000345",
-      "kind": "progress",
-      "location": "Rocket Hideout B3F",
-      "observed_at": "2026-07-18T16:20:29.603526Z",
-      "party_size": 3,
-      "play_time_seconds": 63675,
-      "pokedex": {
-        "caught": 5,
-        "seen": 59
-      },
-      "sequence": 345,
-      "summary": "A retained progress checkpoint records the autonomous run in Rocket Hideout B3F. The retained state shows 4 badges, 5 caught Pokémon, and a party of 3.",
-      "title": "Checkpoint in Rocket Hideout B3F",
-      "video": null
-    },
-    {
-      "badges": [
-        "Boulder",
-        "Cascade",
-        "Thunder",
-        "Rainbow"
-      ],
-      "chapter": "Beyond the Rainbow Badge",
       "coverage_gap_before": false,
       "highest_level": 40,
       "id": "event-000346",
@@ -13402,6 +13352,31 @@
         "Rainbow"
       ],
       "chapter": "Beyond the Rainbow Badge",
+      "coverage_gap_before": true,
+      "highest_level": 41,
+      "id": "event-001056",
+      "kind": "journey",
+      "location": "Lavender Town",
+      "observed_at": "2026-07-21T05:53:54.170792Z",
+      "party_size": 3,
+      "play_time_seconds": 285136,
+      "pokedex": {
+        "caught": 5,
+        "seen": 62
+      },
+      "sequence": 1056,
+      "summary": "By the next retained checkpoint, the run had moved from Celadon City to Lavender Town. The retained state shows 4 badges, 5 caught Pokémon, and a party of 3.",
+      "title": "Reaching Lavender Town",
+      "video": null
+    },
+    {
+      "badges": [
+        "Boulder",
+        "Cascade",
+        "Thunder",
+        "Rainbow"
+      ],
+      "chapter": "Beyond the Rainbow Badge",
       "coverage_gap_before": false,
       "highest_level": 41,
       "id": "event-001061",
@@ -13445,6 +13420,31 @@
       },
       "sequence": 1062,
       "summary": "The run had moved from Route 8 to Game Corner. The retained state shows 4 badges, 5 caught Pokémon, and a party of 3.",
+      "title": "Reaching Game Corner",
+      "video": null
+    },
+    {
+      "badges": [
+        "Boulder",
+        "Cascade",
+        "Thunder",
+        "Rainbow"
+      ],
+      "chapter": "Beyond the Rainbow Badge",
+      "coverage_gap_before": false,
+      "highest_level": 41,
+      "id": "event-001063",
+      "kind": "journey",
+      "location": "Game Corner",
+      "observed_at": "2026-07-21T06:11:26.567954Z",
+      "party_size": 3,
+      "play_time_seconds": 286187,
+      "pokedex": {
+        "caught": 5,
+        "seen": 62
+      },
+      "sequence": 1063,
+      "summary": "The run had moved from Lavender Town to Game Corner. The retained state shows 4 badges, 5 caught Pokémon, and a party of 3.",
       "title": "Reaching Game Corner",
       "video": null
     },
@@ -14377,7 +14377,7 @@
       }
     }
   ],
-  "revision": "sha256:869c14bd41ca685da4786d779390b54d22fc93bc110fe13d3455ff25925bda4f",
+  "revision": "sha256:bc524654ac8112a0fa198a872eced3a6fd366d20a37c9cf5bf1e96349ec08d19",
   "schema_version": 1,
   "status": "in_progress",
   "story_id": "rappter-plays-pokemon-main-run",
