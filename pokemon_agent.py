@@ -201,7 +201,11 @@ PUZZLE_COVERAGE_WAYPOINTS = {
     # concentrate on the entries closest to where the solution must be,
     # instead of nearest-to-player thrashing.
     0xC8: (21, 8),
-    0xC9: (19, 18),
+    # B3F: the corridor to the (19,18) stairs runs through the southwest
+    # maze then east along the southern band (walkthrough topology). The
+    # mouth at ~(13,18) is the bias point; (19,18) itself stays inside the
+    # waypoint radius of it, so the whole approach band qualifies.
+    0xC9: (13, 18),
 }
 SOLVED_ROUTE_ATTEMPT_BLOCK_LIMIT = 64
 GRAPH_NEIGHBORHOOD_LINE_LIMIT = 24
@@ -10414,11 +10418,15 @@ def rocket_hideout_route_guidance(
         if map_id == 0xC9:
             return prefix + (
                 "Stage: reach B4F for the Lift Key. The required stairs are "
-                "(19,18); (25,6) returns to B2F. From the entrance at (25,6), "
-                "go down once, west to (20,7), then south to (20,9); never "
-                "descend at x>=22. The tall eastern doorway is exit-only and "
-                "cannot be entered. Near the final stairs, use one input then "
-                "reobserve until (19,18) transitions to B4F."
+                "(19,18); (25,6) returns to B2F. Walkthrough topology: the "
+                "stairs are reached through the SOUTHWEST spinner maze — work "
+                "south along the western rooms (a Rare Candy lies on the way), "
+                "then east along the southern band to (19,18). The "
+                "north/central spinner web is a decoy that always drains back "
+                "to (17,15)/(16,11); once an edge is learned, never re-ride "
+                "it hoping for a different landing. Never descend at x>=22. "
+                "Near the final stairs, use one input then reobserve until "
+                "(19,18) transitions to B4F."
             )
         if map_id == 0xCA:
             return prefix + (
