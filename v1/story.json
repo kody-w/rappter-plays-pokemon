@@ -129,35 +129,6 @@
         "Rainbow"
       ],
       "chapter": "Beyond the Rainbow Badge",
-      "coverage_gap_before": true,
-      "highest_level": 40,
-      "id": "event-000479",
-      "kind": "journey",
-      "location": "Rocket Hideout B1F",
-      "observed_at": "2026-07-19T05:25:16.056298Z",
-      "party_size": 3,
-      "play_time_seconds": 110709,
-      "pokedex": {
-        "caught": 5,
-        "seen": 59
-      },
-      "sequence": 479,
-      "summary": "By the next retained checkpoint, the run had moved from Celadon Gym to Rocket Hideout B1F. The retained state shows 4 badges, 5 caught Pokémon, and a party of 3.",
-      "title": "Reaching Rocket Hideout B1F",
-      "video": {
-        "end_seconds": 19795,
-        "start_seconds": 19645,
-        "youtube_id": "lAi3T3V_-50"
-      }
-    },
-    {
-      "badges": [
-        "Boulder",
-        "Cascade",
-        "Thunder",
-        "Rainbow"
-      ],
-      "chapter": "Beyond the Rainbow Badge",
       "coverage_gap_before": false,
       "highest_level": 40,
       "id": "event-000480",
@@ -13401,6 +13372,35 @@
         "Rainbow"
       ],
       "chapter": "Beyond the Rainbow Badge",
+      "coverage_gap_before": true,
+      "highest_level": 41,
+      "id": "event-001161",
+      "kind": "journey",
+      "location": "Rocket Hideout B1F",
+      "observed_at": "2026-07-21T16:27:06.162221Z",
+      "party_size": 3,
+      "play_time_seconds": 323114,
+      "pokedex": {
+        "caught": 5,
+        "seen": 62
+      },
+      "sequence": 1161,
+      "summary": "By the next retained checkpoint, the run had moved from Celadon City to Rocket Hideout B1F. The retained state shows 4 badges, 5 caught Pokémon, and a party of 3.",
+      "title": "Reaching Rocket Hideout B1F",
+      "video": {
+        "end_seconds": 5159,
+        "start_seconds": 5009,
+        "youtube_id": "xJttw4139FU"
+      }
+    },
+    {
+      "badges": [
+        "Boulder",
+        "Cascade",
+        "Thunder",
+        "Rainbow"
+      ],
+      "chapter": "Beyond the Rainbow Badge",
       "coverage_gap_before": false,
       "highest_level": 41,
       "id": "event-001163",
@@ -14293,7 +14293,7 @@
       }
     }
   ],
-  "revision": "sha256:9c663dc933e1c9e5648b00910f7bd20ab799ce94f1f387d9b423e25b7b63619e",
+  "revision": "sha256:d98362b6b70e0ea8cb259a238fd698ef6eb5aa4e70bb7bbd61fe4bf7f57121a9",
   "schema_version": 1,
   "status": "in_progress",
   "story_id": "rappter-plays-pokemon-main-run",
