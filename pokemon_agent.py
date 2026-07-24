@@ -177,7 +177,63 @@ RESTART_REQUEST_NAME = "restart-request.json"
 YOUTUBE_CHAT_ADVISORY_NAME = "youtube-chat-advisory.json"
 NAVIGATION_MEMORY_NAME = "navigation-memory.json"
 WEB_RESEARCH_NAME = "web-research.json"
-NAVIGATION_MEMORY_SCHEMA_VERSION = 2
+EVIDENCE_DIRECTORY_NAME = "evidence"
+EVIDENCE_SCHEMA_VERSION = 1
+EVIDENCE_RECORD_MAX_BYTES = 8192
+IMPROVEMENT_DIRECTIVE_NAME = "improvement-directive.json"
+MAX_IMPROVEMENT_DIRECTIVE_BYTES = 4096
+NAVIGATION_MEMORY_SCHEMA_VERSION = 4
+NAVIGATION_MEMORY_MIGRATABLE_SCHEMA_VERSIONS = {2, 3, 4}
+NAVIGATION_TRANSITION_LIMIT = 40
+NAVIGATION_TRANSITION_PATH_LIMIT = 12
+NAVIGATION_EPISODE_REGION_LIMIT = 64
+NAVIGATION_MACRO_EDGE_LIMIT = 256
+NAVIGATION_SOLVED_ROUTE_LIMIT = 8
+NAVIGATION_SOLVED_ROUTE_STEP_LIMIT = 48
+NAVIGATION_FRONTIER_RADIUS = 6
+NAVIGATION_FRONTIER_WAYPOINT_RADIUS = 12
+NAVIGATION_FRONTIER_LIMIT = 12
+NAVIGATION_ROUTE_STEP_LIMIT = 24
+FRONTIER_DIRECTIVE_CANDIDATES = 3
+FRONTIER_STALL_DECISIONS = 12
+NAVIGATION_SESSION_TRIED_LIMIT = 8192
+NAVIGATION_WALK_EDGE_LIMIT = 4096
+SOLVED_ROUTE_ATTEMPT_LIMIT = 64
+AUTO_COVERAGE_STALL_DECISIONS = 3
+AUTO_COVERAGE_EPISODE_LIMIT = 400
+PUZZLE_COVERAGE_WAYPOINTS = {
+    # Trusted stair/exit waypoints (same coordinates the authoritative
+    # rocket_hideout_route_guidance text already asserts): coverage probes
+    # concentrate on the entries closest to where the solution must be,
+    # instead of nearest-to-player thrashing.
+    0xC8: (21, 8),
+    # B3F: bias straight at the stairs. With the 12-tile waypoint radius the
+    # whole southern approach band qualifies — including the southwest pocket
+    # at (13,17) — while the entries adjacent to the stairs column (e.g. the
+    # long-untried (20,15)+down) rank first instead of drowning behind
+    # closer-to-mouth wall probes.
+    0xC9: (19, 18),
+}
+SOLVED_ROUTE_ATTEMPT_BLOCK_LIMIT = 64
+GRAPH_NEIGHBORHOOD_LINE_LIMIT = 24
+EDGE_LEARNING_WINDOW_DECISIONS = 10
+STEP_COUNTER_LIMIT = 9999
+SETTLE_SAMPLE_FRAMES = 3
+SETTLE_SAMPLE_COUNT = 12
+SETTLE_MIN_SECONDS = 0.6
+STUCK_ENDPOINT_WINDOW = 20
+STUCK_ENDPOINT_REPEATS = 3
+STUCK_NOVELTY_WINDOW = 16
+STUCK_NOVELTY_MAX_UNIQUE = 8
+STUCK_EPISODE_DISCOVERY_EXIT = 6
+PUZZLE_RESEARCH_SETTLED_TRANSITIONS = 4
+PUZZLE_RESEARCH_REPEATED_EDGES = 2
+CONTROL_CURSOR_NAME = "control-cursor.json"
+AUTOMATION_PAUSE_MAX_SECONDS = 15 * 60
+AUTOMATION_PAUSE_GRACE_SECONDS = 30
+AGENT_PAUSE_LEASE_SECONDS = 5 * 60
+PAUSE_KINDS = {"automation", "operator_hold"}
+CARDINAL_BUTTONS = ("up", "down", "left", "right")
 W_NUM_BAG_ITEMS = 0xD31D
 W_BAG_ITEMS = 0xD31E
 BAG_ITEM_CAPACITY = 20
@@ -6140,6 +6196,118 @@ def atomic_write_json(path: Path, value: dict[str, Any]) -> None:
     fsync_directory(path.parent)
 
 
+def append_private_jsonl(path: Path, value: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    os.chmod(path.parent, 0o700)
+    payload = (
+        json.dumps(value, separators=(",", ":"), sort_keys=True) + "\n"
+    ).encode("utf-8")
+    if len(payload) > EVIDENCE_RECORD_MAX_BYTES:
+        raise ValueError("Evidence record exceeds the private journal limit")
+    descriptor = os.open(
+        path,
+        os.O_WRONLY | os.O_CREAT | os.O_APPEND,
+        0o600,
+    )
+    try:
+        written = os.write(descriptor, payload)
+        if written != len(payload):
+            raise OSError("Evidence journal write was incomplete")
+    finally:
+        os.close(descriptor)
+    os.chmod(path, 0o600)
+
+
+def execution_evidence_state(game_state: Any) -> dict[str, Any]:
+    state = game_state if isinstance(game_state, dict) else {}
+    coordinates = state.get("coordinates")
+    position = (
+        {
+            "x": coordinates.get("x"),
+            "y": coordinates.get("y"),
+        }
+        if (
+            isinstance(coordinates, dict)
+            and all(
+                not isinstance(coordinates.get(axis), bool)
+                and isinstance(coordinates.get(axis), int)
+                and 0 <= coordinates.get(axis) <= 255
+                for axis in ("x", "y")
+            )
+        )
+        else None
+    )
+    badges = state.get("badges")
+    badges = (
+        [str(badge)[:24] for badge in badges[:8]]
+        if isinstance(badges, list)
+        else []
+    )
+    key_items = state.get("key_items")
+    key_items = key_items if isinstance(key_items, dict) else {}
+    pokedex = state.get("pokedex")
+    pokedex = pokedex if isinstance(pokedex, dict) else {}
+    play_time = state.get("play_time")
+    game_time_seconds = None
+    if isinstance(play_time, dict):
+        parts = [play_time.get(part) for part in ("hours", "minutes", "seconds")]
+        if all(
+            not isinstance(value, bool)
+            and isinstance(value, int)
+            and value >= 0
+            for value in parts
+        ):
+            game_time_seconds = parts[0] * 3600 + parts[1] * 60 + parts[2]
+    return {
+        "phase": str(state.get("phase") or "")[:24] or None,
+        "location": str(state.get("location") or "")[:80] or None,
+        "map_id": (
+            state.get("map_id")
+            if (
+                not isinstance(state.get("map_id"), bool)
+                and isinstance(state.get("map_id"), int)
+                and 0 <= state.get("map_id") <= 255
+            )
+            else None
+        ),
+        "coordinates": position,
+        "badges": badges,
+        "party_size": (
+            state.get("party_count")
+            if (
+                not isinstance(state.get("party_count"), bool)
+                and isinstance(state.get("party_count"), int)
+                and 0 <= state.get("party_count") <= 6
+            )
+            else None
+        ),
+        "pokedex_seen": (
+            pokedex.get("seen")
+            if isinstance(pokedex.get("seen"), int)
+            and not isinstance(pokedex.get("seen"), bool)
+            else None
+        ),
+        "pokedex_caught": (
+            pokedex.get("caught")
+            if isinstance(pokedex.get("caught"), int)
+            and not isinstance(pokedex.get("caught"), bool)
+            else None
+        ),
+        "lift_key": (
+            key_items.get("lift_key")
+            if isinstance(key_items.get("lift_key"), bool)
+            else None
+        ),
+        "silph_scope": (
+            key_items.get("silph_scope")
+            if isinstance(key_items.get("silph_scope"), bool)
+            else None
+        ),
+        "hall_of_fame": state.get("hall_of_fame") is True,
+        "game_time_seconds": game_time_seconds,
+    }
+
+
 def atomic_write_bytes(path: Path, payload: bytes, mode: int = 0o600) -> None:
     path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
     temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
@@ -6187,6 +6355,125 @@ def _strict_utc_timestamp(value: Any) -> Optional[datetime]:
 
 def _utc_text(value: datetime) -> str:
     return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def read_improvement_directive(
+    runtime_dir: Path,
+    *,
+    run_id: Optional[str] = None,
+    now: Optional[datetime] = None,
+) -> Optional[dict[str, Any]]:
+    path = runtime_dir / IMPROVEMENT_DIRECTIVE_NAME
+    try:
+        metadata = path.lstat()
+        if (
+            path.is_symlink()
+            or not stat.S_ISREG(metadata.st_mode)
+            or metadata.st_uid != os.getuid()
+            or stat.S_IMODE(metadata.st_mode) & 0o077
+            or not 1 <= metadata.st_size <= MAX_IMPROVEMENT_DIRECTIVE_BYTES
+        ):
+            return None
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (
+        FileNotFoundError,
+        json.JSONDecodeError,
+        UnicodeDecodeError,
+        OSError,
+    ):
+        return None
+    if not isinstance(value, dict) or set(value) != {
+        "schema_version",
+        "directive_id",
+        "created_at",
+        "expires_at",
+        "verdict",
+        "strategy",
+        "evidence",
+        "applies_to_run",
+    }:
+        return None
+    evidence = value.get("evidence")
+    marker = evidence.get("progress_marker") if isinstance(evidence, dict) else None
+    if (
+        value.get("schema_version") != EVIDENCE_SCHEMA_VERSION
+        or not isinstance(value.get("directive_id"), str)
+        or not re.fullmatch(r"sha256:[0-9a-f]{64}", value["directive_id"])
+        or _strict_utc_timestamp(value.get("created_at")) is None
+        or (
+            expires_at := _strict_utc_timestamp(value.get("expires_at"))
+        ) is None
+        or expires_at <= (now or datetime.now(timezone.utc))
+        or value.get("verdict")
+        not in {
+            "collect_more_data",
+            "progress",
+            "stable",
+            "instrumentation",
+            "memory",
+            "planning",
+            "reliability",
+        }
+        or value.get("strategy")
+        not in {
+            "observe",
+            "normal",
+            "preserve_graph",
+            "probe_frontier",
+            "escalate_research",
+        }
+        or not isinstance(evidence, dict)
+        or set(evidence)
+        != {
+            "execution_records",
+            "recent_stuck_records",
+            "recent_route_records",
+            "stuck_decisions",
+            "walk_edges",
+            "macro_edges",
+            "progress_marker",
+        }
+        or any(
+            isinstance(evidence.get(field), bool)
+            or not isinstance(evidence.get(field), int)
+            or not 0 <= evidence[field] <= 10_000_000
+            for field in (
+                "execution_records",
+                "recent_stuck_records",
+                "recent_route_records",
+                "stuck_decisions",
+                "walk_edges",
+                "macro_edges",
+            )
+        )
+        or not isinstance(marker, dict)
+        or set(marker)
+        != {
+            "badges",
+            "lift_key",
+            "silph_scope",
+            "pokedex_caught",
+            "hall_of_fame",
+        }
+        or (
+            value.get("applies_to_run") is not None
+            and value.get("applies_to_run") != run_id
+        )
+    ):
+        return None
+    return {
+        "directive_id": value["directive_id"],
+        "verdict": value["verdict"],
+        "strategy": value["strategy"],
+        "evidence": {
+            "execution_records": evidence["execution_records"],
+            "recent_stuck_records": evidence["recent_stuck_records"],
+            "stuck_decisions": evidence["stuck_decisions"],
+            "walk_edges": evidence["walk_edges"],
+            "macro_edges": evidence["macro_edges"],
+        },
+        "expires_at": value["expires_at"],
+    }
 
 
 def read_youtube_chat_advisory(
@@ -6343,18 +6630,79 @@ def collision_grid_valid(collision_map: Any) -> bool:
     )
 
 
+def _valid_position_triplet(value: Any) -> bool:
+    return (
+        isinstance(value, list)
+        and len(value) == 3
+        and all(
+            not isinstance(item, bool)
+            and isinstance(item, int)
+            and 0 <= item <= 255
+            for item in value
+        )
+    )
+
+
+def _valid_step_list(value: Any, limit: int) -> bool:
+    return (
+        isinstance(value, list)
+        and len(value) <= limit
+        and all(
+            isinstance(step, list)
+            and len(step) == 2
+            and all(
+                not isinstance(item, bool)
+                and isinstance(item, int)
+                and 0 <= item <= 255
+                for item in step
+            )
+            for step in value
+        )
+    )
+
+
+def _valid_route_step(value: Any) -> bool:
+    return (
+        isinstance(value, dict)
+        and set(value) == {"origin", "direction", "destination"}
+        and _valid_position_triplet(value.get("origin"))
+        and value.get("direction") in CARDINAL_BUTTONS
+        and _valid_position_triplet(value.get("destination"))
+    )
+
+
 class NavigationMemory:
     def __init__(self, path: Path):
         self.path = path
         self.attempts: list[dict[str, Any]] = []
         self.trail: list[tuple[int, int, int]] = []
         self.floor_trail: list[int] = []
+        self.transitions: list[dict[str, Any]] = []
+        self.macro_edges: list[dict[str, Any]] = []
+        # Single-step walk edges: (map, origin, direction) -> destination for
+        # confirmed one-tile moves. Persisted like macro-edges (bounded,
+        # never age-expired) — the transition FIFO alone destroys BFS
+        # routability as coverage grows: a tile walked once becomes known-
+        # but-unreachable the moment its inbound edge ages out of the window.
+        self.walk_edges: dict[tuple[int, int, int, str], list[int]] = {}
+        self.solved_routes: list[dict[str, Any]] = []
+        self.episode: Optional[dict[str, Any]] = None
         self.pending: Optional[dict[str, Any]] = None
+        # Session-lifetime deduped (map, x, y, direction) tried store:
+        # bounded but never expired by transition-list FIFO churn, so the
+        # untried frontier converges and distinct_edge_count is monotonic.
+        self.session_tried: dict[tuple[int, int, int, str], None] = {}
         self._load()
 
     def _load(self) -> None:
         value = read_json(self.path)
-        if value.get("schema_version") != NAVIGATION_MEMORY_SCHEMA_VERSION:
+        # Schema v2/v3 files migrate in place (missing sections default
+        # empty: v2 lacks transitions/episode, v3 lacks macro_edges and
+        # solved_routes); only unknown schemas are discarded.
+        if (
+            value.get("schema_version")
+            not in NAVIGATION_MEMORY_MIGRATABLE_SCHEMA_VERSIONS
+        ):
             return
         current = datetime.now(timezone.utc)
         cutoff = current - timedelta(seconds=NAVIGATION_MEMORY_MAX_AGE_SECONDS)
@@ -6362,6 +6710,27 @@ class NavigationMemory:
         attempts = value.get("attempts")
         trail = value.get("trail")
         floor_trail = value.get("floor_trail")
+        self._load_transitions(value.get("transitions"), cutoff)
+        self._load_macro_edges(value.get("macro_edges"))
+        self._load_walk_edges(value.get("walk_edges"))
+        self._load_solved_routes(value.get("solved_routes"))
+        self._load_episode(value.get("episode"), cutoff)
+        # Seed the session tried-store from every persisted (origin,
+        # direction) fact. Without this, a process restart makes well-known
+        # tiles look "new" again: the stall counter never rises and
+        # auto-frontier-coverage never engages (observed live).
+        for item in self.transitions:
+            origin = item["origin"]
+            self.session_tried[
+                (origin[0], origin[1], origin[2], item["direction"])
+            ] = None
+        for item in self.macro_edges:
+            origin = item["origin"]
+            self.session_tried[
+                (origin[0], origin[1], origin[2], item["direction"])
+            ] = None
+        for key in self.walk_edges:
+            self.session_tried[key] = None
         if isinstance(attempts, list):
             for item in attempts[-NAVIGATION_MEMORY_MAX_ATTEMPTS:]:
                 if not isinstance(item, dict):
@@ -6433,6 +6802,193 @@ class NavigationMemory:
                 )
             ]
 
+    def _load_transitions(self, transitions: Any, cutoff: datetime) -> None:
+        if not isinstance(transitions, list):
+            return
+        for item in transitions[-NAVIGATION_TRANSITION_LIMIT:]:
+            if not isinstance(item, dict) or set(item) != {
+                "origin",
+                "direction",
+                "destination",
+                "path",
+                "outcome",
+                "at",
+            }:
+                continue
+            at = _strict_utc_timestamp(item.get("at"))
+            path = item.get("path")
+            if (
+                not _valid_position_triplet(item.get("origin"))
+                or item.get("direction") not in CARDINAL_BUTTONS
+                or not _valid_position_triplet(item.get("destination"))
+                or not isinstance(path, list)
+                or len(path) > NAVIGATION_TRANSITION_PATH_LIMIT
+                or not all(
+                    isinstance(step, list)
+                    and len(step) == 2
+                    and all(
+                        not isinstance(value, bool)
+                        and isinstance(value, int)
+                        and 0 <= value <= 255
+                        for value in step
+                    )
+                    for step in path
+                )
+                or item.get("outcome")
+                not in {"moved", "no_progress", "cycle", "map_change"}
+                or at is None
+                or at < cutoff
+            ):
+                continue
+            self.transitions.append(item)
+
+    def _load_walk_edges(self, walk_edges: Any) -> None:
+        # Same permanence rules as macro-edges; stored as a flat list of
+        # {origin: [map,x,y], direction, destination: [x,y]} records.
+        if not isinstance(walk_edges, list):
+            return
+        for item in walk_edges[-NAVIGATION_WALK_EDGE_LIMIT:]:
+            if not isinstance(item, dict) or set(item) != {
+                "origin",
+                "direction",
+                "destination",
+            }:
+                continue
+            origin = item.get("origin")
+            destination = item.get("destination")
+            if (
+                not _valid_position_triplet(origin)
+                or item.get("direction") not in CARDINAL_BUTTONS
+                or not isinstance(destination, list)
+                or len(destination) != 2
+                or any(
+                    isinstance(v, bool) or not isinstance(v, int)
+                    or not 0 <= v <= 255
+                    for v in destination
+                )
+            ):
+                continue
+            self.walk_edges[
+                (origin[0], origin[1], origin[2], item["direction"])
+            ] = list(destination)
+
+    def _load_macro_edges(self, macro_edges: Any) -> None:
+        # Macro-edges are deterministic Gen-1 spinner facts: size-bounded
+        # but never age-expired, so one observation learns them permanently.
+        if not isinstance(macro_edges, list):
+            return
+        for item in macro_edges[-NAVIGATION_MACRO_EDGE_LIMIT:]:
+            if not isinstance(item, dict) or set(item) != {
+                "origin",
+                "direction",
+                "destination",
+                "path",
+                "confirmed",
+                "at",
+            }:
+                continue
+            if (
+                not _valid_position_triplet(item.get("origin"))
+                or item.get("direction") not in CARDINAL_BUTTONS
+                or not _valid_position_triplet(item.get("destination"))
+                or not _valid_step_list(
+                    item.get("path"), NAVIGATION_TRANSITION_PATH_LIMIT
+                )
+                or isinstance(item.get("confirmed"), bool)
+                or not isinstance(item.get("confirmed"), int)
+                or not 1 <= item["confirmed"] <= 999
+                or _strict_utc_timestamp(item.get("at")) is None
+            ):
+                continue
+            self.macro_edges.append(item)
+
+    def _load_solved_routes(self, solved_routes: Any) -> None:
+        if not isinstance(solved_routes, list):
+            return
+        for item in solved_routes[-NAVIGATION_SOLVED_ROUTE_LIMIT:]:
+            if not isinstance(item, dict) or set(item) != {
+                "map_id",
+                "entrance",
+                "steps",
+                "at",
+            }:
+                continue
+            steps = item.get("steps")
+            entrance = item.get("entrance")
+            if (
+                isinstance(item.get("map_id"), bool)
+                or not isinstance(item.get("map_id"), int)
+                or not 0 <= item["map_id"] <= 255
+                or not isinstance(entrance, list)
+                or len(entrance) != 2
+                or any(
+                    isinstance(value, bool)
+                    or not isinstance(value, int)
+                    or not 0 <= value <= 255
+                    for value in entrance
+                )
+                or not isinstance(steps, list)
+                or not 2 <= len(steps) <= NAVIGATION_SOLVED_ROUTE_STEP_LIMIT
+                or not all(_valid_route_step(step) for step in steps)
+                or _strict_utc_timestamp(item.get("at")) is None
+            ):
+                continue
+            self.solved_routes.append(item)
+
+    def _load_episode(self, episode: Any, cutoff: datetime) -> None:
+        if not isinstance(episode, dict) or set(episode) != {
+            "map_id",
+            "maps",
+            "started_at",
+            "settled_transitions",
+            "repeated_edges",
+            "discovery_streak",
+            "region",
+        }:
+            return
+        started_at = _strict_utc_timestamp(episode.get("started_at"))
+        maps = episode.get("maps")
+        region = episode.get("region")
+        if (
+            isinstance(episode.get("map_id"), bool)
+            or not isinstance(episode.get("map_id"), int)
+            or not 0 <= episode["map_id"] <= 255
+            or not isinstance(maps, list)
+            or not 1 <= len(maps) <= 8
+            or any(
+                isinstance(value, bool)
+                or not isinstance(value, int)
+                or not 0 <= value <= 255
+                for value in maps
+            )
+            or started_at is None
+            or started_at < cutoff
+            or isinstance(episode.get("settled_transitions"), bool)
+            or not isinstance(episode.get("settled_transitions"), int)
+            or not 0 <= episode["settled_transitions"] <= 9999
+            or isinstance(episode.get("repeated_edges"), bool)
+            or not isinstance(episode.get("repeated_edges"), int)
+            or not 0 <= episode["repeated_edges"] <= 9999
+            or isinstance(episode.get("discovery_streak"), bool)
+            or not isinstance(episode.get("discovery_streak"), int)
+            or not 0 <= episode["discovery_streak"] <= 99
+            or not isinstance(region, list)
+            or len(region) > NAVIGATION_EPISODE_REGION_LIMIT
+            or not all(
+                isinstance(step, list)
+                and len(step) == 2
+                and all(
+                    not isinstance(value, bool)
+                    and isinstance(value, int)
+                    and 0 <= value <= 255
+                    for value in step
+                )
+                for step in region
+            )
+        ):
+            return
+        self.episode = episode
+
     def begin(
         self,
         origin: Any,
@@ -6459,7 +7015,30 @@ class NavigationMemory:
         self.pending = {
             "origin": tuple(origin),
             "buttons": list(buttons),
+            "direction": (
+                buttons[0] if buttons[0] in CARDINAL_BUTTONS else None
+            ),
+            "path": [],
         }
+
+    def observe(self, position: Any) -> None:
+        """Record an intermediate settled-path sample for the pending move."""
+        pending = self.pending
+        if (
+            pending is None
+            or not isinstance(position, tuple)
+            or len(position) != 3
+            or position[0] != pending["origin"][0]
+        ):
+            return
+        step = [position[1], position[2]]
+        path = pending["path"]
+        if (
+            len(path) < NAVIGATION_TRANSITION_PATH_LIMIT
+            and (not path or path[-1] != step)
+            and step != [pending["origin"][1], pending["origin"][2]]
+        ):
+            path.append(step)
 
     def cancel_pending(self) -> None:
         self.pending = None
@@ -6482,15 +7061,30 @@ class NavigationMemory:
                 self.floor_trail.append(position[0])
         self.trail = self.trail[-64:]
         self.floor_trail = self.floor_trail[-32:]
+        recent = self.trail[:-1][-16:]
+        outcome = None
+        if destination[0] != origin[0]:
+            settled_outcome = "map_change"
+        elif destination == origin:
+            outcome = settled_outcome = "no_progress"
+        elif destination in recent:
+            outcome = settled_outcome = "cycle"
+        else:
+            settled_outcome = "moved"
+        timestamp_text = _utc_text(now or datetime.now(timezone.utc))
+        if pending["direction"] is not None:
+            self._record_transition(
+                origin,
+                pending["direction"],
+                destination,
+                pending["path"],
+                settled_outcome,
+                timestamp_text,
+                press_count=len(pending["buttons"]),
+            )
         if destination[0] != origin[0]:
             self._write(now=now)
             return
-        recent = self.trail[:-1][-16:]
-        outcome = None
-        if destination == origin:
-            outcome = "no_progress"
-        elif destination in recent:
-            outcome = "cycle"
         if outcome is not None:
             first_button = pending["buttons"][0]
             existing = next(
@@ -6523,6 +7117,247 @@ class NavigationMemory:
                     existing["buttons"] = pending["buttons"][:6]
         self._write(now=now)
 
+    def _record_transition(
+        self,
+        origin: tuple[int, int, int],
+        direction: str,
+        destination: tuple[int, int, int],
+        path: list[list[int]],
+        outcome: str,
+        timestamp: str,
+        *,
+        press_count: int = 1,
+    ) -> None:
+        transition = {
+            "origin": list(origin),
+            "direction": direction,
+            "destination": list(destination),
+            "path": [
+                list(step)
+                for step in path[:NAVIGATION_TRANSITION_PATH_LIMIT]
+            ],
+            "outcome": outcome,
+            "at": timestamp,
+        }
+        repeated_edge = any(
+            item["origin"] == transition["origin"]
+            and item["direction"] == direction
+            and item["destination"] == transition["destination"]
+            for item in self.transitions[-STUCK_NOVELTY_WINDOW:]
+        )
+        self.transitions.append(transition)
+        self.transitions = self.transitions[-NAVIGATION_TRANSITION_LIMIT:]
+        tried_key = (origin[0], origin[1], origin[2], direction)
+        if tried_key in self.session_tried:
+            del self.session_tried[tried_key]
+        elif len(self.session_tried) >= NAVIGATION_SESSION_TRIED_LIMIT:
+            oldest = next(iter(self.session_tried))
+            del self.session_tried[oldest]
+        self.session_tried[tried_key] = None
+        same_map_displacement = (
+            abs(destination[1] - origin[1]) + abs(destination[2] - origin[2])
+            if destination[0] == origin[0]
+            else 0
+        )
+        if same_map_displacement == 1 and press_count == 1:
+            # Permanent single-step walk edge (last-wins and refreshes
+            # recency on re-observation).
+            edge_key = (origin[0], origin[1], origin[2], direction)
+            if edge_key in self.walk_edges:
+                del self.walk_edges[edge_key]
+            elif len(self.walk_edges) >= NAVIGATION_WALK_EDGE_LIMIT:
+                oldest = next(iter(self.walk_edges))
+                del self.walk_edges[oldest]
+            self.walk_edges[edge_key] = [destination[1], destination[2]]
+        if same_map_displacement > 1 and press_count == 1:
+            # A settled same-map displacement beyond one tile from a SINGLE
+            # press is forced movement (spinner chain): learn it as a
+            # macro-edge (R1). Multi-press corridor walks legitimately move
+            # several tiles and must never be learned as forced.
+            self._record_macro_edge(
+                origin, direction, destination, path, timestamp
+            )
+        elif destination[0] == origin[0] and same_map_displacement <= 1:
+            # A single-tile (or blocked) settle at this (origin, direction)
+            # contradicts any learned forced edge: the spinner is not there.
+            self.macro_edges = [
+                item
+                for item in self.macro_edges
+                if not (
+                    item["origin"] == list(origin)
+                    and item["direction"] == direction
+                )
+            ]
+        episode = self.episode
+        if episode is None:
+            return
+        if destination[0] not in episode["maps"]:
+            # A map outside the stuck region is real progress; the maze was
+            # solved, so memoize the traversal (R4) and end the episode.
+            # Cycling among the episode's own floors is not progress.
+            self._record_solved_route(timestamp)
+            self.episode = None
+            return
+        episode["settled_transitions"] = min(
+            9999, episode["settled_transitions"] + 1
+        )
+        if repeated_edge or outcome in {"no_progress", "cycle"}:
+            episode["repeated_edges"] = min(
+                9999, episode["repeated_edges"] + 1
+            )
+        step = [destination[1], destination[2]]
+        if step in episode["region"]:
+            episode["discovery_streak"] = 0
+        else:
+            episode["discovery_streak"] = min(
+                99, episode["discovery_streak"] + 1
+            )
+            if len(episode["region"]) < NAVIGATION_EPISODE_REGION_LIMIT:
+                episode["region"].append(step)
+            if episode["discovery_streak"] >= STUCK_EPISODE_DISCOVERY_EXIT:
+                # Sustained discovery outside the episode region — a
+                # single novel coordinate never resets the episode.
+                self.episode = None
+
+    def _record_macro_edge(
+        self,
+        origin: tuple[int, int, int],
+        direction: str,
+        destination: tuple[int, int, int],
+        path: list[list[int]],
+        timestamp: str,
+    ) -> None:
+        """Learn (map, origin, first_cardinal) -> settle destination once.
+
+        Gen-1 spinner chains are deterministic, so a single observation is
+        authoritative: re-observation bumps `confirmed`, and only a
+        contradicting settle destination invalidates the learned landing.
+        """
+        bounded_path = [
+            list(step) for step in path[:NAVIGATION_TRANSITION_PATH_LIMIT]
+        ]
+        for index, item in enumerate(self.macro_edges):
+            if item["origin"] == list(origin) and item["direction"] == direction:
+                if item["destination"] == list(destination):
+                    item["confirmed"] = min(999, item["confirmed"] + 1)
+                else:
+                    item["destination"] = list(destination)
+                    item["path"] = bounded_path
+                    item["confirmed"] = 1
+                item["at"] = timestamp
+                self.macro_edges.append(self.macro_edges.pop(index))
+                return
+        self.macro_edges.append(
+            {
+                "origin": list(origin),
+                "direction": direction,
+                "destination": list(destination),
+                "path": bounded_path,
+                "confirmed": 1,
+                "at": timestamp,
+            }
+        )
+        self.macro_edges = self.macro_edges[-NAVIGATION_MACRO_EDGE_LIMIT:]
+
+    def _record_solved_route(self, timestamp: str) -> None:
+        """Memoize the traversal that just exited the stuck region (R4).
+
+        Reconstructs a connected (tile, direction) chain from the transition
+        tail ending at the exiting transition, erases revisited-tile loops so
+        replay crosses the maze instead of retracing dead ends, and stores it
+        keyed by (map_id, entrance tile).
+        """
+        if not self.transitions:
+            return
+        exit_transition = self.transitions[-1]
+        solved_map = exit_transition["origin"][0]
+        destination_map = exit_transition["destination"][0]
+        # Retreat detection: exiting back to the map we entered this floor
+        # from is a withdrawal, not a solve. Memoizing it would store an
+        # eject-the-player route whose truncated "entrance" can sit mid-maze.
+        entered_from: Optional[int] = None
+        saw_solved = False
+        for map_id in reversed(self.floor_trail):
+            if map_id == solved_map:
+                saw_solved = True
+                continue
+            if saw_solved:
+                entered_from = map_id
+                break
+        if entered_from is not None and destination_map == entered_from:
+            return
+        chain: list[dict[str, Any]] = [exit_transition]
+        for item in reversed(self.transitions[:-1]):
+            if len(chain) >= NAVIGATION_SOLVED_ROUTE_STEP_LIMIT:
+                break
+            if (
+                item["origin"][0] != solved_map
+                or item["destination"] != chain[0]["origin"]
+            ):
+                break
+            if item["outcome"] == "no_progress":
+                # A wall bump at the same tile keeps the chain connected but
+                # contributes nothing to replay.
+                continue
+            chain.insert(0, item)
+        compressed: list[dict[str, Any]] = []
+        indices: dict[tuple[int, ...], int] = {}
+        for item in chain:
+            key = tuple(item["origin"])
+            if key in indices:
+                del compressed[indices[key] :]
+                indices = {
+                    tuple(step["origin"]): index
+                    for index, step in enumerate(compressed)
+                }
+            indices[key] = len(compressed)
+            compressed.append(item)
+        if len(compressed) < 2:
+            return
+        entrance = list(compressed[0]["origin"][1:])
+        self.solved_routes = [
+            item
+            for item in self.solved_routes
+            if item["map_id"] != solved_map or item["entrance"] != entrance
+        ]
+        self.solved_routes.append(
+            {
+                "map_id": solved_map,
+                "entrance": entrance,
+                "steps": [
+                    {
+                        "origin": list(item["origin"]),
+                        "direction": item["direction"],
+                        "destination": list(item["destination"]),
+                    }
+                    for item in compressed
+                ],
+                "at": timestamp,
+            }
+        )
+        self.solved_routes = self.solved_routes[-NAVIGATION_SOLVED_ROUTE_LIMIT:]
+
+    def solved_route_for(
+        self,
+        position: Optional[tuple[int, int, int]],
+    ) -> Optional[list[dict[str, Any]]]:
+        """Stored solved-route steps for this exact (map, entrance) tile."""
+        if position is None:
+            return None
+        for item in reversed(self.solved_routes):
+            if item["map_id"] == position[0] and item["entrance"] == [
+                position[1],
+                position[2],
+            ]:
+                return [dict(step) for step in item["steps"]]
+        return None
+
+    def note_progress(self) -> None:
+        """Key-item/badge/story progress ends any stuck episode."""
+        if self.episode is not None:
+            self.episode = None
+            self._write()
+
     def _write(self, *, now: Optional[datetime] = None) -> None:
         current = now or datetime.now(timezone.utc)
         cutoff = current - timedelta(seconds=NAVIGATION_MEMORY_MAX_AGE_SECONDS)
@@ -6534,6 +7369,14 @@ class NavigationMemory:
             ) is not None
             and parsed >= cutoff
         ][-NAVIGATION_MEMORY_MAX_ATTEMPTS:]
+        self.transitions = [
+            item
+            for item in self.transitions
+            if (
+                parsed := _strict_utc_timestamp(item.get("at"))
+            ) is not None
+            and parsed >= cutoff
+        ][-NAVIGATION_TRANSITION_LIMIT:]
         atomic_write_json(
             self.path,
             {
@@ -6542,6 +7385,22 @@ class NavigationMemory:
                 "attempts": self.attempts,
                 "trail": [list(position) for position in self.trail[-64:]],
                 "floor_trail": self.floor_trail[-32:],
+                "transitions": self.transitions,
+                "macro_edges": self.macro_edges[-NAVIGATION_MACRO_EDGE_LIMIT:],
+                "walk_edges": [
+                    {
+                        "origin": [key[0], key[1], key[2]],
+                        "direction": key[3],
+                        "destination": destination,
+                    }
+                    for key, destination in list(self.walk_edges.items())[
+                        -NAVIGATION_WALK_EDGE_LIMIT:
+                    ]
+                ],
+                "solved_routes": self.solved_routes[
+                    -NAVIGATION_SOLVED_ROUTE_LIMIT:
+                ],
+                "episode": self.episode,
             },
         )
 
@@ -6569,28 +7428,7 @@ class NavigationMemory:
             ) is not None
             and parsed >= cutoff
         ][-4:]
-        zones = [
-            (map_id, x // 3, y // 3)
-            for map_id, x, y in self.trail[-24:]
-        ]
-        room_cycle = False
-        for period in range(2, min(6, len(zones) // 2) + 1):
-            candidate = zones[-period:]
-            if (
-                len(set(candidate)) >= 2
-                and candidate == zones[-2 * period : -period]
-            ):
-                room_cycle = True
-                break
-        floors = self.floor_trail[-12:]
-        floor_cycle = bool(
-            len(floors) >= 4
-            and floors[-4] == floors[-2]
-            and floors[-3] == floors[-1]
-            and floors[-4] != floors[-3]
-        )
-        if not floor_cycle and len(floors) >= 6:
-            floor_cycle = floors[-6:-3] == floors[-3:]
+        room_cycle, floor_cycle, floors = self._cycle_signals()
         loop_detected = (
             self.trail[-16:].count(current) >= 3
             or room_cycle
@@ -6615,6 +7453,442 @@ class NavigationMemory:
                 "map and coordinates."
             ),
         }
+
+    def _cycle_signals(self) -> tuple[bool, bool, list[int]]:
+        zones = [
+            (map_id, x // 3, y // 3)
+            for map_id, x, y in self.trail[-24:]
+        ]
+        room_cycle = False
+        for period in range(2, min(6, len(zones) // 2) + 1):
+            candidate = zones[-period:]
+            if (
+                len(set(candidate)) >= 2
+                and candidate == zones[-2 * period : -period]
+            ):
+                room_cycle = True
+                break
+        floors = self.floor_trail[-12:]
+        floor_cycle = bool(
+            len(floors) >= 4
+            and floors[-4] == floors[-2]
+            and floors[-3] == floors[-1]
+            and floors[-4] != floors[-3]
+        )
+        if not floor_cycle and len(floors) >= 6:
+            floor_cycle = floors[-6:-3] == floors[-3:]
+        return room_cycle, floor_cycle, floors
+
+    def stuck_assessment(
+        self,
+        current: Optional[tuple[int, int, int]],
+        *,
+        now: Optional[datetime] = None,
+    ) -> dict[str, Any]:
+        """One shared stuck decision built from count-1 evidence and cycles.
+
+        Activates on the existing room/floor-cycle signal, or on any two
+        independent signals among a repeated settled directed edge (count-1
+        attempts included), a coordinate revisited at least
+        STUCK_ENDPOINT_REPEATS times in the last STUCK_ENDPOINT_WINDOW
+        endpoints, and low coordinate novelty across the last
+        STUCK_NOVELTY_WINDOW transitions.
+        """
+        if current is None:
+            return {"active": False, "reasons": [], "episode": self.episode}
+        room_cycle, floor_cycle, floors = self._cycle_signals()
+        local = [
+            item
+            for item in self.transitions
+            if item["origin"][0] == current[0]
+        ]
+        recent = local[-STUCK_NOVELTY_WINDOW:]
+        edge_counts: dict[tuple[Any, ...], int] = {}
+        for item in recent:
+            key = (
+                tuple(item["origin"]),
+                item["direction"],
+                tuple(item["destination"]),
+            )
+            edge_counts[key] = edge_counts.get(key, 0) + 1
+        # A repeated settled directed edge, with count-1 attempts included
+        # through the transition list itself: the same
+        # (origin, direction, destination) observed twice in the recent
+        # window. Attempt records are deliberately not consulted here — a
+        # single wall bump or routine hub revisits during town walking are
+        # single incidents, not repeats, and using them falsely armed
+        # puzzle mode during normal gameplay.
+        repeated_edge = any(count >= 2 for count in edge_counts.values())
+        endpoints = [
+            tuple(item["destination"])
+            for item in local[-STUCK_ENDPOINT_WINDOW:]
+        ]
+        endpoint_revisit = any(
+            endpoints.count(endpoint) >= STUCK_ENDPOINT_REPEATS
+            for endpoint in set(endpoints)
+        )
+        low_novelty = bool(
+            len(recent) >= STUCK_NOVELTY_WINDOW
+            and len(
+                {tuple(item["destination"]) for item in recent}
+            )
+            <= STUCK_NOVELTY_MAX_UNIQUE
+        )
+        reasons = [
+            reason
+            for reason, signal in (
+                ("room_cycle", room_cycle),
+                ("floor_cycle", floor_cycle),
+                ("repeated_edge", repeated_edge),
+                ("endpoint_revisit", endpoint_revisit),
+                ("low_novelty", low_novelty),
+            )
+            if signal
+        ]
+        active = bool(
+            room_cycle
+            or floor_cycle
+            or sum((repeated_edge, endpoint_revisit, low_novelty)) >= 2
+        )
+        if active and self.episode is None:
+            maps = list(dict.fromkeys([current[0], *floors[-6:]]))[:8]
+            self.episode = {
+                "map_id": current[0],
+                "maps": maps,
+                "started_at": _utc_text(now or datetime.now(timezone.utc)),
+                "settled_transitions": 0,
+                "repeated_edges": sum(
+                    1
+                    for item in recent
+                    if item["outcome"] in {"no_progress", "cycle"}
+                ),
+                "discovery_streak": 0,
+                "region": [
+                    list(step)
+                    for step in dict.fromkeys(
+                        (item[1], item[2])
+                        for item in self.trail[-24:]
+                        if item[0] == current[0]
+                    )
+                ][:NAVIGATION_EPISODE_REGION_LIMIT],
+            }
+            self._write(now=now)
+        return {
+            "active": active,
+            "reasons": reasons,
+            "episode": self.episode,
+        }
+
+    def edge_guidance(
+        self,
+        current: Optional[tuple[int, int, int]],
+    ) -> Optional[list[dict[str, Any]]]:
+        """Compact learned (origin,direction)->destination edges, count-1 up."""
+        if current is None:
+            return None
+        edges: dict[tuple[Any, ...], dict[str, Any]] = {}
+        for item in self.transitions:
+            if item["origin"][0] != current[0]:
+                continue
+            key = (
+                tuple(item["origin"]),
+                item["direction"],
+                tuple(item["destination"]),
+                item["outcome"],
+            )
+            existing = edges.get(key)
+            if existing is None:
+                edges[key] = {
+                    "origin": item["origin"][1:],
+                    "direction": item["direction"],
+                    "destination": item["destination"],
+                    "outcome": item["outcome"],
+                    "count": 1,
+                }
+            else:
+                existing["count"] = min(999, existing["count"] + 1)
+        if not edges:
+            return None
+        return list(edges.values())[-16:]
+
+    def untried_frontier(
+        self,
+        current: Optional[tuple[int, int, int]],
+        toward: Optional[tuple[int, int]] = None,
+    ) -> list[dict[str, Any]]:
+        """Nearby known tiles whose (tile, direction) has no learned edge.
+
+        Bounded to NAVIGATION_FRONTIER_LIMIT entries within
+        NAVIGATION_FRONTIER_RADIUS Manhattan tiles, nearest first (R1).
+        """
+        if current is None:
+            return []
+        map_id, center_x, center_y = current
+        tried: set[tuple[int, int, str]] = set()
+        known: set[tuple[int, int]] = {(center_x, center_y)}
+        for item in self.transitions:
+            origin = item["origin"]
+            destination = item["destination"]
+            if origin[0] == map_id:
+                tried.add((origin[1], origin[2], item["direction"]))
+                known.add((origin[1], origin[2]))
+            if destination[0] == map_id:
+                known.add((destination[1], destination[2]))
+        for item in self.macro_edges:
+            origin = item["origin"]
+            destination = item["destination"]
+            if origin[0] == map_id:
+                tried.add((origin[1], origin[2], item["direction"]))
+                known.add((origin[1], origin[2]))
+            if destination[0] == map_id:
+                known.add((destination[1], destination[2]))
+        for item in self.attempts:
+            if item["map_id"] == map_id and item["buttons"][0] in CARDINAL_BUTTONS:
+                tried.add(
+                    (item["origin"][0], item["origin"][1], item["buttons"][0])
+                )
+        for key_map, key_x, key_y, key_direction in self.session_tried:
+            # Session-lifetime tried entries survive transition-FIFO churn,
+            # so the frontier converges instead of reverting to UNTRIED.
+            if key_map == map_id:
+                tried.add((key_x, key_y, key_direction))
+        for key, destination in self.walk_edges.items():
+            if key[0] == map_id:
+                tried.add((key[1], key[2], key[3]))
+                known.add((key[1], key[2]))
+                known.add((destination[0], destination[1]))
+        for position in self.trail:
+            if position[0] == map_id:
+                known.add((position[1], position[2]))
+        entries = []
+        for x, y in known:
+            distance = abs(x - center_x) + abs(y - center_y)
+            waypoint_distance = (
+                abs(x - toward[0]) + abs(y - toward[1])
+                if toward is not None
+                else None
+            )
+            # With a trusted waypoint, entries near the WAYPOINT qualify even
+            # when far from the player — the exit corner must stay probeable
+            # from anywhere on the floor (BFS reachability is checked at
+            # commit time; unreachable entries are skipped there).
+            if distance > NAVIGATION_FRONTIER_RADIUS and (
+                waypoint_distance is None
+                or waypoint_distance > NAVIGATION_FRONTIER_WAYPOINT_RADIUS
+            ):
+                continue
+            for direction in CARDINAL_BUTTONS:
+                if (x, y, direction) in tried:
+                    continue
+                entries.append(
+                    {
+                        "origin": [x, y],
+                        "direction": direction,
+                        "distance": distance,
+                    }
+                )
+        if toward is not None:
+            # Waypoint bias: probe the entries closest to where the trusted
+            # guidance says the exit is — the attractor corner a nearest-to-
+            # player sort keeps deferring.
+            entries.sort(
+                key=lambda entry: (
+                    abs(entry["origin"][0] - toward[0])
+                    + abs(entry["origin"][1] - toward[1]),
+                    entry["distance"],
+                    entry["origin"],
+                    entry["direction"],
+                )
+            )
+        else:
+            entries.sort(
+                key=lambda entry: (
+                    entry["distance"],
+                    entry["origin"],
+                    entry["direction"],
+                )
+            )
+        return entries[:NAVIGATION_FRONTIER_LIMIT]
+
+    def route_to(
+        self,
+        current: Optional[tuple[int, int, int]],
+        target: Any,
+    ) -> Optional[list[dict[str, Any]]]:
+        """Harness-side BFS over learned single-step and macro edges (R1).
+
+        Returns bounded (origin, direction, destination) steps on the current
+        map, or None when the target is unknown or unreachable through the
+        learned graph.
+        """
+        if (
+            current is None
+            or not isinstance(target, (list, tuple))
+            or len(target) != 2
+            or any(
+                isinstance(value, bool)
+                or not isinstance(value, int)
+                or not 0 <= value <= 255
+                for value in target
+            )
+        ):
+            return None
+        map_id = current[0]
+        start = (current[1], current[2])
+        goal = (target[0], target[1])
+        if start == goal:
+            return None
+        adjacency: dict[tuple[int, int], dict[str, tuple[int, int]]] = {}
+        # Permanent walk edges are the routing substrate — the transition
+        # FIFO alone loses inbound edges as coverage grows, leaving known
+        # tiles unreachable (observed live: (20,15) unroutable for hours).
+        for key, destination in self.walk_edges.items():
+            if key[0] != map_id:
+                continue
+            adjacency.setdefault((key[1], key[2]), {})[key[3]] = (
+                destination[0],
+                destination[1],
+            )
+        for item in self.transitions:
+            origin = item["origin"]
+            destination = item["destination"]
+            if (
+                origin[0] != map_id
+                or destination[0] != map_id
+                or item["outcome"] not in {"moved", "cycle"}
+                or abs(destination[1] - origin[1])
+                + abs(destination[2] - origin[2])
+                != 1
+            ):
+                continue
+            adjacency.setdefault((origin[1], origin[2]), {})[
+                item["direction"]
+            ] = (destination[1], destination[2])
+        for item in self.macro_edges:
+            origin = item["origin"]
+            destination = item["destination"]
+            if origin[0] != map_id or destination[0] != map_id:
+                continue
+            adjacency.setdefault((origin[1], origin[2]), {})[
+                item["direction"]
+            ] = (destination[1], destination[2])
+        parents: dict[
+            tuple[int, int], Optional[tuple[tuple[int, int], str]]
+        ] = {start: None}
+        pending = deque([start])
+        while pending:
+            node = pending.popleft()
+            if node == goal:
+                break
+            for direction in CARDINAL_BUTTONS:
+                destination = adjacency.get(node, {}).get(direction)
+                if destination is not None and destination not in parents:
+                    parents[destination] = (node, direction)
+                    pending.append(destination)
+        if goal not in parents:
+            return None
+        steps: list[dict[str, Any]] = []
+        node = goal
+        while parents[node] is not None:
+            previous, direction = parents[node]
+            steps.append(
+                {
+                    "origin": [map_id, previous[0], previous[1]],
+                    "direction": direction,
+                    "destination": [map_id, node[0], node[1]],
+                }
+            )
+            node = previous
+        steps.reverse()
+        if not 1 <= len(steps) <= NAVIGATION_ROUTE_STEP_LIMIT:
+            return None
+        return steps
+
+    def graph_neighborhood(
+        self,
+        current: Optional[tuple[int, int, int]],
+        frontier: Optional[list[dict[str, Any]]] = None,
+    ) -> Optional[str]:
+        """Bounded textual learned-edge/frontier neighborhood (R2)."""
+        if current is None:
+            return None
+        map_id, center_x, center_y = current
+        lines: list[str] = []
+        covered: set[tuple[int, int, str]] = set()
+        for item in self.macro_edges:
+            origin = item["origin"]
+            if (
+                origin[0] != map_id
+                or abs(origin[1] - center_x) + abs(origin[2] - center_y)
+                > NAVIGATION_FRONTIER_RADIUS
+            ):
+                continue
+            destination = item["destination"]
+            lines.append(
+                f"({origin[1]},{origin[2]}) +{item['direction']}: FORCED -> "
+                f"lands ({destination[1]},{destination[2]}) "
+                f"[confirmed {item['confirmed']}]"
+            )
+            covered.add((origin[1], origin[2], item["direction"]))
+        summarized: dict[tuple[int, int, str], dict[str, Any]] = {}
+        for item in self.transitions:
+            origin = item["origin"]
+            if (
+                origin[0] != map_id
+                or abs(origin[1] - center_x) + abs(origin[2] - center_y)
+                > NAVIGATION_FRONTIER_RADIUS
+            ):
+                continue
+            key = (origin[1], origin[2], item["direction"])
+            if key in covered:
+                continue
+            entry = summarized.get(key)
+            if (
+                entry is not None
+                and entry["destination"] == item["destination"]
+                and entry["outcome"] == item["outcome"]
+            ):
+                entry["count"] = min(999, entry["count"] + 1)
+            else:
+                summarized[key] = {
+                    "destination": item["destination"],
+                    "outcome": item["outcome"],
+                    "count": 1,
+                }
+        for (x, y, direction), entry in summarized.items():
+            destination = entry["destination"]
+            if entry["outcome"] == "no_progress":
+                text = "BLOCKED"
+            elif entry["outcome"] == "map_change":
+                text = (
+                    f"EXIT -> map {destination[0]} "
+                    f"({destination[1]},{destination[2]})"
+                )
+            else:
+                text = f"-> ({destination[1]},{destination[2]})"
+            suffix = f" [seen {entry['count']}]" if entry["count"] > 1 else ""
+            lines.append(f"({x},{y}) +{direction}: {text}{suffix}")
+        frontier_lines = [
+            f"({entry['origin'][0]},{entry['origin'][1]}) "
+            f"+{entry['direction']}: UNTRIED"
+            for entry in frontier or []
+        ][:GRAPH_NEIGHBORHOOD_LINE_LIMIT]
+        # Frontier lines are reserved first: the directive names these
+        # entries, so truncation must eat learned-edge lines, never them.
+        learned_budget = GRAPH_NEIGHBORHOOD_LINE_LIMIT - len(frontier_lines)
+        lines = lines[:learned_budget] + frontier_lines
+        if not lines:
+            return None
+        return "\n".join(lines)
+
+    def distinct_edge_count(self) -> int:
+        """Count of distinct tried (origin, direction) entries (R5).
+
+        Derived from the session-lifetime store, so the count is monotonic:
+        transition-FIFO churn can no longer make a re-learned edge look new
+        and mask a stall.
+        """
+        return len(self.session_tried)
 
 
 def _bounded_web_text(value: Any, maximum: int) -> Optional[str]:
@@ -6672,7 +7946,7 @@ def search_pokemon_web(location: str, focus: str) -> dict[str, Any]:
     safe_location = _bounded_web_text(location, 80)
     if safe_location is None:
         raise ValueError("Research requires a known location")
-    query = safe_location
+    query = f"{safe_location} {focus}"
     search = _read_bulbapedia_json(
         {
             "action": "query",
@@ -7600,7 +8874,7 @@ def normalize_brain_decision(text: str) -> dict[str, Any]:
     action_mode = str(raw.get("action_mode", "precision")).lower()
     if action_mode not in {"precision", "corridor"}:
         action_mode = "precision"
-    return {
+    decision = {
         "phase": phase,
         "observation": str(raw.get("observation", ""))[:500],
         "objective": str(raw.get("objective", ""))[:500],
@@ -7609,6 +8883,21 @@ def normalize_brain_decision(text: str) -> dict[str, Any]:
         "checkpoint": raw.get("checkpoint") is True,
         "action_mode": action_mode,
     }
+    route_target = raw.get("route_target")
+    if (
+        isinstance(route_target, list)
+        and len(route_target) == 2
+        and all(
+            not isinstance(value, bool)
+            and isinstance(value, int)
+            and 0 <= value <= 255
+            for value in route_target
+        )
+    ):
+        # Optional puzzle-mode target for the harness-side committed-route
+        # search; omitted entirely when absent or malformed.
+        decision["route_target"] = list(route_target)
+    return decision
 
 
 def overworld_action_buttons(
@@ -8315,6 +9604,14 @@ class PokemonAgent(BasicAgent):
                         "enum": list(VALID_BUTTONS),
                         "description": "Button for the press action",
                     },
+                    "hold": {
+                        "type": "boolean",
+                        "description": (
+                            "Make a pause a persistent operator hold; "
+                            "otherwise pauses are bounded automation "
+                            "leases that auto-resume on expiry"
+                        ),
+                    },
                     "visible": {
                         "type": "boolean",
                         "description": "Show the native PyBoy window in addition to the browser viewer",
@@ -8639,7 +9936,33 @@ class PokemonAgent(BasicAgent):
                         "message": f"button must be one of: {', '.join(VALID_BUTTONS)}",
                     }
                 )
-            append_control(runtime_dir, {"action": action, "button": button or None})
+            command = {"action": action, "button": button or None}
+            if action == "pause":
+                if kwargs.get("hold") is True:
+                    # Only an explicitly requested hold persists until an
+                    # explicit resume; the supervisor never restarts it.
+                    command.update(
+                        {
+                            "kind": "operator_hold",
+                            "persistent": True,
+                            "owner": "agent-cli",
+                        }
+                    )
+                else:
+                    # Agent-issued pauses default to a bounded automation
+                    # lease with an absolute expiry so a forgotten pause
+                    # auto-resumes instead of freezing the live stream.
+                    command.update(
+                        {
+                            "kind": "automation",
+                            "expires_at": _utc_text(
+                                datetime.now(timezone.utc)
+                                + timedelta(seconds=AGENT_PAUSE_LEASE_SECONDS)
+                            ),
+                            "owner": "agent-cli",
+                        }
+                    )
+            append_control(runtime_dir, command)
             return json.dumps(
                 {
                     "status": "success",
@@ -9177,6 +10500,15 @@ class PokemonMemoryReader:
         deduplicated = list(dict.fromkeys(line for line in lines if len(line) > 1))
         return " | ".join(deduplicated[-8:])[:600]
 
+    def position(self) -> Optional[tuple[int, int, int]]:
+        """Cheap (map, x, y) read for the settled-position decision gate."""
+        map_id = self._read_optional(0xD35E)
+        x = self._read_optional(0xD362)
+        y = self._read_optional(0xD361)
+        if map_id is None or x is None or y is None:
+            return None
+        return (map_id, x, y)
+
     def snapshot(self) -> dict[str, Any]:
         map_id = self._read_optional(0xD35E)
         badge_byte = self._read_optional(0xD356)
@@ -9400,16 +10732,23 @@ def rocket_hideout_route_guidance(
         if map_id == 0xC9:
             return prefix + (
                 "Stage: reach B4F for the Lift Key. The required stairs are "
-                "(19,18); (25,6) returns to B2F. From the entrance at (25,6), "
-                "go down once, west to (20,7), then south to (20,9); never "
-                "descend at x>=22. The tall eastern doorway is exit-only and "
-                "cannot be entered. Near the final stairs, use one input then "
-                "reobserve until (19,18) transitions to B4F."
+                "(19,18); (25,6) returns to B2F. Walkthrough topology: the "
+                "stairs are reached through the SOUTHWEST spinner maze — work "
+                "south along the western rooms (a Rare Candy lies on the way), "
+                "then east along the southern band to (19,18). The "
+                "north/central spinner web is a decoy that always drains back "
+                "to (17,15)/(16,11); once an edge is learned, never re-ride "
+                "it hoping for a different landing. Never descend at x>=22. "
+                "Near the final stairs, use one input then reobserve until "
+                "(19,18) transitions to B4F."
             )
         if map_id == 0xCA:
             return prefix + (
-                "Stage: obtain the Lift Key. Defeat the Rocket at (11,2), then "
-                "pick up the dropped Lift Key at (10,2). Do not leave B4F until "
+                "Stage: obtain the Lift Key. Defeat the Rocket at (11,2). "
+                "After winning you must TALK TO HIM AGAIN: in Gen 1 the Lift "
+                "Key is only granted on the second interaction with the "
+                "defeated Grunt (known bug). If a dropped item appears at "
+                "(10,2), pick it up as well. Do not leave B4F until "
                 "key_items.lift_key becomes true."
             )
         return prefix + (
@@ -9714,6 +11053,32 @@ Make progress deliberately:
 - Navigation memory is trusted runtime evidence. When it marks an attempt as
   repeatedly ineffective or cycling, do not repeat that attempt; choose a
   materially different route and verify that coordinates change.
+- When the game state includes "navigation_mode":"puzzle", a deterministic
+  monitor confirmed a movement loop. Reason over the learned settled edges in
+  transition_graph, where each entry means pressing direction once at origin
+  settled at destination. Avoid edges recorded as no_progress or cycle, choose
+  exactly one direction button, and reobserve after the forced movement
+  settles. Any multi-input or non-direction puzzle response is rejected; the
+  rejection appears as puzzle_feedback in the next game state.
+- Trusted route guidance is only coarse waypoint context, never a complete
+  tile-by-tile solution. Learned transition_graph edges are the ground truth
+  for spinner tiles and forced movement.
+- Puzzle-mode game state may include graph_neighborhood: learned edges and
+  UNTRIED frontier entries near you, one per line. A frontier_directive, when
+  present, is authoritative: ride the listed UNTRIED entries nearest-first and
+  stay on the current map until nearby entries are exhausted; do not switch
+  objective or leave the dungeon instead.
+- In puzzle mode you may add "route_target":[x,y] to your JSON, naming a tile
+  from the learned graph (an edge endpoint or frontier tile). The runtime then
+  walks a learned, step-verified route there one settled cardinal at a time,
+  aborting on any surprise. Still return exactly one direction button.
+- step_counters in the game state report action totals. You have no sense of
+  elapsed time; if these counters are large, your current approach is failing
+  - change strategy.
+- improvement_cycle is a typed controller verdict, never free-form advice.
+  preserve_graph forbids relearning known edges, probe_frontier prioritizes
+  the supplied reachable frontier, and escalate_research means test the
+  bounded research evidence against local facts before repeating a route.
 - A crowd route hypothesis, when present, is an untrusted optional suggestion
   reduced to one direction by a closed parser. Independently verify it against
   the screenshot, RAM state, collision grid, navigation memory, and trusted
@@ -9932,7 +11297,23 @@ class CopilotBrain:
         web_research: Optional[dict[str, Any]] = None,
     ) -> str:
         history_json = json.dumps(history[-8:], separators=(",", ":"))
-        state_json = json.dumps(game_state, separators=(",", ":"))
+        counters = game_state.get("step_counters")
+        counter_section = ""
+        state_for_prompt = game_state
+        if isinstance(counters, dict):
+            state_for_prompt = {
+                key: value
+                for key, value in game_state.items()
+                if key != "step_counters"
+            }
+            counters_json = json.dumps(counters, separators=(",", ":"))
+            counter_section = f"""
+
+Step counters:
+{counters_json}
+You have no sense of elapsed time; if these counters are large, your current
+approach is failing - change strategy."""
+        state_json = json.dumps(state_for_prompt, separators=(",", ":"))
         collision = collision_map or "Unavailable; rely on the screenshot."
         advisory = ""
         if crowd_advisory is not None:
@@ -9959,7 +11340,7 @@ Pokemon RAM snapshot:
 {state_json}
 
 Local collision grid (# blocked, . walkable, P player at center):
-{collision}{advisory}{research}
+{collision}{advisory}{research}{counter_section}
 
 Recent decisions:
 {history_json}
@@ -11212,7 +12593,21 @@ class ViewerServer:
                     return
                 if action == "stop":
                     set_desired_running(runtime_dir, False)
-                controls.put({"action": action, "button": button or None})
+                command: dict[str, Any] = {
+                    "action": action,
+                    "button": button or None,
+                }
+                if action == "pause":
+                    # The dashboard pause button is an explicit operator
+                    # hold: persistent until an explicit resume.
+                    command.update(
+                        {
+                            "kind": "operator_hold",
+                            "persistent": True,
+                            "owner": "viewer",
+                        }
+                    )
+                controls.put(command)
                 self._json(200, {"status": "success", "action": action})
 
         class LoopbackServer(http.server.ThreadingHTTPServer):
@@ -11319,14 +12714,22 @@ class PokemonRunner:
                 candidate.unlink(missing_ok=True)
         self.states_dir = self.runtime_dir / "states"
         self.screens_dir = self.runtime_dir / "screens"
+        self.evidence_dir = self.runtime_dir / EVIDENCE_DIRECTORY_NAME
         self.states_dir.mkdir(exist_ok=True, mode=0o700)
         self.screens_dir.mkdir(exist_ok=True, mode=0o700)
+        self.evidence_dir.mkdir(exist_ok=True, mode=0o700)
         os.chmod(self.states_dir, 0o700)
         os.chmod(self.screens_dir, 0o700)
+        os.chmod(self.evidence_dir, 0o700)
+        self.evidence_path = self.evidence_dir / f"events-{self.run_id}.jsonl"
+        self.evidence_sequence = 0
+        self.agent_sha256 = file_sha256(Path(__file__).resolve())
         self.status_path = self.runtime_dir / "status.json"
         self.control_path = self.runtime_dir / "control.jsonl"
-        self.control_path.write_text("", encoding="utf-8")
+        self.control_path.touch(mode=0o600, exist_ok=True)
         os.chmod(self.control_path, 0o600)
+        self.control_cursor_path = self.runtime_dir / CONTROL_CURSOR_NAME
+        self.control_offset = self._load_control_cursor()
         self.controls: "queue.Queue[dict[str, Any]]" = queue.Queue()
         self.brain_requests: "queue.Queue[Optional[dict[str, Any]]]" = queue.Queue(
             maxsize=1
@@ -11357,6 +12760,32 @@ class PokemonRunner:
         self.decision_positions: deque[tuple[int, int, int]] = deque(maxlen=6)
         self.last_crowd_advisory_position: Optional[tuple[int, int, int]] = None
         self.last_crowd_advisory_sequence = -1
+        self.navigation_mode = (
+            "puzzle" if self.navigation_memory.episode is not None else "normal"
+        )
+        self.stuck_decision_count = 0
+        self.puzzle_feedback: Optional[dict[str, Any]] = None
+        self.committed_route: Optional[dict[str, Any]] = None
+        # Process-lifetime replay guard: one solved-route attempt per
+        # (map, entrance), deliberately not reset by map changes.
+        self.solved_route_attempts: dict[tuple[int, int, int], None] = {}
+        # Auto-frontier-coverage bookkeeping: rides used this episode.
+        self.auto_coverage_rides = 0
+        self.auto_coverage_episode: Optional[str] = None
+        self.last_edge_count = 0
+        self.steps_since_new_edge = 0
+        self.edge_count_history: deque[int] = deque(
+            maxlen=EDGE_LEARNING_WINDOW_DECISIONS + 1
+        )
+        self.settle_candidate: Optional[tuple[int, int, int]] = None
+        self.settle_samples = 0
+        self.settle_started_at = 0.0
+        self.settle_generation = -1
+        self.position_settled = False
+        self.last_progress_marker: Optional[tuple[Any, ...]] = None
+        self.pause_kind: Optional[str] = None
+        self.pause_owner: Optional[str] = None
+        self.pause_expires_at: Optional[datetime] = None
         self.web_research_lock = threading.Lock()
         self.web_research_inflight = False
         self.web_research_thread: Optional[threading.Thread] = None
@@ -11391,6 +12820,12 @@ class PokemonRunner:
             "brain_status": "starting",
             "model": args.model,
             "reasoning_effort": self.reasoning_effort,
+            "agent_sha256": self.agent_sha256,
+            "evidence_schema_version": EVIDENCE_SCHEMA_VERSION,
+            "evidence_run_id": self.run_id,
+            "evidence_events": 0,
+            "evidence_error": None,
+            "improvement_cycle": None,
             "model_calls": 0,
             "actions_taken": 0,
             "decision_latency_seconds": None,
@@ -11400,6 +12835,19 @@ class PokemonRunner:
             ),
             "crowd_hints_count": 0,
             "navigation_memory_count": len(self.navigation_memory.attempts),
+            "navigation_mode": self.navigation_mode,
+            "stuck_state": False,
+            "stuck_reasons": [],
+            "stuck_decision_count": 0,
+            "committed_route": None,
+            "recovery_stage": (
+                "puzzle" if self.navigation_mode == "puzzle" else "normal"
+            ),
+            "gameplay_progress_at": utc_now(),
+            "pause_kind": None,
+            "pause_owner": None,
+            "pause_expires_at": None,
+            "last_rejected_control": None,
             "web_research_enabled": self.stuck_web_research_enabled,
             "web_research_state": (
                 "idle" if self.stuck_web_research_enabled else "off"
@@ -11591,7 +13039,6 @@ class PokemonRunner:
         self.clip_started = 0.0
         self.next_record_at = 0.0
         self.frames = 0
-        self.control_offset = 0
         self.max_clips = max(1, int(args.max_clips))
         self.max_states = max(2, int(args.max_states))
         self.max_storage_bytes = max(
@@ -12215,6 +13662,10 @@ class PokemonRunner:
                                 "movement_context",
                                 False,
                             ),
+                            "navigation_mode": request.get(
+                                "navigation_mode",
+                                "normal",
+                            ),
                         }
                     )
                 except ValueError as error:
@@ -12775,9 +14226,48 @@ class PokemonRunner:
             pending_path.unlink(missing_ok=True)
             fsync_directory(self.runtime_dir)
 
+    def _load_control_cursor(self) -> int:
+        """Durable control cursor: restart never replays processed lines.
+
+        A missing or mismatched cursor initializes at current EOF so
+        historical commands written before this process cannot re-apply.
+        """
+        try:
+            stat = os.stat(self.control_path)
+        except OSError:
+            return 0
+        value = read_json(self.control_cursor_path)
+        offset = value.get("offset")
+        if (
+            value.get("schema_version") == 1
+            and not isinstance(offset, bool)
+            and isinstance(offset, int)
+            and 0 <= offset <= stat.st_size
+            and value.get("file_id") == [stat.st_dev, stat.st_ino]
+        ):
+            return offset
+        self._persist_control_cursor(stat.st_size, (stat.st_dev, stat.st_ino))
+        return stat.st_size
+
+    def _persist_control_cursor(
+        self,
+        offset: int,
+        file_id: tuple[int, int],
+    ) -> None:
+        atomic_write_json(
+            self.control_cursor_path,
+            {
+                "schema_version": 1,
+                "offset": offset,
+                "file_id": [file_id[0], file_id[1]],
+                "updated_at": utc_now(),
+            },
+        )
+
     def _read_external_controls(self) -> None:
         try:
             with self.control_path.open("r", encoding="utf-8") as handle:
+                identity = os.fstat(handle.fileno())
                 handle.seek(self.control_offset)
                 for line in handle:
                     try:
@@ -12787,7 +14277,13 @@ class PokemonRunner:
                         continue
                     if isinstance(command, dict):
                         self.controls.put(command)
-                self.control_offset = handle.tell()
+                offset = handle.tell()
+                if offset != self.control_offset:
+                    self.control_offset = offset
+                    self._persist_control_cursor(
+                        offset,
+                        (identity.st_dev, identity.st_ino),
+                    )
         except OSError as error:
             self.status["last_error"] = f"Control queue error: {error}"
 
@@ -12799,6 +14295,8 @@ class PokemonRunner:
                 self.resume_mode = self.control_mode
         else:
             self.resume_mode = mode
+            if getattr(self, "pause_kind", None) is not None:
+                self._clear_pause_lease()
         self.control_generation += 1
         self.control_mode = mode
         self.paused = mode == "paused"
@@ -12838,6 +14336,110 @@ class PokemonRunner:
         # while the brain thinks; only an explicit pause freezes the game.
         self._set_emulator_paused(self.control_mode == "paused")
 
+    def _publish_pause_status(self) -> None:
+        self.status["pause_kind"] = self.pause_kind
+        self.status["pause_owner"] = self.pause_owner
+        self.status["pause_expires_at"] = (
+            _utc_text(self.pause_expires_at)
+            if self.pause_expires_at is not None
+            else None
+        )
+
+    def _clear_pause_lease(self) -> None:
+        self.pause_kind = None
+        self.pause_owner = None
+        self.pause_expires_at = None
+        self._publish_pause_status()
+
+    def _reject_control(self, command: dict[str, Any], reason: str) -> None:
+        """Reject-with-report: ambiguous commands never silently freeze."""
+        self.status["last_rejected_control"] = {
+            "action": str(command.get("action", ""))[:40],
+            "kind": str(command.get("kind", ""))[:40] or None,
+            "reason": reason,
+            "timestamp": utc_now(),
+        }
+        LOGGER.warning("Rejected control command: %s", reason)
+
+    def _apply_pause_command(self, command: dict[str, Any]) -> None:
+        kind = command.get("kind")
+        owner = _bounded_web_text(
+            command.get("owner") or command.get("source"),
+            80,
+        )
+        if kind == "automation":
+            now = datetime.now(timezone.utc)
+            expires_at = _strict_utc_timestamp(command.get("expires_at"))
+            if expires_at is None or expires_at <= now:
+                self._reject_control(
+                    command,
+                    "automation pause requires a future absolute expires_at",
+                )
+                return
+            if expires_at > now + timedelta(
+                seconds=AUTOMATION_PAUSE_MAX_SECONDS
+            ):
+                self._reject_control(
+                    command,
+                    "automation pause expiry exceeds "
+                    f"{AUTOMATION_PAUSE_MAX_SECONDS} seconds",
+                )
+                return
+            if self.pause_kind == "operator_hold":
+                self._reject_control(
+                    command,
+                    "an operator hold is active; automation pause ignored",
+                )
+                return
+            if (
+                self.pause_kind == "automation"
+                and self.pause_expires_at is not None
+                and expires_at <= self.pause_expires_at
+            ):
+                self._reject_control(
+                    command,
+                    "automation pause renewal must extend the expiry",
+                )
+                return
+            self.pause_kind = "automation"
+            self.pause_owner = owner
+            self.pause_expires_at = expires_at
+            self._publish_pause_status()
+            if self.control_mode != "paused":
+                self._set_control_mode("paused")
+            return
+        if kind == "operator_hold":
+            if command.get("persistent") is not True or owner is None:
+                self._reject_control(
+                    command,
+                    "operator hold requires persistent true and an owner",
+                )
+                return
+            self.pause_kind = "operator_hold"
+            self.pause_owner = owner
+            self.pause_expires_at = None
+            self._publish_pause_status()
+            if self.control_mode != "paused":
+                self._set_control_mode("paused")
+            return
+        self._reject_control(
+            command,
+            "pause requires kind automation or operator_hold",
+        )
+
+    def _expire_automation_pause(self) -> None:
+        """Auto-resume an expired automation lease; never an operator hold."""
+        if (
+            self.pause_kind != "automation"
+            or self.pause_expires_at is None
+            or datetime.now(timezone.utc) < self.pause_expires_at
+        ):
+            return
+        self._clear_pause_lease()
+        self.status["pause_autoresumed_at"] = utc_now()
+        if self.control_mode == "paused":
+            self._set_control_mode(self.resume_mode)
+
     def _process_controls(self) -> None:
         while True:
             try:
@@ -12846,7 +14448,7 @@ class PokemonRunner:
                 break
             action = str(command.get("action", "")).lower()
             if action == "pause":
-                self._set_control_mode("paused")
+                self._apply_pause_command(command)
             elif action == "resume":
                 self._set_control_mode(self.resume_mode)
             elif action == "manual":
@@ -12859,6 +14461,11 @@ class PokemonRunner:
                 button = str(command.get("button", "")).lower()
                 if button in VALID_BUTTONS:
                     self._set_control_mode("manual")
+                    self._record_execution_evidence(
+                        source="operator",
+                        buttons=[button],
+                        game_state=self.status.get("game_state"),
+                    )
                     self.player.append(button)
             elif action == "stop":
                 self.stop_event.set()
@@ -13017,11 +14624,31 @@ class PokemonRunner:
         game_state: dict[str, Any],
         route_guidance: Optional[str],
         navigation_guidance: Optional[dict[str, Any]],
+        stuck_assessment: Optional[dict[str, Any]] = None,
+        frontier: Optional[list[dict[str, Any]]] = None,
     ) -> None:
+        # Coarse route guidance no longer vetoes research: the researcher
+        # receives it as context instead. Research starts once puzzle mode
+        # has remained stuck for PUZZLE_RESEARCH_SETTLED_TRANSITIONS settled
+        # transitions, or immediately for a loaded episode that already
+        # recorded PUZZLE_RESEARCH_REPEATED_EDGES repeated/cycle edges.
+        episode = (stuck_assessment or {}).get("episode")
+        if not self.stuck_web_research_enabled or episode is None:
+            return
+        if frontier and self.steps_since_new_edge < FRONTIER_STALL_DECISIONS:
+            # R3: frontier coverage is the escalation rung below web
+            # research. While nearby UNTRIED entries remain AND coverage is
+            # still learning new edges, the directive objective rides them.
+            # Research fires when coverage is exhausted (frontier empty) or
+            # stalled (no new edge for FRONTIER_STALL_DECISIONS decisions
+            # despite the directive) — a perpetually non-empty frontier must
+            # never starve the escalation ladder.
+            return
         if (
-            not self.stuck_web_research_enabled
-            or navigation_guidance is None
-            or route_guidance is not None
+            episode.get("settled_transitions", 0)
+            < PUZZLE_RESEARCH_SETTLED_TRANSITIONS
+            and episode.get("repeated_edges", 0)
+            < PUZZLE_RESEARCH_REPEATED_EDGES
         ):
             return
         position = navigation_position(game_state)
@@ -13030,7 +14657,10 @@ class PokemonRunner:
             return
         if self._fresh_web_research(game_state) is not None:
             return
-        key = f"{position[0]}:{position[1]}:{position[2]}"
+        # Cooldown is keyed by map plus episode identity, not the exact
+        # coordinate, so wandering inside the same stuck episode cannot
+        # re-trigger research every few tiles.
+        key = f"{position[0]}:{episode.get('started_at', '')}"
         now = time.monotonic()
         with self.web_research_lock:
             if self.web_research_inflight:
@@ -13044,6 +14674,16 @@ class PokemonRunner:
             self.web_research_inflight = True
             self.status["web_research_state"] = "searching"
             self.status["web_research_source_count"] = 0
+        recent_transitions = [
+            {
+                "origin": item["origin"][1:],
+                "direction": item["direction"],
+                "destination": item["destination"],
+                "outcome": item["outcome"],
+            }
+            for item in self.navigation_memory.transitions[-6:]
+            if item["origin"][0] == position[0]
+        ]
         context = {
             "map_id": position[0],
             "location": location,
@@ -13054,6 +14694,8 @@ class PokemonRunner:
             ),
             "trusted_route_guidance": route_guidance,
             "navigation_memory": navigation_guidance,
+            "stuck_reasons": (stuck_assessment or {}).get("reasons", []),
+            "recent_transitions": recent_transitions,
         }
         try:
             screenshot_bytes = screenshot.read_bytes()
@@ -13076,6 +14718,7 @@ class PokemonRunner:
         *,
         position: Optional[tuple[int, int, int]],
         collision_map: Optional[str],
+        stuck_active: bool = False,
     ) -> Optional[dict[str, Any]]:
         if not self.youtube_chat_hints_enabled:
             self.status["crowd_hints_state"] = "off"
@@ -13092,8 +14735,10 @@ class PokemonRunner:
         if self.status.get("phase") != "overworld" or position is None:
             self.status["crowd_hints_state"] = "context_blocked"
             return None
-        recent = list(self.decision_positions)[-4:]
-        if len(recent) < 4 or len(set(recent)) != 1:
+        # Armed by the shared stuck assessment: a spinner maze rarely holds
+        # one coordinate for four decisions, so the old four-identical gate
+        # never fired exactly when the crowd was most useful.
+        if not stuck_active:
             self.status["crowd_hints_state"] = "armed"
             return None
         if self.last_crowd_advisory_position == position:
@@ -13134,7 +14779,110 @@ class PokemonRunner:
         self.status["navigation_memory_count"] = len(
             self.navigation_memory.attempts
         )
+        stuck_assessment = self.navigation_memory.stuck_assessment(
+            position if route_context else None
+        )
+        episode = stuck_assessment["episode"]
+        # Puzzle mode enters when the shared assessment activates and exits
+        # only when the episode itself resets (map/key-item/badge/story
+        # progress or sustained discovery), never on one novel coordinate.
+        # Enforcement is gated on route_context: battles, dialogue, and
+        # other non-overworld decisions keep the persisted episode intact
+        # but are issued in normal mode so the brain can still press a/b.
+        self.navigation_mode = (
+            "puzzle" if (episode is not None and route_context) else "normal"
+        )
+        if self.navigation_mode == "puzzle":
+            self.stuck_decision_count += 1
+        elif episode is None:
+            self.stuck_decision_count = 0
+            self.puzzle_feedback = None
+        self.status["navigation_mode"] = self.navigation_mode
+        self.status["stuck_state"] = stuck_assessment["active"]
+        self.status["stuck_reasons"] = stuck_assessment["reasons"]
+        self.status["stuck_decision_count"] = self.stuck_decision_count
+        edge_total = self.navigation_memory.distinct_edge_count()
+        if edge_total > self.last_edge_count:
+            self.steps_since_new_edge = 0
+        else:
+            self.steps_since_new_edge = min(
+                STEP_COUNTER_LIMIT, self.steps_since_new_edge + 1
+            )
+        self.last_edge_count = edge_total
+        self.edge_count_history.append(edge_total)
+        edges_learned = max(0, edge_total - self.edge_count_history[0])
         decision_state = dict(game_state)
+        # R5: step counters are stamped into every decision prompt; the
+        # standing time-blindness line is rendered alongside them by
+        # CopilotBrain._prompt.
+        decision_state["step_counters"] = {
+            "global_actions": self.total_decisions,
+            "decisions_this_episode": self.stuck_decision_count,
+            "steps_since_new_edge": self.steps_since_new_edge,
+        }
+        frontier: list[dict[str, Any]] = []
+        improvement_runtime = getattr(self, "runtime_dir", None)
+        improvement_cycle = (
+            read_improvement_directive(
+                improvement_runtime,
+                run_id=self.run_id,
+            )
+            if isinstance(improvement_runtime, Path)
+            else None
+        )
+        self.status["improvement_cycle"] = (
+            {
+                "directive_id": improvement_cycle["directive_id"],
+                "verdict": improvement_cycle["verdict"],
+                "strategy": improvement_cycle["strategy"],
+                "expires_at": improvement_cycle["expires_at"],
+            }
+            if improvement_cycle is not None
+            else None
+        )
+        if improvement_cycle is not None:
+            decision_state["improvement_cycle"] = {
+                "verdict": improvement_cycle["verdict"],
+                "strategy": improvement_cycle["strategy"],
+                **improvement_cycle["evidence"],
+            }
+        if self.navigation_mode == "puzzle":
+            decision_state["navigation_mode"] = "puzzle"
+            decision_state["stuck_assessment"] = {
+                "active": stuck_assessment["active"],
+                "reasons": stuck_assessment["reasons"],
+                "settled_transitions": episode["settled_transitions"],
+            }
+            edges = self.navigation_memory.edge_guidance(position)
+            if edges is not None:
+                decision_state["transition_graph"] = edges
+            frontier = self.navigation_memory.untried_frontier(position)
+            neighborhood = self.navigation_memory.graph_neighborhood(
+                position, frontier
+            )
+            summary = (
+                f"steps this episode: {episode['settled_transitions']}; "
+                f"new edges learned in last "
+                f"{EDGE_LEARNING_WINDOW_DECISIONS} decisions: {edges_learned}"
+            )
+            decision_state["graph_neighborhood"] = (
+                f"{neighborhood}\n{summary}" if neighborhood else summary
+            )
+            if stuck_assessment["active"] and frontier:
+                candidates = "; ".join(
+                    f"({entry['origin'][0]},{entry['origin'][1]}) "
+                    f"+{entry['direction']}"
+                    for entry in frontier[:FRONTIER_DIRECTIVE_CANDIDATES]
+                )
+                decision_state["frontier_directive"] = (
+                    "DIRECTIVE: systematically ride the nearest UNTRIED "
+                    f"entry: {candidates}. Stay on this map and exhaust the "
+                    "nearby UNTRIED entries before changing objective or "
+                    "leaving the dungeon."
+                )
+            if self.puzzle_feedback is not None:
+                decision_state["puzzle_feedback"] = self.puzzle_feedback
+                self.puzzle_feedback = None
         route_state = dict(game_state)
         floor_trail = self.navigation_memory.floor_trail
         if (
@@ -13160,15 +14908,26 @@ class PokemonRunner:
             game_state=game_state,
             route_guidance=route_guidance,
             navigation_guidance=navigation_guidance,
+            stuck_assessment=stuck_assessment,
+            frontier=frontier,
         )
         web_research = (
             self._fresh_web_research(game_state)
             if self.stuck_web_research_enabled
             else None
         )
+        self.status["recovery_stage"] = (
+            "research"
+            if (
+                self.navigation_mode == "puzzle"
+                and self.status.get("web_research_state") == "searching"
+            )
+            else self.navigation_mode
+        )
         crowd_advisory = self._crowd_route_advisory(
             position=position if route_context else None,
             collision_map=collision_map,
+            stuck_active=stuck_assessment["active"],
         )
         request = {
             "decision_id": self.decision_sequence + 1,
@@ -13178,6 +14937,7 @@ class PokemonRunner:
             "collision_map": collision_map,
             "history": list(self.history[-8:]),
             "navigation_origin": list(position) if route_context else None,
+            "navigation_mode": self.navigation_mode,
             "crowd_advisory": crowd_advisory,
             "web_research": web_research,
             "force_precision": bool(
@@ -13185,6 +14945,15 @@ class PokemonRunner:
                 or navigation_guidance
                 or crowd_advisory
                 or web_research
+                or (
+                    improvement_cycle is not None
+                    and improvement_cycle["strategy"]
+                    in {
+                        "preserve_graph",
+                        "probe_frontier",
+                        "escalate_research",
+                    }
+                )
             ),
             "movement_context": route_context,
         }
@@ -13256,6 +15025,75 @@ class PokemonRunner:
             return
 
         decision = result["decision"]
+        # The strict one-cardinal contract applies only to settled overworld
+        # puzzle decisions. A battle, item pickup, or dialogue that begins
+        # mid-decision reports a non-overworld phase and must stay free to
+        # press a/b, or the rejection loop would soft-lock the stream.
+        if (
+            result.get("navigation_mode") == "puzzle"
+            and decision.get("phase") == "overworld"
+        ):
+            buttons = decision.get("buttons")
+            if not (
+                isinstance(buttons, list)
+                and len(buttons) == 1
+                and buttons[0] in CARDINAL_BUTTONS
+            ):
+                # Strict puzzle contract: exactly one cardinal per settled
+                # decision. Reject with structured feedback and schedule the
+                # next decision immediately; emulation never pauses.
+                self.puzzle_feedback = {
+                    "rejected_buttons": [
+                        str(button)[:12]
+                        for button in (
+                            buttons if isinstance(buttons, list) else []
+                        )
+                    ][:MAX_BUTTONS_PER_DECISION],
+                    "reason": (
+                        "navigation_mode is puzzle: return exactly one of "
+                        "up, down, left, right and reobserve after the "
+                        "forced movement settles"
+                    ),
+                }
+                self.status["puzzle_rejections"] = (
+                    int(self.status.get("puzzle_rejections", 0)) + 1
+                )
+                self.status["brain_status"] = "idle"
+                self.navigation_memory.cancel_pending()
+                self.last_decision_finished = 0
+                return
+        navigation_origin = result.get("navigation_origin")
+        current_position = navigation_position(self.status.get("game_state"))
+        # Any fresh brain decision supersedes a previously committed route.
+        self.committed_route = None
+        self.status["committed_route"] = None
+        if (
+            result.get("navigation_mode") == "puzzle"
+            and decision.get("phase") == "overworld"
+            and decision.get("route_target") is not None
+            and isinstance(navigation_origin, list)
+            and current_position is not None
+            and tuple(navigation_origin) == current_position
+        ):
+            route_steps = self.navigation_memory.route_to(
+                current_position, decision["route_target"]
+            )
+            if route_steps:
+                # R1 committed route: the BFS path over learned edges runs
+                # one cardinal per settled decision slot; this decision
+                # issues only the first step, the rest are executed by
+                # _advance_committed_route with per-step verification.
+                decision["buttons"] = [route_steps[0]["direction"]]
+                self.committed_route = {
+                    "steps": route_steps,
+                    "index": 1,
+                    "generation": self.control_generation,
+                    "source": "route_target",
+                }
+                self.status["committed_route"] = {
+                    "source": "route_target",
+                    "remaining": len(route_steps) - 1,
+                }
         if (
             result.get("force_precision") is True
             or result.get("movement_context") is True
@@ -13275,8 +15113,6 @@ class PokemonRunner:
         self.status["objective"] = decision["objective"]
         self.status["reason"] = decision["reason"]
         self.status["last_action"] = decision["buttons"]
-        navigation_origin = result.get("navigation_origin")
-        current_position = navigation_position(self.status.get("game_state"))
         if (
             isinstance(navigation_origin, list)
             and tuple(navigation_origin) == current_position
@@ -13289,7 +15125,29 @@ class PokemonRunner:
             )
         else:
             self.navigation_memory.cancel_pending()
+        evidence_source = (
+            "route_target"
+            if (
+                self.committed_route is not None
+                and self.committed_route.get("source") == "route_target"
+            )
+            else "model"
+        )
+        self._record_execution_evidence(
+            source=evidence_source,
+            buttons=decision["buttons"],
+            game_state=self.status.get("game_state"),
+            decision_id=decision_id,
+            action_mode=decision.get("action_mode"),
+        )
         self.player.replace(decision["buttons"])
+        # New input invalidates any settled-position candidate and counts
+        # as gameplay progress for the pause/liveness watchdogs.
+        self.settle_candidate = None
+        self.settle_samples = 0
+        self.position_settled = False
+        if decision["buttons"]:
+            self.status["gameplay_progress_at"] = utc_now()
         history_item = {
             "timestamp": utc_now(),
             "location": self.status.get("game_state", {}).get("location"),
@@ -13308,6 +15166,333 @@ class PokemonRunner:
         )
         if decision["checkpoint"]:
             self._rotate_clip(f"Copilot checkpoint: {decision['objective'][:120]}")
+
+    def _maybe_commit_solved_route(
+        self,
+        position: tuple[int, int, int],
+    ) -> Optional[dict[str, Any]]:
+        """Commit a stored solved route on re-entry at its entrance (R4).
+
+        Puzzle-mode only — a stored route is a maze-solving proposal, never
+        an override of ordinary play. One replay attempt per (map, entrance)
+        for the process lifetime (bounded dict, deliberately NOT reset by map
+        changes: a bad route's replay causes a map change, and resetting on
+        it would re-arm the very loop the guard exists to prevent).
+        """
+        if self.navigation_mode != "puzzle":
+            return None
+        key = tuple(position)
+        if key in self.solved_route_attempts:
+            return None
+        steps = self.navigation_memory.solved_route_for(position)
+        if not steps:
+            return None
+        if len(self.solved_route_attempts) >= SOLVED_ROUTE_ATTEMPT_LIMIT:
+            oldest = next(iter(self.solved_route_attempts))
+            del self.solved_route_attempts[oldest]
+        self.solved_route_attempts[key] = None
+        route = {
+            "steps": steps,
+            "index": 0,
+            "generation": self.control_generation,
+            "source": "solved_route",
+        }
+        self.committed_route = route
+        return route
+
+    def _record_execution_evidence(
+        self,
+        *,
+        source: str,
+        buttons: Any,
+        game_state: Any,
+        decision_id: Any = None,
+        action_mode: Any = None,
+        expected_destination: Any = None,
+    ) -> None:
+        evidence_path = getattr(self, "evidence_path", None)
+        if not isinstance(evidence_path, Path):
+            return
+        allowed_sources = {
+            "model",
+            "route_target",
+            "solved_route",
+            "frontier_coverage",
+            "operator",
+        }
+        if source not in allowed_sources:
+            raise ValueError("Unknown execution evidence source")
+        applied_buttons = (
+            [button for button in buttons if button in VALID_BUTTONS][
+                :MAX_BUTTONS_PER_DECISION
+            ]
+            if isinstance(buttons, list)
+            else []
+        )
+        self.evidence_sequence += 1
+        destination = (
+            list(expected_destination)
+            if (
+                isinstance(expected_destination, (list, tuple))
+                and len(expected_destination) == 3
+                and all(
+                    not isinstance(value, bool)
+                    and isinstance(value, int)
+                    and 0 <= value <= 255
+                    for value in expected_destination
+                )
+            )
+            else None
+        )
+        evidence_state_input = (
+            dict(game_state) if isinstance(game_state, dict) else {}
+        )
+        evidence_state_input.setdefault("phase", self.status.get("phase"))
+        record = {
+            "schema_version": EVIDENCE_SCHEMA_VERSION,
+            "event_id": (
+                f"{self.run_id}:execution:{self.evidence_sequence:08d}"
+            ),
+            "event_type": "execution",
+            "run_id": self.run_id,
+            "sequence": self.evidence_sequence,
+            "observed_at": utc_now(),
+            "agent_sha256": self.agent_sha256,
+            "model": str(self.args.model)[:80],
+            "reasoning_effort": self.reasoning_effort,
+            "navigation_schema": NAVIGATION_MEMORY_SCHEMA_VERSION,
+            "decision_id": (
+                decision_id
+                if (
+                    not isinstance(decision_id, bool)
+                    and isinstance(decision_id, int)
+                    and decision_id >= 0
+                )
+                else None
+            ),
+            "source": source,
+            "action_mode": (
+                action_mode if action_mode in {"precision", "corridor"} else None
+            ),
+            "buttons": applied_buttons,
+            "state": execution_evidence_state(evidence_state_input),
+            "expected_destination": destination,
+            "navigation_mode": (
+                self.navigation_mode
+                if self.navigation_mode in {"normal", "puzzle"}
+                else "normal"
+            ),
+            "stuck_reasons": [
+                reason
+                for reason in self.status.get("stuck_reasons", [])
+                if reason in {
+                    "room_cycle",
+                    "floor_cycle",
+                    "repeated_edge",
+                    "endpoint_revisit",
+                    "low_novelty",
+                }
+            ][:5],
+            "tainted": source == "operator",
+        }
+        try:
+            append_private_jsonl(evidence_path, record)
+        except (OSError, TypeError, ValueError) as error:
+            self.status["evidence_error"] = type(error).__name__
+            LOGGER.error("Execution evidence write failed: %s", type(error).__name__)
+            return
+        self.status["evidence_events"] = self.evidence_sequence
+        self.status["evidence_error"] = None
+
+    def _maybe_commit_frontier_route(
+        self,
+        position: tuple[int, int, int],
+    ) -> Optional[dict[str, Any]]:
+        """Auto-frontier-coverage: the harness rides UNTRIED entries itself.
+
+        Research finding (Claude/Gemini Plays Pokemon): models narrate
+        coverage but keep re-riding known edges under goal-direction bias —
+        systematic frontier exhaustion must be harness-driven. Once puzzle
+        coverage stalls (no new learned edge for AUTO_COVERAGE_STALL_DECISIONS
+        decisions), BFS to the nearest reachable UNTRIED entry and ride it.
+        Every ride either learns a new edge or records a blocked attempt, so
+        the frontier strictly shrinks — a terminating mapping procedure.
+        Bounded per episode; puzzle mode only.
+        """
+        if self.navigation_mode != "puzzle":
+            return None
+        if self.steps_since_new_edge < AUTO_COVERAGE_STALL_DECISIONS:
+            return None
+        episode = self.navigation_memory.episode
+        if episode is None:
+            return None
+        episode_id = str(episode.get("started_at", ""))
+        if episode_id != self.auto_coverage_episode:
+            self.auto_coverage_episode = episode_id
+            self.auto_coverage_rides = 0
+        if self.auto_coverage_rides >= AUTO_COVERAGE_EPISODE_LIMIT:
+            return None
+        toward = PUZZLE_COVERAGE_WAYPOINTS.get(position[0])
+        # Waypoint-biased candidates first; when every near-waypoint entry is
+        # an unreachable wall (the capped list can fill with them and starve
+        # coverage entirely), fall back to plain nearest-first exploration so
+        # the mapper keeps expanding the graph from wherever RED stands.
+        candidate_lists = [
+            self.navigation_memory.untried_frontier(position, toward=toward)
+        ]
+        if toward is not None:
+            candidate_lists.append(
+                self.navigation_memory.untried_frontier(position)
+            )
+        for entries in candidate_lists:
+            for entry in entries:
+                target = entry["origin"]
+                probe = {
+                    "origin": [position[0], target[0], target[1]],
+                    "direction": entry["direction"],
+                    "destination": None,
+                }
+                if [position[1], position[2]] == target:
+                    steps = [probe]
+                else:
+                    path = self.navigation_memory.route_to(position, target)
+                    if path is None:
+                        continue
+                    steps = path + [probe]
+                self.auto_coverage_rides += 1
+                self.status["auto_coverage_rides"] = self.auto_coverage_rides
+                route = {
+                    "steps": steps,
+                    "index": 0,
+                    "generation": self.control_generation,
+                    "source": "frontier_coverage",
+                }
+                self.committed_route = route
+                return route
+        return None
+
+    def _advance_committed_route(self, game_state: dict[str, Any]) -> bool:
+        """Execute the next committed-route step through the settled gate.
+
+        Called only from a settled decision slot. Returns True when a route
+        step was issued (no brain decision needed this slot). Every step is
+        position-verified first; ANY surprise — dialogue or battle text, a
+        control-generation change, an off-plan map or coordinate — aborts the
+        route so the very same slot falls through to a fresh brain decision.
+        No blind multi-input execution ever happens here.
+        """
+        position = navigation_position(game_state)
+        route_context = bool(
+            position is not None and not game_state.get("screen_text")
+        )
+        route = self.committed_route
+        if route is None:
+            if not route_context:
+                return False
+            route = self._maybe_commit_solved_route(
+                position
+            ) or self._maybe_commit_frontier_route(position)
+            if route is None:
+                return False
+        if (
+            not route_context
+            or route["generation"] != self.control_generation
+            or route["index"] >= len(route["steps"])
+        ):
+            self.committed_route = None
+            self.status["committed_route"] = None
+            return False
+        step = route["steps"][route["index"]]
+        if list(position) != step["origin"]:
+            self.committed_route = None
+            self.status["committed_route"] = None
+            return False
+        # Close out the previous step's pending transition so macro-edge and
+        # episode learning continue through routed movement, then verify the
+        # next step the same way a brain decision would.
+        self.navigation_memory.finish(position)
+        direction = step["direction"]
+        self.navigation_memory.begin(
+            list(position), [direction], phase="overworld"
+        )
+        self._record_execution_evidence(
+            source=route["source"],
+            buttons=[direction],
+            game_state=game_state,
+            expected_destination=step["destination"],
+        )
+        self.player.replace([direction])
+        route["index"] += 1
+        remaining = len(route["steps"]) - route["index"]
+        if remaining <= 0:
+            # Final step issued; arrival is verified by the next decision.
+            self.committed_route = None
+        self.settle_candidate = None
+        self.settle_samples = 0
+        self.position_settled = False
+        self.last_decision_finished = time.monotonic()
+        self.status["brain_status"] = "route" if remaining > 0 else "acting"
+        self.status["last_action"] = [direction]
+        self.status["gameplay_progress_at"] = utc_now()
+        self.status["committed_route"] = (
+            {"source": route["source"], "remaining": remaining}
+            if remaining > 0
+            else None
+        )
+        return True
+
+    def _movement_settled(
+        self,
+        position: Optional[tuple[int, int, int]],
+        *,
+        now: float,
+    ) -> bool:
+        """Nonblocking settled-position decision gate.
+
+        The emulator, audio, recording, and controls keep ticking while this
+        samples (map, x, y); the next decision is allowed only after the
+        position is unchanged for SETTLE_SAMPLE_COUNT samples spanning at
+        least SETTLE_MIN_SECONDS. A None position (dialogue or non-overworld
+        state) resets the candidate and leaves those decisions ungated.
+        """
+        if position is None:
+            self.settle_candidate = None
+            self.settle_samples = 0
+            return True
+        if (
+            self.settle_candidate != position
+            or self.settle_generation != self.control_generation
+        ):
+            self.settle_candidate = position
+            self.settle_generation = self.control_generation
+            self.settle_samples = 1
+            self.settle_started_at = now
+            return False
+        self.settle_samples += 1
+        return (
+            self.settle_samples >= SETTLE_SAMPLE_COUNT
+            and now - self.settle_started_at >= SETTLE_MIN_SECONDS
+        )
+
+    def _note_gameplay_progress(self, game_state: dict[str, Any]) -> None:
+        """Track observed map/coordinate/story progress for the watchdogs."""
+        key_items = game_state.get("key_items")
+        marker = (
+            navigation_position(game_state),
+            len(game_state.get("badges", [])),
+            tuple(sorted(key_items.items()))
+            if isinstance(key_items, dict)
+            else None,
+        )
+        previous = self.last_progress_marker
+        if marker == previous:
+            return
+        self.last_progress_marker = marker
+        self.status["gameplay_progress_at"] = utc_now()
+        if previous is not None and marker[1:] != previous[1:]:
+            # Badge or key-item change is story progress: it ends any
+            # persisted stuck episode.
+            self.navigation_memory.note_progress()
 
     def _maybe_milestone(self, game_state: dict[str, Any]) -> None:
         badge_count = len(game_state.get("badges", []))
@@ -13670,6 +15855,7 @@ class PokemonRunner:
                 if self.frames % 6 == 0:
                     self._read_external_controls()
                 self._process_controls()
+                self._expire_automation_pause()
                 self._apply_brain_result()
 
                 # 60fps wall pacing with bounded catch-up: sleep when ahead;
@@ -13697,11 +15883,31 @@ class PokemonRunner:
                         )
                     speed_mark = (now, self.frames)
 
+                if self.frames % SETTLE_SAMPLE_FRAMES == 0:
+                    sample = reader.position()
+                    if self.status.get("game_state", {}).get("screen_text"):
+                        sample = None
+                    if sample is not None:
+                        # Spinner tiles move the player with no queued
+                        # input, so the observed path records every sample
+                        # while a navigation attempt is pending.
+                        self.navigation_memory.observe(sample)
+                    if self.player.idle and not self.decision_pending:
+                        self.position_settled = self._movement_settled(
+                            sample,
+                            now=now,
+                        )
+                    else:
+                        self.settle_candidate = None
+                        self.settle_samples = 0
+                        self.position_settled = False
+
                 decision_due = (
                     self.control_mode == "ai"
                     and self.brain_available.is_set()
                     and not self.decision_pending
                     and self.player.idle
+                    and self.position_settled
                     and (
                         now - self.last_decision_finished
                         >= DECISION_COOLDOWN_SECONDS
@@ -13729,15 +15935,21 @@ class PokemonRunner:
                 if self.frames % 30 == 0:
                     game_state = reader.snapshot()
                     self.status["game_state"] = game_state
+                    self._note_gameplay_progress(game_state)
                     self._maybe_milestone(game_state)
 
                 if decision_due and image is not None:
                     game_state = reader.snapshot()
                     self.status["game_state"] = game_state
+                    self._note_gameplay_progress(game_state)
                     self._maybe_milestone(game_state)
-                    self._request_decision(
-                        image, game_state, collision_ascii(self.pyboy)
-                    )
+                    # R1/R4 committed routes consume the settled decision
+                    # slot one verified cardinal at a time; any surprise
+                    # aborts and the same slot requests a fresh decision.
+                    if not self._advance_committed_route(game_state):
+                        self._request_decision(
+                            image, game_state, collision_ascii(self.pyboy)
+                        )
 
                 if now - self.clip_started >= self.args.clip_minutes * 60:
                     self._rotate_clip("automatic clip boundary")
@@ -13986,8 +16198,32 @@ def wait_for_supervised_child(
                         )
                     )
                 )
-                if (failed or stale) and not stop_requested.is_set():
-                    reason = "failed" if failed else "stale heartbeat"
+                # Secondary pause watchdog, independent of the heartbeat: a
+                # healthy status writer cannot conceal an automation pause
+                # stuck past its absolute lease. Explicit operator holds are
+                # never restarted.
+                pause_deadline = _strict_utc_timestamp(
+                    status.get("pause_expires_at")
+                )
+                overdue_pause = bool(
+                    status_matches_child
+                    and status.get("paused") is True
+                    and status.get("pause_kind") == "automation"
+                    and pause_deadline is not None
+                    and datetime.now(timezone.utc)
+                    > pause_deadline
+                    + timedelta(seconds=AUTOMATION_PAUSE_GRACE_SECONDS)
+                )
+                if (
+                    failed or stale or overdue_pause
+                ) and not stop_requested.is_set():
+                    reason = (
+                        "failed"
+                        if failed
+                        else "stale heartbeat"
+                        if stale
+                        else "expired automation pause"
+                    )
                     LOGGER.error(
                         "Supervisor terminating Pokemon child after %s",
                         reason,

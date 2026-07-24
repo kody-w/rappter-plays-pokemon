@@ -51,7 +51,7 @@ Run every check before submitting:
 .venv-dev/bin/python scripts/update_browser_assets.py --check
 .venv-dev/bin/python scripts/build_pages_site.py --check
 .venv-dev/bin/python scripts/check_browser_js.py
-bash -n bootstrap.sh chat.sh launch.sh story.sh uninstall.sh
+bash -n bootstrap.sh chat.sh improve.sh launch.sh story.sh uninstall.sh warehouse.sh
 ```
 
 No test may contact GitHub Copilot, PeerJS Cloud, a Nostr relay, STUN, the

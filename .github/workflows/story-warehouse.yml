@@ -1,0 +1,62 @@
+name: Story warehouse
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 * * * *"
+
+permissions: {}
+
+concurrency:
+  group: story-warehouse
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+      - name: Install package
+        run: python -m pip install -e .
+      - name: Fetch public data branches
+        run: |
+          git fetch origin \
+            story-archive:refs/remotes/origin/story-archive \
+            story-warehouse:refs/remotes/origin/story-warehouse
+      - name: Recover public execution receipts
+        run: |
+          mkdir -p dist
+          git show \
+            refs/remotes/origin/story-warehouse:v1/execution-receipts.jsonl \
+            > dist/execution-receipts.jsonl || : > dist/execution-receipts.jsonl
+      - name: Build and verify warehouse
+        run: |
+          python -m rappter_plays_pokemon.warehouse build \
+            --source-ref refs/remotes/origin/story-archive \
+            --database dist/warehouse.db \
+            --manifest dist/warehouse-manifest.json \
+            --public-receipts dist/execution-receipts.jsonl
+          python -m rappter_plays_pokemon.warehouse verify \
+            --database dist/warehouse.db \
+            --manifest dist/warehouse-manifest.json
+          python -m rappter_plays_pokemon.warehouse static \
+            --database dist/warehouse.db \
+            --manifest dist/warehouse-manifest.json \
+            --public-receipts dist/execution-receipts.jsonl \
+            --static-dir dist/warehouse-static
+      - name: Publish changed snapshot
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python -m rappter_plays_pokemon.warehouse publish \
+            --static-dir dist/warehouse-static \
+            --repository "${{ github.repository }}" \
+            --branch story-warehouse

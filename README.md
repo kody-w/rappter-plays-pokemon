@@ -66,6 +66,14 @@ reasoning.
   route cycle, an isolated one-shot Copilot session can search reviewed
   Bulbapedia text with a single bounded tool, inspect the current screenshot,
   and return source-cited facts for the gameplay model to verify or ignore.
+- **Continuous improvement governor:** append-only private execution receipts
+  feed a deterministic sidecar that judges progress, memory, planning, and
+  reliability, then injects only an expiring enum-based strategy into the next
+  decision cycle.
+- **Git-backed research warehouse:** every public story revision and
+  allowlisted execution receipt is materialized into SQLite, committed to the
+  orphan `story-warehouse` branch, and exposed as a `rapp-static-api/1.0`
+  registry for humans, agents, and local analytics.
 - **Bounded recording:** local, rotating H.264 MP4 clips with manifests,
   retention limits, a disk budget, and a free-space reserve.
 - **Local-only state:** ROM path, screenshots, saves, logs, and videos stay in a
@@ -148,6 +156,19 @@ Build or publish the public-safe story without stopping the game:
 ./story.sh watch --interval 600 \
   --youtube-video-id CURRENT_VIDEO_ID \
   --youtube-started-at UTC_BROADCAST_START
+```
+
+Run the improvement and warehouse loops independently:
+
+```bash
+./improve.sh judge
+./improve.sh watch --interval 60 --stuck-budget 100
+./improve.sh export --output /private/path/execution-receipts.jsonl
+
+./warehouse.sh watch --interval 600
+./warehouse.sh verify \
+  --database ~/.openrappter/pokemon-red-warehouse/warehouse.db \
+  --manifest ~/.openrappter/pokemon-red-warehouse/warehouse-manifest.json
 ```
 
 `launch.sh` never replaces the registered single-file agent for status or
@@ -373,6 +394,39 @@ original run started, so the curator never invents missing opening events.
 Gameplay MP4s, screenshots, ROM data, paths, hashes, names, screen text,
 objectives, buttons, and raw model reasoning remain private.
 
+### Continuous improvement and public warehouse
+
+The runner writes one private, mode-`0600` execution receipt for every model,
+verified-route, frontier, or operator input. Receipts contain bounded
+controller facts and exact code provenance, but no prompts, observations,
+objectives, reasoning, screen text, images, ROM bytes, or credentials.
+
+[`improve.sh`](improve.sh) reads those receipts and the current status. Its
+deterministic judge emits one expiring, run-bound strategy enum such as
+`probe_frontier` or `preserve_graph`. The gameplay process validates the exact
+schema before adding that controller verdict to the next decision. The
+governor cannot press buttons, edit source, weaken tests, merge code, or
+override screenshots, collision data, navigation memory, and authoritative
+route facts.
+
+[`warehouse.sh`](warehouse.sh) follows Simon Willison's
+[Git scraping](https://simonwillison.net/2020/Oct/9/git-scraping/) pattern:
+the human-readable `story-archive` JSON remains the source history, while one
+complete SQLite database is rebuilt and committed at `v1/warehouse.db` on the
+orphan `story-warehouse` branch. Each Git commit is an immutable warehouse
+snapshot; the latest tree does not accumulate one database file per commit.
+
+- [RAPP static API registry](https://raw.githubusercontent.com/kody-w/rappter-plays-pokemon/refs/heads/story-warehouse/registry.json)
+- [SQLite warehouse](https://raw.githubusercontent.com/kody-w/rappter-plays-pokemon/refs/heads/story-warehouse/v1/warehouse.db)
+- [Execution receipts](https://raw.githubusercontent.com/kody-w/rappter-plays-pokemon/refs/heads/story-warehouse/v1/execution-receipts.jsonl)
+- [Static data explorer](https://kody-w.github.io/rappter-plays-pokemon/data/)
+
+The public projection removes coordinates, map IDs, media references, local
+paths, ROM/checkpoint hashes, chat, identities, and all free-form model output.
+Public availability makes the corpus usable for retrieval, evaluation, and
+optional downstream training where lawful; it does not guarantee that any
+model provider will ingest it.
+
 The overlay QR opens a
 [user-facing project introduction](https://kody-w.github.io/rappter-plays-pokemon/d/)
 with live, catch-up, and source links. Its fragment may also carry a bounded,
@@ -450,8 +504,10 @@ files containing local state are mode `0600`.
 | `states/*.json` | Checkpoint hash and matching-ROM manifest |
 | `pokemon-red.ram` | Atomic cartridge RAM |
 | `screens/` | Bounded decision screenshots |
+| `evidence/events-*.jsonl` | Append-only private execution receipts |
 | `brain.json` | Recent decisions and progress context |
 | `navigation-memory.json` | Bounded failed/cycling route-attempt history |
+| `improvement-directive.json` | Expiring enum-only next-cycle strategy |
 | `youtube-chat-advisory.json` | Expiring direction enum; never raw chat |
 | `web-research.json` | Expiring source-cited stuck-recovery facts |
 | `player.log` | Local supervisor/player diagnostics |
@@ -497,6 +553,11 @@ flowchart LR
     B -->|PNG screenshot only| C[GitHub Copilot SDK<br/>gpt-5.6-sol / max]
     C -->|JSON buttons, zero tools| R
     R --> L[Local private states, RAM, manifests]
+    R --> E[Private execution receipts]
+    E --> G[Deterministic improvement governor]
+    G -->|typed expiring strategy| R
+    E --> X[Public allowlist exporter]
+    X --> D[Git-backed SQLite + RAPP static API]
 ```
 
 The emulator free-runs at real time while each model decision is pending, and
@@ -509,8 +570,9 @@ after repeated crashes.
 
 ## Privacy and security model
 
-- **No game data in Git:** `.gitignore` blocks ROMs, saves, video, screenshots,
-  logs, and runtime state. CI uses generated synthetic bytes and mocks only.
+- **No private game artifacts in Git:** `.gitignore` blocks ROMs, saves, video,
+  screenshots, logs, and raw runtime state. Only schema-validated public story
+  facts and sanitized execution receipts cross the publication boundary.
 - **Explicit ROM only:** the agent accepts the path argument, environment
   variable, or private runtime config; it does not scan Downloads, Documents,
   Spotlight, or the network.

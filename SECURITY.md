@@ -201,6 +201,31 @@ YouTube ID and bounded integer start/end offsets; the page constructs an exact
 `youtube-nocookie.com` embed. No gameplay recording or screenshot is published
 to GitHub.
 
+The continuous-improvement journal is private mode-`0600` state. It records
+only bounded execution receipts: controller enums, progress counters, exact
+agent hash, and local map/coordinate facts needed for diagnosis. It never
+records prompts, observations, objectives, reasoning, screen text, screenshots,
+collision maps, ROM/save bytes or hashes, chat, identities, secrets, or local
+paths. The separate governor can write only an exact, expiring, run-bound
+strategy enum. It cannot press buttons, modify code, change control ownership,
+or grant itself tools.
+
+The `story-warehouse` branch is a one-way public projection. Its exporter
+constructs every field explicitly and removes coordinates, map IDs, location
+text, media references, raw timestamps, arbitrary prose model output, manual
+control records, and all private artifact identifiers. The branch contains a
+read-only `rapp-static-api/1.0` registry, sanitized JSONL, and SQLite; it has no
+server-side execution, uploads, cookies, credentials, proxying, or dynamic
+query endpoint. Every database and receipt file is SHA-256 identified in the
+manifest. Consumers must pin a Git commit or verify those hashes when
+reproducibility matters.
+
+The public corpus is intended for analysis, retrieval, evaluation, and
+optional downstream model training where permitted. Repository MIT terms do
+not license third-party trademarks, game assets, linked media, privacy or
+publicity rights, or promise that any downstream training use is lawful. The
+warehouse deliberately excludes the underlying game assets and model prose.
+
 The overlay's learn-more QR points to the user-facing `/d/` Pages route. It may
 include bounded encoder metrics only after `#`; fragments do not reach Pages
 HTTP requests or logs. The decoder accepts an exact numeric allowlist and can
