@@ -146,3 +146,27 @@ def test_public_projection_pairs_outcomes_and_excludes_tainted_records(tmp_path)
     assert result["records"] == 2
     assert output.stat().st_mode & 0o777 == 0o600
     assert len(load_evidence(runtime)) == 3
+
+
+def test_judge_escalates_ready_research_after_second_stuck_budget(tmp_path):
+    runtime = tmp_path / "runtime"
+    state_dir = tmp_path / "improvement"
+    _write_json(runtime / "status.json", _status(stuck_count=200))
+    _write_json(
+        runtime / "navigation-memory.json",
+        {"walk_edges": [{}] * 800, "macro_edges": [{}] * 40},
+    )
+    _evidence(
+        runtime,
+        [_record(index, coordinates=(index, 1)) for index in range(1, 21)],
+    )
+
+    directive = judge(
+        runtime,
+        state_dir,
+        minimum_records=20,
+        stuck_budget=100,
+    )
+
+    assert directive["verdict"] == "planning"
+    assert directive["strategy"] == "escalate_research"
