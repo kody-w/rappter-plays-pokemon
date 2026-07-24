@@ -319,3 +319,54 @@ def test_publisher_refuses_monotonic_receipt_regression(monkeypatch, tmp_path):
 
     assert result["changed"] is False
     assert result["stale"] is True
+
+
+def test_large_warehouse_uses_git_transport(monkeypatch, tmp_path):
+    static_dir = tmp_path / "static"
+    manifest_path = static_dir / "api" / "v1" / "manifest.json"
+    manifest_path.parent.mkdir(parents=True)
+    manifest_path.write_text(
+        json.dumps(
+            {
+                "source": {"head_commit": "a" * 40},
+                "warehouse": {
+                    "database_sha256": "b" * 64,
+                    "execution_receipts_sha256": "c" * 64,
+                    "counts": {
+                        "source_commits": 2,
+                        "execution_receipts": 3,
+                    },
+                },
+            }
+        )
+    )
+    database = static_dir / "v1" / "warehouse.db"
+    database.parent.mkdir(parents=True)
+    database.write_bytes(b"x")
+    monkeypatch.setattr(
+        "rappter_plays_pokemon.warehouse.GITHUB_BLOB_API_SAFE_BYTES",
+        0,
+    )
+    monkeypatch.setattr(
+        "rappter_plays_pokemon.warehouse.shutil.which",
+        lambda name: "/usr/bin/gh" if name == "gh" else None,
+    )
+    publisher = GitHubWarehousePublisher("owner/repository", "warehouse")
+    monkeypatch.setattr(publisher, "ensure_branch", lambda: "d" * 40)
+    monkeypatch.setattr(publisher, "_remote_release_summary", lambda: None)
+    called = {}
+    monkeypatch.setattr(
+        publisher,
+        "_publish_with_git",
+        lambda static, manifest, digest: called.update(
+            static=static,
+            digest=digest,
+        )
+        or {"status": "success", "changed": True},
+    )
+
+    result = publisher.publish(static_dir)
+
+    assert result["changed"] is True
+    assert called["static"] == static_dir
+    assert called["digest"] == "b" * 64

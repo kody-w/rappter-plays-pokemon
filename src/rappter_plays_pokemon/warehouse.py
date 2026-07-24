@@ -12,6 +12,7 @@ import shutil
 import sqlite3
 import stat
 import subprocess
+import tempfile
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -35,6 +36,7 @@ STORY_PATH = "v1/story.json"
 MAX_STORY_BYTES = 1024 * 1024
 MAX_RECEIPT_BYTES = 8192
 MAX_PUBLISH_FILE_BYTES = 100 * 1024 * 1024
+GITHUB_BLOB_API_SAFE_BYTES = 20 * 1024 * 1024
 REPOSITORY_RE = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
 BRANCH_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$")
 SHA_RE = re.compile(r"^[0-9a-f]{40}$")
@@ -1147,19 +1149,37 @@ class GitHubWarehousePublisher:
                 "database_sha256": database_sha,
                 "branch": self.branch,
             }
+        publish_files = [
+            path
+            for path in sorted(static_dir.rglob("*"))
+            if path.is_file()
+            and not path.is_symlink()
+            and (
+                not path.relative_to(static_dir).as_posix().startswith(".")
+                or path.relative_to(static_dir).as_posix() == ".nojekyll"
+            )
+        ]
+        for path in publish_files:
+            if path.stat().st_size > MAX_PUBLISH_FILE_BYTES:
+                raise WarehouseError(
+                    f"Publish file is too large: {path.name}"
+                )
+        if any(
+            path.stat().st_size > GITHUB_BLOB_API_SAFE_BYTES
+            for path in publish_files
+        ):
+            return self._publish_with_git(
+                static_dir,
+                manifest,
+                database_sha,
+            )
         parent = self._api(
             f"repos/{self.repository}/git/commits/{parent_sha}"
         )
         entries = []
-        for path in sorted(static_dir.rglob("*")):
-            if not path.is_file() or path.is_symlink():
-                continue
+        for path in publish_files:
             relative = path.relative_to(static_dir).as_posix()
-            if relative.startswith(".") and relative != ".nojekyll":
-                continue
             payload = path.read_bytes()
-            if len(payload) > MAX_PUBLISH_FILE_BYTES:
-                raise WarehouseError(f"Publish file is too large: {relative}")
             blob = self._api(
                 f"repos/{self.repository}/git/blobs",
                 method="POST",
@@ -1209,6 +1229,130 @@ class GitHubWarehousePublisher:
             "database_sha256": database_sha,
             "branch": self.branch,
         }
+
+    def _publish_with_git(
+        self,
+        static_dir: Path,
+        manifest: dict[str, Any],
+        database_sha: str,
+    ) -> dict[str, Any]:
+        with tempfile.TemporaryDirectory(
+            prefix="rappter-warehouse-"
+        ) as temporary:
+            checkout = Path(temporary) / "repository"
+            environment = {
+                **os.environ,
+                "GIT_TERMINAL_PROMPT": "0",
+            }
+            setup = subprocess.run(
+                ["gh", "auth", "setup-git"],
+                text=True,
+                capture_output=True,
+                check=False,
+                env=environment,
+            )
+            if setup.returncode:
+                raise WarehouseError(
+                    "GitHub CLI could not configure Git authentication"
+                )
+            clone = subprocess.run(
+                [
+                    "gh",
+                    "repo",
+                    "clone",
+                    self.repository,
+                    str(checkout),
+                    "--",
+                    "--depth",
+                    "1",
+                    "--branch",
+                    self.branch,
+                ],
+                text=True,
+                capture_output=True,
+                check=False,
+                env=environment,
+            )
+            if clone.returncode:
+                detail = (clone.stderr or clone.stdout).strip()
+                raise WarehouseError(f"Warehouse clone failed: {detail}")
+            for source in sorted(static_dir.rglob("*")):
+                if not source.is_file() or source.is_symlink():
+                    continue
+                relative = source.relative_to(static_dir)
+                if (
+                    relative.as_posix().startswith(".")
+                    and relative.as_posix() != ".nojekyll"
+                ):
+                    continue
+                destination = checkout / relative
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(source, destination)
+            commands = (
+                ["git", "config", "user.name", "rappter-warehouse[bot]"],
+                [
+                    "git",
+                    "config",
+                    "user.email",
+                    "rappter-warehouse[bot]@users.noreply.github.com",
+                ],
+                ["git", "add", "-A"],
+                [
+                    "git",
+                    "commit",
+                    "-m",
+                    (
+                        "data: build warehouse through "
+                        f"{manifest['source']['head_commit'][:12]}"
+                    ),
+                ],
+            )
+            for command in commands:
+                result = subprocess.run(
+                    command,
+                    cwd=checkout,
+                    text=True,
+                    capture_output=True,
+                    check=False,
+                    env=environment,
+                )
+                if result.returncode:
+                    detail = (result.stderr or result.stdout).strip()
+                    raise WarehouseError(
+                        f"Warehouse Git publish failed: {detail}"
+                    )
+            commit_sha = subprocess.run(
+                ["git", "rev-parse", "HEAD"],
+                cwd=checkout,
+                text=True,
+                capture_output=True,
+                check=True,
+                env=environment,
+            ).stdout.strip()
+            push = subprocess.run(
+                [
+                    "git",
+                    "push",
+                    "origin",
+                    f"HEAD:refs/heads/{self.branch}",
+                ],
+                cwd=checkout,
+                text=True,
+                capture_output=True,
+                check=False,
+                env=environment,
+            )
+            if push.returncode:
+                detail = (push.stderr or push.stdout).strip()
+                raise WarehouseError(f"Warehouse push failed: {detail}")
+            return {
+                "status": "success",
+                "changed": True,
+                "commit": commit_sha,
+                "database_sha256": database_sha,
+                "branch": self.branch,
+                "transport": "git",
+            }
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -1300,9 +1444,39 @@ def run(argv: Sequence[str] | None = None) -> dict[str, Any]:
     args = build_parser().parse_args(argv)
     if args.action == "watch":
         cycles = 0
+        failures = 0
         latest: dict[str, Any] = {}
         while True:
-            latest = _watch_cycle(args)
+            try:
+                latest = _watch_cycle(args)
+            except (
+                OSError,
+                sqlite3.Error,
+                WarehouseError,
+                json.JSONDecodeError,
+            ) as error:
+                failures += 1
+                if args.once:
+                    raise
+                state_dir = args.state_dir.expanduser().resolve()
+                state_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
+                status_path = state_dir / "status.json"
+                status_path.write_bytes(
+                    _canonical(
+                        {
+                            "schema_version": WAREHOUSE_SCHEMA_VERSION,
+                            "updated_at": datetime.now(timezone.utc).isoformat(),
+                            "status": "error",
+                            "error_kind": type(error).__name__,
+                            "consecutive_failures": failures,
+                        },
+                        pretty=True,
+                    )
+                )
+                os.chmod(status_path, 0o600)
+                time.sleep(min(max(60, args.interval), 60 * 2**min(failures, 4)))
+                continue
+            failures = 0
             cycles += 1
             if args.once:
                 return {"status": "success", "cycles": cycles, "latest": latest}
