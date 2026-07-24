@@ -50,6 +50,14 @@ restarts the encoder if it ever exits. The permanent share link is the
 channel's live URL (`https://www.youtube.com/channel/<CHANNEL-ID>/live`);
 it survives restarts, unlike per-session P2P links.
 
+The watchdog also mirrors the already-composed H.264/AAC program to
+`udp://127.0.0.1:23000` as MPEG-TS. OBS can ingest that loopback feed as a
+Media Source and send it to Twitch without desktop capture or a second reader
+on the game-audio FIFO. YouTube remains the primary output: a failed local
+mirror is ignored, while a failed YouTube output still recycles the encoder.
+Set `RPP_OBS_MIRROR_URL=""` to disable the local mirror or provide another
+loopback URL when port 23000 is unavailable.
+
 ## Self-healing layers
 
 The unattended broadcast recovers without resetting game progress:

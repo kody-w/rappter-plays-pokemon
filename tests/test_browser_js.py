@@ -251,6 +251,9 @@ def test_overlay_exposes_screenshot_safe_tuning_metrics_and_qr():
         "web_research_source_count",
     ):
         assert field in encoder
+    assert "VIDEO_MAX_CATCHUP_FRAMES = FRAME_RATE * 2" in encoder
+    assert "const dueFrames =" in encoder
+    assert "let deficit = dueFrames - piped" in encoder
     assert "innerHTML" not in overlay
 
 

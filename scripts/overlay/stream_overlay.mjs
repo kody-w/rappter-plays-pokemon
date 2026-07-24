@@ -33,6 +33,7 @@ try {
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const FRAME_RATE = 20;
+const VIDEO_MAX_CATCHUP_FRAMES = FRAME_RATE * 2;
 const STALL_EXIT_MS = 60000;
 const BACKPRESSURE_EXIT_MS = 30000;
 
@@ -452,6 +453,7 @@ console.error(
 
 const startedAt = Date.now();
 let piped = 0;
+let videoStartedAt = 0;
 await new Promise(resolve => {
   const timer = setInterval(() => {
     if (
@@ -465,7 +467,16 @@ await new Promise(resolve => {
       return;
     }
     if (latestShot) {
-      try {
+      const now = Date.now();
+      if (!videoStartedAt) videoStartedAt = now;
+      const dueFrames =
+        Math.floor((now - videoStartedAt) / 1000 * FRAME_RATE) + 1;
+      let deficit = dueFrames - piped;
+      if (deficit > VIDEO_MAX_CATCHUP_FRAMES) {
+        videoStartedAt = now - piped / FRAME_RATE * 1000;
+        deficit = 1;
+      }
+      while (deficit > 0) {
         if (ffmpeg.stdin.writableNeedDrain) {
           if (!encoderMetrics.videoBackpressureAt) {
             encoderMetrics.videoBackpressureAt = Date.now();
@@ -478,12 +489,16 @@ await new Promise(resolve => {
           return;
         }
         encoderMetrics.videoBackpressureAt = 0;
-        ffmpeg.stdin.write(latestShot);
-        piped += 1;
-        encoderMetrics.piped = piped;
-      } catch (_error) {
-        clearInterval(timer);
-        resolve();
+        try {
+          ffmpeg.stdin.write(latestShot);
+          piped += 1;
+          encoderMetrics.piped = piped;
+          deficit -= 1;
+        } catch (_error) {
+          clearInterval(timer);
+          resolve();
+          return;
+        }
       }
     }
   }, 1000 / FRAME_RATE);
