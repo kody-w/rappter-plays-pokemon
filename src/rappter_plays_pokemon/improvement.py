@@ -209,7 +209,11 @@ def load_evidence(
     if evidence_dir.is_symlink() or not evidence_dir.is_dir():
         raise ImprovementError("Evidence input must be a private directory")
     records: deque[dict[str, Any]] = deque(maxlen=max(1, min(limit, 10000)))
-    for path in sorted(evidence_dir.glob("events-*.jsonl")):
+    paths = sorted(
+        evidence_dir.glob("events-*.jsonl"),
+        key=lambda candidate: candidate.stat().st_mtime_ns,
+    )
+    for path in paths:
         metadata = path.lstat()
         if path.is_symlink() or not stat.S_ISREG(metadata.st_mode):
             raise ImprovementError(f"Invalid evidence shard: {path.name}")
@@ -309,13 +313,18 @@ def judge(
     stuck_count = status.get("stuck_decision_count")
     stuck_count = stuck_count if isinstance(stuck_count, int) else 0
     recent = records[-100:]
-    stuck_records = sum(bool(record["stuck_reasons"]) for record in recent)
+    stuck_records = 0
+    for record in reversed(records):
+        if not record["stuck_reasons"]:
+            break
+        stuck_records += 1
     route_records = sum(
         record["source"] in {"route_target", "solved_route", "frontier_coverage"}
         for record in recent
     )
     navigation = _navigation_counts(runtime_dir)
 
+    effective_stuck_count = max(stuck_count, stuck_records)
     if (
         status.get("running") is not True
         or status.get("lifecycle") != "ready"
@@ -328,11 +337,14 @@ def judge(
         verdict, strategy = "progress", "normal"
     elif len(records) < minimum_records:
         verdict, strategy = "collect_more_data", "observe"
-    elif status.get("stuck_state") is True and stuck_count >= stuck_budget:
+    elif (
+        status.get("stuck_state") is True
+        and effective_stuck_count >= stuck_budget
+    ):
         if navigation["walk_edges"] >= 3800 or navigation["macro_edges"] >= 240:
             verdict, strategy = "memory", "preserve_graph"
         elif (
-            stuck_count >= stuck_budget * 2
+            effective_stuck_count >= stuck_budget * 2
             and status.get("web_research_state") in {"ready", "searching"}
         ):
             verdict, strategy = "planning", "escalate_research"
@@ -347,7 +359,7 @@ def judge(
         "execution_records": len(records),
         "recent_stuck_records": stuck_records,
         "recent_route_records": route_records,
-        "stuck_decisions": stuck_count,
+        "stuck_decisions": effective_stuck_count,
         "walk_edges": navigation["walk_edges"],
         "macro_edges": navigation["macro_edges"],
         "progress_marker": marker,

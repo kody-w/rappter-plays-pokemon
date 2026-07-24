@@ -170,3 +170,27 @@ def test_judge_escalates_ready_research_after_second_stuck_budget(tmp_path):
 
     assert directive["verdict"] == "planning"
     assert directive["strategy"] == "escalate_research"
+
+
+def test_judge_preserves_stuck_budget_across_process_restart(tmp_path):
+    runtime = tmp_path / "runtime"
+    state_dir = tmp_path / "improvement"
+    _write_json(runtime / "status.json", _status(stuck_count=1))
+    _write_json(
+        runtime / "navigation-memory.json",
+        {"walk_edges": [{}] * 800, "macro_edges": [{}] * 40},
+    )
+    _evidence(
+        runtime,
+        [_record(index, coordinates=(index, 1)) for index in range(1, 101)],
+    )
+
+    directive = judge(
+        runtime,
+        state_dir,
+        minimum_records=20,
+        stuck_budget=100,
+    )
+
+    assert directive["strategy"] == "probe_frontier"
+    assert directive["evidence"]["stuck_decisions"] == 100
