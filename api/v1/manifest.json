@@ -5,7 +5,7 @@
     "python": "3.13.12",
     "sqlite": "3.53.3"
   },
-  "generated_at": "2026-07-24T03:14:15+00:00",
+  "generated_at": "2026-07-24T03:24:17+00:00",
   "license": {
     "id": "CC0-1.0",
     "notice": "https://github.com/kody-w/rappter-plays-pokemon/blob/main/DATA_LICENSE.md",
@@ -21,24 +21,24 @@
   },
   "schema": "rappter-pokemon-warehouse-manifest/1.0",
   "source": {
-    "head_commit": "d3d72e5cce439910c74df53d9b00148a4c059491",
+    "head_commit": "64ed6f6e9d6d61c916dc329d4f227d6c08f2a4fb",
     "observed_through": "2026-07-24T03:02:44.322889Z",
     "ref": "refs/remotes/origin/story-archive",
     "repository": "kody-w/rappter-plays-pokemon",
-    "story_revision": "sha256:684fec24b5e380498a7fa7c7c4de9c826d52f55557f97efda0d2d1794972cde7"
+    "story_revision": "sha256:865e49f61252cdb2eed39343363b0b97967b8ef7cd3c3621ce2a3cae7d48a8a9"
   },
   "warehouse": {
     "counts": {
-      "event_versions": 893,
-      "execution_receipts": 2041,
-      "logical_events": 893,
-      "snapshot_memberships": 171723,
-      "source_commits": 458
+      "event_versions": 895,
+      "execution_receipts": 2584,
+      "logical_events": 895,
+      "snapshot_memberships": 172235,
+      "source_commits": 459
     },
-    "database_bytes": 45314048,
-    "database_sha256": "ebfccfd223a477f5f369b1e3bbbcc45e8eb1f9d5afaf227d3a55ab5f2d18ef6a",
-    "execution_receipts_bytes": 1797433,
-    "execution_receipts_sha256": "f583d9ef2a2a58a0ec045fad4caa3c4b140e9d58f1dfb7043b6f40eb5c874b5c",
+    "database_bytes": 47976448,
+    "database_sha256": "09066b9bbf47df76f94f9cc3b5be8a96ca46635054a8735c9959348839873b02",
+    "execution_receipts_bytes": 2273086,
+    "execution_receipts_sha256": "c5a591ae96ec668eabd8b5ecf8ea9cf5dce93467f24bbee3f198105942988390",
     "schema_version": 1
   },
   "warehouse_id": "rappter-plays-pokemon"

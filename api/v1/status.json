@@ -1,17 +1,17 @@
 {
   "counts": {
-    "event_versions": 893,
-    "execution_receipts": 2041,
-    "logical_events": 893,
-    "snapshot_memberships": 171723,
-    "source_commits": 458
+    "event_versions": 895,
+    "execution_receipts": 2584,
+    "logical_events": 895,
+    "snapshot_memberships": 172235,
+    "source_commits": 459
   },
-  "database_bytes": 45314048,
-  "database_sha256": "ebfccfd223a477f5f369b1e3bbbcc45e8eb1f9d5afaf227d3a55ab5f2d18ef6a",
-  "execution_receipts_bytes": 1797433,
-  "execution_receipts_sha256": "f583d9ef2a2a58a0ec045fad4caa3c4b140e9d58f1dfb7043b6f40eb5c874b5c",
-  "generated_at": "2026-07-24T03:14:15+00:00",
+  "database_bytes": 47976448,
+  "database_sha256": "09066b9bbf47df76f94f9cc3b5be8a96ca46635054a8735c9959348839873b02",
+  "execution_receipts_bytes": 2273086,
+  "execution_receipts_sha256": "c5a591ae96ec668eabd8b5ecf8ea9cf5dce93467f24bbee3f198105942988390",
+  "generated_at": "2026-07-24T03:24:17+00:00",
   "schema": "rappter-pokemon-warehouse-status/1.0",
-  "source_head": "d3d72e5cce439910c74df53d9b00148a4c059491",
+  "source_head": "64ed6f6e9d6d61c916dc329d4f227d6c08f2a4fb",
   "status": "ready"
 }
