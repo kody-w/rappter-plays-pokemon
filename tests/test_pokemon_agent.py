@@ -1759,11 +1759,15 @@ def test_auto_coverage_requires_stall_and_puzzle_mode(tmp_path):
     )
 
 
-def test_governor_probe_frontier_bypasses_local_stall_counter(tmp_path):
+@pytest.mark.parametrize("strategy", ["probe_frontier", "escalate_research"])
+def test_governor_probe_frontier_bypasses_local_stall_counter(
+    tmp_path,
+    strategy,
+):
     memory = NavigationMemory(tmp_path / "navigation-memory.json")
     runner = _coverage_runner(tmp_path, memory)
     runner.steps_since_new_edge = 0
-    runner.status["improvement_cycle"] = {"strategy": "probe_frontier"}
+    runner.status["improvement_cycle"] = {"strategy": strategy}
 
     assert (
         runner._advance_committed_route(
