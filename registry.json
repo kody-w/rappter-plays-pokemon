@@ -5,8 +5,8 @@
       "manifest_url": "https://raw.githubusercontent.com/kody-w/rappter-plays-pokemon/refs/heads/story-warehouse/api/v1/manifest.json",
       "name": "warehouse",
       "schema": "rappter-pokemon-warehouse/1.0",
-      "sha256": "546d001002939cfd69e9ea0316769db62fb92ff654375c79296d8f42186d0774",
-      "sha8": "546d00100293",
+      "sha256": "18a1e5be59b2378d4e59c73b8f9c78de6f89184a7521d2ef4b7f737c0e341efe",
+      "sha8": "18a1e5be59b2",
       "source_commit": "d1cceb8fe594522878de3d72d0466f82bcb990ea",
       "src_url": "https://raw.githubusercontent.com/kody-w/rappter-plays-pokemon/refs/heads/story-warehouse/v1/warehouse.db",
       "status_url": "https://raw.githubusercontent.com/kody-w/rappter-plays-pokemon/refs/heads/story-warehouse/api/v1/status.json"
