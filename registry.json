@@ -1,15 +1,25 @@
 {
   "entries": [
     {
-      "bytes": 35201024,
+      "bytes": 35782656,
       "manifest_url": "https://raw.githubusercontent.com/kody-w/rappter-plays-pokemon/refs/heads/story-warehouse/api/v1/manifest.json",
       "name": "warehouse",
       "schema": "rappter-pokemon-warehouse/1.0",
-      "sha256": "6f431c5aecbc64cecc28b438b48e9662a22b2968e63aacc0d795139a54ce7726",
-      "sha8": "6f431c5aecbc",
+      "sha256": "b71d376945214a306a9f00c379fac983977cf046f61f28378c232e7e231e86f0",
+      "sha8": "b71d37694521",
       "source_commit": "29cb03c96f1884a019ce42e776abab962ff2db77",
       "src_url": "https://raw.githubusercontent.com/kody-w/rappter-plays-pokemon/refs/heads/story-warehouse/v1/warehouse.db",
       "status_url": "https://raw.githubusercontent.com/kody-w/rappter-plays-pokemon/refs/heads/story-warehouse/api/v1/status.json"
+    },
+    {
+      "bytes": 152232,
+      "manifest_url": "https://raw.githubusercontent.com/kody-w/rappter-plays-pokemon/refs/heads/story-warehouse/api/v1/manifest.json",
+      "name": "execution-receipts",
+      "schema": "rappter-pokemon-execution/1.0",
+      "sha256": "8c17b4fcc25aa4b23e45ac6f6da8daaeabc5600c3f7d7de5116ca37606c308b2",
+      "sha8": "8c17b4fcc25a",
+      "source_commit": "29cb03c96f1884a019ce42e776abab962ff2db77",
+      "src_url": "https://raw.githubusercontent.com/kody-w/rappter-plays-pokemon/refs/heads/story-warehouse/v1/execution-receipts.jsonl"
     }
   ],
   "generated": "2026-07-24T00:53:49+00:00",
@@ -18,8 +28,8 @@
   "raw_base": "https://raw.githubusercontent.com/kody-w/rappter-plays-pokemon/refs/heads/story-warehouse",
   "schema": "rapp-static-api/1.0",
   "summary": {
-    "endpoints": 3,
-    "execution_receipts": 48,
+    "endpoints": 4,
+    "execution_receipts": 171,
     "logical_events": 880
   }
 }
