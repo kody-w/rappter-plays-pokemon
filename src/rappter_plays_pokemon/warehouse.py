@@ -1074,7 +1074,7 @@ class GitHubWarehousePublisher:
             commit_sha = existing["object"]["sha"]
         return commit_sha
 
-    def _remote_release_identity(self) -> tuple[str, str] | None:
+    def _remote_release_summary(self) -> dict[str, Any] | None:
         path = quote("api/v1/manifest.json", safe="/")
         response = self._api(
             f"repos/{self.repository}/contents/{path}?ref={quote(self.branch)}",
@@ -1091,6 +1091,7 @@ class GitHubWarehousePublisher:
             warehouse = value["warehouse"]
             database_digest = warehouse["database_sha256"]
             receipts_digest = warehouse.get("execution_receipts_sha256")
+            counts = warehouse["counts"]
         except (
             KeyError,
             TypeError,
@@ -1102,9 +1103,17 @@ class GitHubWarehousePublisher:
         if not (
             isinstance(database_digest, str)
             and isinstance(receipts_digest, str)
+            and isinstance(counts, dict)
+            and isinstance(counts.get("source_commits"), int)
+            and isinstance(counts.get("execution_receipts"), int)
         ):
             return None
-        return database_digest, receipts_digest
+        return {
+            "database_sha256": database_digest,
+            "execution_receipts_sha256": receipts_digest,
+            "source_commits": counts["source_commits"],
+            "execution_receipts": counts["execution_receipts"],
+        }
 
     def publish(self, static_dir: Path) -> dict[str, Any]:
         static_dir = static_dir.expanduser().resolve()
@@ -1114,7 +1123,24 @@ class GitHubWarehousePublisher:
         database_sha = manifest["warehouse"]["database_sha256"]
         receipts_sha = manifest["warehouse"]["execution_receipts_sha256"]
         parent_sha = self.ensure_branch()
-        if self._remote_release_identity() == (database_sha, receipts_sha):
+        remote = self._remote_release_summary()
+        candidate_counts = manifest["warehouse"]["counts"]
+        if remote is not None and (
+            remote["source_commits"] > candidate_counts["source_commits"]
+            or remote["execution_receipts"]
+            > candidate_counts["execution_receipts"]
+        ):
+            return {
+                "status": "success",
+                "changed": False,
+                "stale": True,
+                "database_sha256": database_sha,
+                "branch": self.branch,
+            }
+        if remote is not None and (
+            remote["database_sha256"] == database_sha
+            and remote["execution_receipts_sha256"] == receipts_sha
+        ):
             return {
                 "status": "success",
                 "changed": False,
