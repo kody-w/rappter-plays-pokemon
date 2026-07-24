@@ -1,0 +1,11 @@
+# RAPPter Plays Pokemon warehouse
+
+> A public-safe, read-only, Git-backed gameplay telemetry corpus.
+
+- Registry: https://raw.githubusercontent.com/kody-w/rappter-plays-pokemon/refs/heads/story-warehouse/registry.json
+- Status: https://raw.githubusercontent.com/kody-w/rappter-plays-pokemon/refs/heads/story-warehouse/api/v1/status.json
+- Manifest: https://raw.githubusercontent.com/kody-w/rappter-plays-pokemon/refs/heads/story-warehouse/api/v1/manifest.json
+- SQLite: https://raw.githubusercontent.com/kody-w/rappter-plays-pokemon/refs/heads/story-warehouse/v1/warehouse.db
+- Schema: https://raw.githubusercontent.com/kody-w/rappter-plays-pokemon/refs/heads/story-warehouse/v1/schema.sql
+
+The static API supports GET/HEAD only. It contains no ROM, media, screenshots, raw model output, chat, identities, secrets, or paths.

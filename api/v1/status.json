@@ -1,0 +1,15 @@
+{
+  "counts": {
+    "event_versions": 880,
+    "execution_receipts": 48,
+    "logical_events": 880,
+    "snapshot_memberships": 168139,
+    "source_commits": 451
+  },
+  "database_bytes": 35201024,
+  "database_sha256": "6f431c5aecbc64cecc28b438b48e9662a22b2968e63aacc0d795139a54ce7726",
+  "generated_at": "2026-07-24T00:53:49+00:00",
+  "schema": "rappter-pokemon-warehouse-status/1.0",
+  "source_head": "29cb03c96f1884a019ce42e776abab962ff2db77",
+  "status": "ready"
+}

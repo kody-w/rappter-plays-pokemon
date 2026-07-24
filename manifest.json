@@ -1,0 +1,12 @@
+{
+  "description": "Public-safe gameplay evidence warehouse built from Git history",
+  "name": "rappter-plays-pokemon-warehouse",
+  "schema": "rapp-static-api/1.0",
+  "source": {
+    "head_commit": "29cb03c96f1884a019ce42e776abab962ff2db77",
+    "observed_through": "2026-07-24T00:52:03.483459Z",
+    "ref": "refs/remotes/origin/story-archive",
+    "repository": "kody-w/rappter-plays-pokemon",
+    "story_revision": "sha256:0b8c1aec2ffdd810a698d5c385e0ab3404d138f5802d6cf789659880c77a5cfa"
+  }
+}
