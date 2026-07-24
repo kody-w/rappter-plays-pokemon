@@ -225,6 +225,7 @@ PUZZLE_COVERAGE_PROBES = {
         ((17, 16), "down"),
     ),
 }
+SEMANTIC_PROGRESS_MAP_IDS = {0xCA}
 SOLVED_ROUTE_ATTEMPT_BLOCK_LIMIT = 64
 GRAPH_NEIGHBORHOOD_LINE_LIMIT = 24
 EDGE_LEARNING_WINDOW_DECISIONS = 10
@@ -6465,6 +6466,7 @@ def read_improvement_directive(
             "silph_scope",
             "pokedex_caught",
             "hall_of_fame",
+            "stage",
         }
         or (
             value.get("applies_to_run") is not None
@@ -15606,7 +15608,19 @@ class PokemonRunner:
             return
         self.last_progress_marker = marker
         self.status["gameplay_progress_at"] = utc_now()
-        if previous is not None and marker[1:] != previous[1:]:
+        entered_progress_map = bool(
+            marker[0] is not None
+            and marker[0][0] in SEMANTIC_PROGRESS_MAP_IDS
+            and (
+                previous is None
+                or previous[0] is None
+                or previous[0][0] != marker[0][0]
+            )
+        )
+        story_progress = bool(
+            previous is not None and marker[1:] != previous[1:]
+        )
+        if story_progress or entered_progress_map:
             # Badge or key-item change is story progress: it ends any
             # persisted stuck episode.
             self.navigation_memory.note_progress()
