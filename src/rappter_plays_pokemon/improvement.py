@@ -209,7 +209,11 @@ def load_evidence(
     if evidence_dir.is_symlink() or not evidence_dir.is_dir():
         raise ImprovementError("Evidence input must be a private directory")
     records: deque[dict[str, Any]] = deque(maxlen=max(1, min(limit, 10000)))
-    for path in sorted(evidence_dir.glob("events-*.jsonl")):
+    paths = sorted(
+        evidence_dir.glob("events-*.jsonl"),
+        key=lambda candidate: candidate.stat().st_mtime_ns,
+    )
+    for path in paths:
         metadata = path.lstat()
         if path.is_symlink() or not stat.S_ISREG(metadata.st_mode):
             raise ImprovementError(f"Invalid evidence shard: {path.name}")
@@ -305,17 +309,27 @@ def judge(
     previous_marker = previous_marker if isinstance(previous_marker, dict) else {}
     marker = _progress_marker(status)
     advanced = _marker_advanced(previous_marker, marker)
+    progress_at = previous_state.get("progress_at")
+    progress_at = progress_at if isinstance(progress_at, str) else None
+    relevant_records = [
+        record
+        for record in records
+        if progress_at is None or record["observed_at"] > progress_at
+    ]
     evidence_error = status.get("evidence_error")
     stuck_count = status.get("stuck_decision_count")
     stuck_count = stuck_count if isinstance(stuck_count, int) else 0
-    recent = records[-100:]
-    stuck_records = sum(bool(record["stuck_reasons"]) for record in recent)
+    recent = relevant_records[-100:]
+    stuck_records = sum(
+        bool(record["stuck_reasons"]) for record in relevant_records
+    )
     route_records = sum(
         record["source"] in {"route_target", "solved_route", "frontier_coverage"}
         for record in recent
     )
     navigation = _navigation_counts(runtime_dir)
 
+    effective_stuck_count = max(stuck_count, stuck_records)
     if (
         status.get("running") is not True
         or status.get("lifecycle") != "ready"
@@ -326,13 +340,16 @@ def judge(
         verdict, strategy = "instrumentation", "observe"
     elif advanced:
         verdict, strategy = "progress", "normal"
-    elif len(records) < minimum_records:
+    elif len(relevant_records) < minimum_records:
         verdict, strategy = "collect_more_data", "observe"
-    elif status.get("stuck_state") is True and stuck_count >= stuck_budget:
+    elif (
+        status.get("stuck_state") is True
+        and effective_stuck_count >= stuck_budget
+    ):
         if navigation["walk_edges"] >= 3800 or navigation["macro_edges"] >= 240:
             verdict, strategy = "memory", "preserve_graph"
         elif (
-            stuck_count >= stuck_budget * 2
+            effective_stuck_count >= stuck_budget * 2
             and status.get("web_research_state") in {"ready", "searching"}
         ):
             verdict, strategy = "planning", "escalate_research"
@@ -344,15 +361,16 @@ def judge(
         verdict, strategy = "stable", "normal"
 
     evidence = {
-        "execution_records": len(records),
+        "execution_records": len(relevant_records),
         "recent_stuck_records": stuck_records,
         "recent_route_records": route_records,
-        "stuck_decisions": stuck_count,
+        "stuck_decisions": effective_stuck_count,
         "walk_edges": navigation["walk_edges"],
         "macro_edges": navigation["macro_edges"],
         "progress_marker": marker,
     }
     now = datetime.now(timezone.utc)
+    next_progress_at = now.isoformat() if advanced else progress_at
     unsigned = {
         "schema_version": SCHEMA_VERSION,
         "created_at": now.isoformat(),
@@ -392,9 +410,10 @@ def judge(
             "updated_at": directive["created_at"],
             "diagnosis_id": diagnosis["diagnosis_id"],
             "progress_marker": marker,
+            "progress_at": next_progress_at,
             "verdict": verdict,
             "strategy": strategy,
-            "execution_records": len(records),
+            "execution_records": len(relevant_records),
         },
     )
     return directive
