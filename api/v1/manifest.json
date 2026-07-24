@@ -1,11 +1,11 @@
 {
   "builder": {
-    "commit": "c35a2c1a3d8c933c72cddf8c1e1ba1496fd869e7",
+    "commit": "dfda5a8a5791cc24bde388497431421dba341178",
     "module_sha256": "475c3d74533d73890a06f7e58fb24e5d8c673ca2f1746cb55e5d63cd11ea075c",
     "python": "3.13.12",
     "sqlite": "3.53.3"
   },
-  "generated_at": "2026-07-24T03:54:22+00:00",
+  "generated_at": "2026-07-24T04:04:24+00:00",
   "license": {
     "id": "CC0-1.0",
     "notice": "https://github.com/kody-w/rappter-plays-pokemon/blob/main/DATA_LICENSE.md",
@@ -21,24 +21,24 @@
   },
   "schema": "rappter-pokemon-warehouse-manifest/1.0",
   "source": {
-    "head_commit": "8edfeb5fbf70ea10f6e9ef09593bf1d3e467c18b",
-    "observed_through": "2026-07-24T03:02:44.322889Z",
+    "head_commit": "6b55dccd3c79a49bc978d90cd57472dc8635d094",
+    "observed_through": "2026-07-24T03:53:32.028975Z",
     "ref": "refs/remotes/origin/story-archive",
     "repository": "kody-w/rappter-plays-pokemon",
-    "story_revision": "sha256:f147c8afe6b2d8b22f9d9c9bceea45a4dff64b559db2f755f02bd56bbf2eca04"
+    "story_revision": "sha256:88575b935006f2282b858e0e487f4acde7686830a2a336239dc7e8a005afb3ae"
   },
   "warehouse": {
     "counts": {
-      "event_versions": 897,
-      "execution_receipts": 3008,
-      "logical_events": 897,
-      "snapshot_memberships": 172747,
-      "source_commits": 460
+      "event_versions": 926,
+      "execution_receipts": 3323,
+      "logical_events": 926,
+      "snapshot_memberships": 173259,
+      "source_commits": 461
     },
-    "database_bytes": 50073600,
-    "database_sha256": "bd1d4cf7d73959654b4ef35801e6e6d7d6758466bfd29e7c774ac44f42f65ba1",
-    "execution_receipts_bytes": 2648088,
-    "execution_receipts_sha256": "6dc8667c4962b6c1d17d8fafa07c47a48cfafd64028650dec51c1386724a852d",
+    "database_bytes": 51798016,
+    "database_sha256": "1e66d611230ae84a24ad99eb3cba1e06c43d22dd3f5b8aee4b862323edeffa9f",
+    "execution_receipts_bytes": 2922344,
+    "execution_receipts_sha256": "768d144507c589428a356cad0fa01f134e7e639389b83e3200e3c2a3d793ec15",
     "schema_version": 1
   },
   "warehouse_id": "rappter-plays-pokemon"
