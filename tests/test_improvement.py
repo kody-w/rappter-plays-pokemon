@@ -194,3 +194,27 @@ def test_judge_preserves_stuck_budget_across_process_restart(tmp_path):
 
     assert directive["strategy"] == "probe_frontier"
     assert directive["evidence"]["stuck_decisions"] == 100
+
+
+def test_detector_warmup_does_not_erase_pre_restart_stuck_budget(tmp_path):
+    runtime = tmp_path / "runtime"
+    state_dir = tmp_path / "improvement"
+    _write_json(runtime / "status.json", _status(stuck_count=1))
+    _write_json(
+        runtime / "navigation-memory.json",
+        {"walk_edges": [{}] * 800, "macro_edges": [{}] * 40},
+    )
+    records = [_record(index, coordinates=(index, 1)) for index in range(1, 101)]
+    for record in records[-20:]:
+        record["stuck_reasons"] = []
+    _evidence(runtime, records)
+
+    directive = judge(
+        runtime,
+        state_dir,
+        minimum_records=20,
+        stuck_budget=80,
+    )
+
+    assert directive["strategy"] == "probe_frontier"
+    assert directive["evidence"]["stuck_decisions"] == 80

@@ -309,15 +309,20 @@ def judge(
     previous_marker = previous_marker if isinstance(previous_marker, dict) else {}
     marker = _progress_marker(status)
     advanced = _marker_advanced(previous_marker, marker)
+    progress_at = previous_state.get("progress_at")
+    progress_at = progress_at if isinstance(progress_at, str) else None
+    relevant_records = [
+        record
+        for record in records
+        if progress_at is None or record["observed_at"] > progress_at
+    ]
     evidence_error = status.get("evidence_error")
     stuck_count = status.get("stuck_decision_count")
     stuck_count = stuck_count if isinstance(stuck_count, int) else 0
-    recent = records[-100:]
-    stuck_records = 0
-    for record in reversed(records):
-        if not record["stuck_reasons"]:
-            break
-        stuck_records += 1
+    recent = relevant_records[-100:]
+    stuck_records = sum(
+        bool(record["stuck_reasons"]) for record in relevant_records
+    )
     route_records = sum(
         record["source"] in {"route_target", "solved_route", "frontier_coverage"}
         for record in recent
@@ -335,7 +340,7 @@ def judge(
         verdict, strategy = "instrumentation", "observe"
     elif advanced:
         verdict, strategy = "progress", "normal"
-    elif len(records) < minimum_records:
+    elif len(relevant_records) < minimum_records:
         verdict, strategy = "collect_more_data", "observe"
     elif (
         status.get("stuck_state") is True
@@ -356,7 +361,7 @@ def judge(
         verdict, strategy = "stable", "normal"
 
     evidence = {
-        "execution_records": len(records),
+        "execution_records": len(relevant_records),
         "recent_stuck_records": stuck_records,
         "recent_route_records": route_records,
         "stuck_decisions": effective_stuck_count,
@@ -365,6 +370,7 @@ def judge(
         "progress_marker": marker,
     }
     now = datetime.now(timezone.utc)
+    next_progress_at = now.isoformat() if advanced else progress_at
     unsigned = {
         "schema_version": SCHEMA_VERSION,
         "created_at": now.isoformat(),
@@ -404,9 +410,10 @@ def judge(
             "updated_at": directive["created_at"],
             "diagnosis_id": diagnosis["diagnosis_id"],
             "progress_marker": marker,
+            "progress_at": next_progress_at,
             "verdict": verdict,
             "strategy": strategy,
-            "execution_records": len(records),
+            "execution_records": len(relevant_records),
         },
     )
     return directive
