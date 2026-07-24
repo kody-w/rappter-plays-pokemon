@@ -9,6 +9,7 @@ import pytest
 from rappter_plays_pokemon.improvement import public_records
 from rappter_plays_pokemon.story import _with_revision
 from rappter_plays_pokemon.warehouse import (
+    GitHubWarehousePublisher,
     WarehouseError,
     build_database,
     build_static_api,
@@ -263,3 +264,58 @@ def test_static_api_and_receipt_allowlist(tmp_path):
     )
     with pytest.raises(WarehouseError, match="allowlist"):
         load_public_receipts(unsafe)
+
+
+def test_publisher_refuses_monotonic_receipt_regression(monkeypatch, tmp_path):
+    repo, _, _ = _repository(tmp_path)
+    database = tmp_path / "warehouse.db"
+    manifest = tmp_path / "manifest.json"
+    receipts = tmp_path / "receipts.jsonl"
+    receipts.write_text(
+        "".join(
+            json.dumps(row) + "\n"
+            for row in public_records(
+                [_private_record(1, 1), _private_record(2, 2)]
+            )
+        )
+    )
+    build_database(
+        repo,
+        "story-archive",
+        database,
+        manifest,
+        public_receipts_path=receipts,
+    )
+    static_dir = tmp_path / "static"
+    build_static_api(
+        database,
+        manifest,
+        static_dir,
+        public_receipts_path=receipts,
+    )
+    monkeypatch.setattr(
+        "rappter_plays_pokemon.warehouse.shutil.which",
+        lambda name: "/usr/bin/gh" if name == "gh" else None,
+    )
+    publisher = GitHubWarehousePublisher("owner/repository", "warehouse")
+    monkeypatch.setattr(publisher, "ensure_branch", lambda: "a" * 40)
+    monkeypatch.setattr(
+        publisher,
+        "_remote_release_summary",
+        lambda: {
+            "database_sha256": "b" * 64,
+            "execution_receipts_sha256": "c" * 64,
+            "source_commits": 2,
+            "execution_receipts": 3,
+        },
+    )
+    monkeypatch.setattr(
+        publisher,
+        "_api",
+        lambda *args, **kwargs: pytest.fail("stale publish reached GitHub API"),
+    )
+
+    result = publisher.publish(static_dir)
+
+    assert result["changed"] is False
+    assert result["stale"] is True
