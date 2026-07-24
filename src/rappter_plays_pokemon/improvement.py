@@ -57,6 +57,9 @@ VALID_STRATEGIES = {
     "probe_frontier",
     "escalate_research",
 }
+SEMANTIC_PROGRESS_STAGES = {
+    0xCA: "rocket_b4f",
+}
 PRIVATE_EVIDENCE_KEYS = {
     "schema_version",
     "event_id",
@@ -252,6 +255,7 @@ def _progress_marker(status: dict[str, Any]) -> dict[str, Any]:
             pokedex.get("caught") if isinstance(pokedex.get("caught"), int) else None
         ),
         "hall_of_fame": game.get("hall_of_fame") is True,
+        "stage": SEMANTIC_PROGRESS_STAGES.get(game.get("map_id")),
     }
 
 
@@ -269,6 +273,9 @@ def _marker_advanced(
     return any(
         current.get(field) is True and previous.get(field) is not True
         for field in ("lift_key", "silph_scope", "hall_of_fame")
+    ) or (
+        current.get("stage") is not None
+        and current.get("stage") != previous.get("stage")
     )
 
 

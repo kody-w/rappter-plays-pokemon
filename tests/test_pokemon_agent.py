@@ -152,6 +152,7 @@ def test_improvement_directive_is_run_bound_expiring_and_enum_only(tmp_path):
                 "silph_scope": False,
                 "pokedex_caught": 5,
                 "hall_of_fame": False,
+                "stage": None,
             },
         },
         "applies_to_run": "run-a",
@@ -842,6 +843,25 @@ def test_stuck_episode_resets_on_map_and_story_progress(tmp_path):
     memory.note_progress()
     assert memory.episode is None
     assert NavigationMemory(memory.path).episode is None
+
+
+def test_runner_treats_b4f_entry_as_semantic_progress(tmp_path):
+    memory, _, _ = _activated_memory(tmp_path)
+    runner = PokemonRunner.__new__(PokemonRunner)
+    runner.navigation_memory = memory
+    runner.last_progress_marker = None
+    runner.status = {}
+
+    runner._note_gameplay_progress(
+        {
+            "map_id": 0xCA,
+            "coordinates": {"x": 19, "y": 10},
+            "badges": ["Boulder", "Cascade", "Thunder", "Rainbow"],
+            "key_items": {"lift_key": False, "silph_scope": False},
+        }
+    )
+
+    assert memory.episode is None
 
 
 def test_edge_guidance_exposes_learned_directed_edges(tmp_path):

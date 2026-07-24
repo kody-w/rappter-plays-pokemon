@@ -31,6 +31,7 @@ def _status(*, stuck=True, stuck_count=120, badges=None):
             "key_items": {"lift_key": False, "silph_scope": False},
             "pokedex": {"caught": 5},
             "hall_of_fame": False,
+            "map_id": 0xC9,
         },
     }
 
@@ -218,3 +219,28 @@ def test_detector_warmup_does_not_erase_pre_restart_stuck_budget(tmp_path):
 
     assert directive["strategy"] == "probe_frontier"
     assert directive["evidence"]["stuck_decisions"] == 80
+
+
+def test_b4f_stage_is_semantic_progress_and_resets_budget(tmp_path):
+    runtime = tmp_path / "runtime"
+    state_dir = tmp_path / "improvement"
+    previous = _status(stuck_count=200)
+    _write_json(runtime / "status.json", previous)
+    _write_json(
+        runtime / "navigation-memory.json",
+        {"walk_edges": [{}] * 800, "macro_edges": [{}] * 40},
+    )
+    _evidence(
+        runtime,
+        [_record(index, coordinates=(index, 1)) for index in range(1, 101)],
+    )
+    judge(runtime, state_dir, minimum_records=20, stuck_budget=100)
+    current = _status(stuck_count=1)
+    current["game_state"]["map_id"] = 0xCA
+    _write_json(runtime / "status.json", current)
+
+    directive = judge(runtime, state_dir, minimum_records=20, stuck_budget=100)
+
+    assert directive["verdict"] == "progress"
+    assert directive["strategy"] == "normal"
+    assert directive["evidence"]["progress_marker"]["stage"] == "rocket_b4f"
