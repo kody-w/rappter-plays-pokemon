@@ -1,11 +1,11 @@
 {
   "builder": {
-    "commit": "f3afee8148bf27e31856b31a4b5ca935f56c6f35",
+    "commit": "49cd015b6f91e6d00fef382b166f71567be355df",
     "module_sha256": "93d522ecf480b85bd6e6651c0b58448f5fa65fcab5625bf8458caed8ea221323",
     "python": "3.13.12",
     "sqlite": "3.53.3"
   },
-  "generated_at": "2026-07-24T02:24:03+00:00",
+  "generated_at": "2026-07-24T02:44:08+00:00",
   "license": {
     "id": "CC0-1.0",
     "notice": "https://github.com/kody-w/rappter-plays-pokemon/blob/main/DATA_LICENSE.md",
@@ -21,24 +21,24 @@
   },
   "schema": "rappter-pokemon-warehouse-manifest/1.0",
   "source": {
-    "head_commit": "30dbd7343ce152ff9e909b729e175f46e5beb910",
+    "head_commit": "351ba580886a5bcc3c75a7d2adebc89a189b84ca",
     "observed_through": "2026-07-24T01:59:29.312763Z",
     "ref": "refs/remotes/origin/story-archive",
     "repository": "kody-w/rappter-plays-pokemon",
-    "story_revision": "sha256:4222c0fbcf68bfcb5da1882097213066a94bfed775e00a176f5496814b93e396"
+    "story_revision": "sha256:71a435f45f0c5ccafb831db8c47180a4e1e76c32c0fbfc1f04be71df0474b9db"
   },
   "warehouse": {
     "counts": {
-      "event_versions": 883,
-      "execution_receipts": 916,
-      "logical_events": 883,
-      "snapshot_memberships": 169163,
-      "source_commits": 453
+      "event_versions": 885,
+      "execution_receipts": 1186,
+      "logical_events": 885,
+      "snapshot_memberships": 170187,
+      "source_commits": 455
     },
-    "database_bytes": 39485440,
-    "database_sha256": "fa4a5284d860cb42db14376d30be1f887e01d70db179b130a30130264252483f",
-    "execution_receipts_bytes": 807375,
-    "execution_receipts_sha256": "83341cfd5ee921d523524fa11e6d9f0815c85bf4750e19bb4ab405a91a5317a3",
+    "database_bytes": 40951808,
+    "database_sha256": "4fc07ca1cf968f2104647f0f536d1f2f6eede6061cfb1e66f2626851f2a30c61",
+    "execution_receipts_bytes": 1044201,
+    "execution_receipts_sha256": "5c05b957f90217cf15939764957020ae8d948af8a879b2fe7d986b9375d374a5",
     "schema_version": 1
   },
   "warehouse_id": "rappter-plays-pokemon"
