@@ -1,6 +1,6 @@
 {
   "builder": {
-    "commit": "8142bb02529c37c4256c8fd0f94aaec544111c87",
+    "commit": "49f1428a69561f76e12c4946502ffdfa27f4cc23",
     "module_sha256": "93d522ecf480b85bd6e6651c0b58448f5fa65fcab5625bf8458caed8ea221323",
     "python": "3.13.12",
     "sqlite": "3.53.3"
@@ -30,15 +30,15 @@
   "warehouse": {
     "counts": {
       "event_versions": 881,
-      "execution_receipts": 412,
+      "execution_receipts": 428,
       "logical_events": 881,
       "snapshot_memberships": 168651,
       "source_commits": 452
     },
-    "database_bytes": 37011456,
-    "database_sha256": "8d7f90f240cf16a3d180f2747413b88752958887f5faf0d1f52c0b57c7cddd36",
-    "execution_receipts_bytes": 364669,
-    "execution_receipts_sha256": "35f08ee195d715998e06472004ff977b6854f75da8f53654e17d2cc618bc27df",
+    "database_bytes": 37085184,
+    "database_sha256": "e958d31aaef7767fbccae494c7520acfc92c3d3aa91e82c179036c2c19eb4bf5",
+    "execution_receipts_bytes": 378747,
+    "execution_receipts_sha256": "c2593a9c25571ec250d36ee9a1aa3445a2c1d7b48dc949526aea4d39f8d25ba6",
     "schema_version": 1
   },
   "warehouse_id": "rappter-plays-pokemon"
