@@ -3,10 +3,10 @@
   "name": "rappter-plays-pokemon-warehouse",
   "schema": "rapp-static-api/1.0",
   "source": {
-    "head_commit": "29cb03c96f1884a019ce42e776abab962ff2db77",
-    "observed_through": "2026-07-24T00:52:03.483459Z",
+    "head_commit": "931cca05132320d4262499f0b5f86a0355cf5442",
+    "observed_through": "2026-07-24T01:59:29.312763Z",
     "ref": "refs/remotes/origin/story-archive",
     "repository": "kody-w/rappter-plays-pokemon",
-    "story_revision": "sha256:0b8c1aec2ffdd810a698d5c385e0ab3404d138f5802d6cf789659880c77a5cfa"
+    "story_revision": "sha256:96188ce20d97030c4156a1b31a1ba4950224496d0e331a0c8887eb58dab1fedd"
   }
 }
