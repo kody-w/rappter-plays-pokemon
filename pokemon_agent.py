@@ -219,6 +219,7 @@ PUZZLE_COVERAGE_PROBES = {
     # generic frontier controller consumes these like any other ordered probe;
     # route-specific coordinates stay out of its policy logic.
     0xC9: (
+        ((15, 11), "down"),
         ((20, 15), "down"),
         ((19, 15), "down"),
         ((17, 16), "down"),

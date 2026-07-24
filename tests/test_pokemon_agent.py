@@ -1798,6 +1798,21 @@ def test_environment_probe_priority_outranks_closer_dead_end(tmp_path):
     }
 
 
+def test_b3f_adapter_starts_south_from_entrance(tmp_path):
+    memory = NavigationMemory(tmp_path / "navigation-memory.json")
+    runner = _coverage_runner(tmp_path, memory)
+    runner.status["improvement_cycle"] = {"strategy": "escalate_research"}
+
+    assert (
+        runner._advance_committed_route(
+            {"map_id": 0xC9, "coordinates": {"x": 15, "y": 11}}
+        )
+        is True
+    )
+    assert runner.player.replaced == [["down"]]
+    assert runner.status["auto_coverage_rides"] == 1
+
+
 def test_auto_coverage_episode_cap_and_reset(tmp_path):
     memory = NavigationMemory(tmp_path / "navigation-memory.json")
     runner = _coverage_runner(tmp_path, memory)
