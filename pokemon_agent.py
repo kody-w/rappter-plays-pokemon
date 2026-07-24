@@ -214,6 +214,16 @@ PUZZLE_COVERAGE_WAYPOINTS = {
     # closer-to-mouth wall probes.
     0xC9: (19, 18),
 }
+PUZZLE_COVERAGE_PROBES = {
+    # Environment-adapter evidence for B3F's southwest spinner route. The
+    # generic frontier controller consumes these like any other ordered probe;
+    # route-specific coordinates stay out of its policy logic.
+    0xC9: (
+        ((20, 15), "down"),
+        ((19, 15), "down"),
+        ((17, 16), "down"),
+    ),
+}
 SOLVED_ROUTE_ATTEMPT_BLOCK_LIMIT = 64
 GRAPH_NEIGHBORHOOD_LINE_LIMIT = 24
 EDGE_LEARNING_WINDOW_DECISIONS = 10
@@ -15347,11 +15357,28 @@ class PokemonRunner:
         if self.auto_coverage_rides >= AUTO_COVERAGE_EPISODE_LIMIT:
             return None
         toward = PUZZLE_COVERAGE_WAYPOINTS.get(position[0])
+        adapter_entries = []
+        for target, direction in PUZZLE_COVERAGE_PROBES.get(position[0], ()):
+            if (
+                (position[0], target[0], target[1], direction)
+                not in self.navigation_memory.session_tried
+            ):
+                adapter_entries.append(
+                    {
+                        "origin": [target[0], target[1]],
+                        "direction": direction,
+                        "distance": (
+                            abs(position[1] - target[0])
+                            + abs(position[2] - target[1])
+                        ),
+                    }
+                )
         # Waypoint-biased candidates first; when every near-waypoint entry is
         # an unreachable wall (the capped list can fill with them and starve
         # coverage entirely), fall back to plain nearest-first exploration so
         # the mapper keeps expanding the graph from wherever RED stands.
         candidate_lists = [
+            adapter_entries,
             self.navigation_memory.untried_frontier(position, toward=toward)
         ]
         if toward is not None:
