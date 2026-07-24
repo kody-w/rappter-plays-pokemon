@@ -1,0 +1,29 @@
+{
+  "dataset_id": "rappter-plays-pokemon",
+  "excluded": [
+    "ROM and save data",
+    "media and screenshots",
+    "coordinates and map IDs",
+    "prompts and raw model output",
+    "chat and identities",
+    "secrets and local paths"
+  ],
+  "intended_uses": [
+    "analysis",
+    "retrieval",
+    "evaluation",
+    "optional downstream model training where permitted"
+  ],
+  "license": {
+    "id": "CC0-1.0",
+    "notice": "https://github.com/kody-w/rappter-plays-pokemon/blob/main/DATA_LICENSE.md",
+    "scope": "publisher-owned compilation and generated telemetry"
+  },
+  "limitations": [
+    "single evolving run",
+    "not an independent benchmark",
+    "early decision evidence unavailable",
+    "public story coverage has explicit gaps"
+  ],
+  "schema": "rappter-pokemon-dataset-card/1.0"
+}

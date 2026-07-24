@@ -5,6 +5,7 @@
 - Registry: https://raw.githubusercontent.com/kody-w/rappter-plays-pokemon/refs/heads/story-warehouse/registry.json
 - Status: https://raw.githubusercontent.com/kody-w/rappter-plays-pokemon/refs/heads/story-warehouse/api/v1/status.json
 - Manifest: https://raw.githubusercontent.com/kody-w/rappter-plays-pokemon/refs/heads/story-warehouse/api/v1/manifest.json
+- Dataset card: https://raw.githubusercontent.com/kody-w/rappter-plays-pokemon/refs/heads/story-warehouse/api/v1/dataset-card.json
 - SQLite: https://raw.githubusercontent.com/kody-w/rappter-plays-pokemon/refs/heads/story-warehouse/v1/warehouse.db
 - Execution receipts: https://raw.githubusercontent.com/kody-w/rappter-plays-pokemon/refs/heads/story-warehouse/v1/execution-receipts.jsonl
 - Schema: https://raw.githubusercontent.com/kody-w/rappter-plays-pokemon/refs/heads/story-warehouse/v1/schema.sql
