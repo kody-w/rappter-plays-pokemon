@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta
+    http-equiv="Content-Security-Policy"
+    content="default-src 'none'; base-uri 'none'; form-action 'none'; object-src 'none'; style-src 'self'; script-src 'self'; connect-src https://raw.githubusercontent.com"
+  >
+  <meta name="referrer" content="no-referrer">
+  <meta name="theme-color" content="#090d18">
+  <meta
+    name="description"
+    content="Explore the public-safe, Git-backed RAPPter Plays Pokémon warehouse."
+  >
+  <link rel="canonical" href="https://kody-w.github.io/rappter-plays-pokemon/data/">
+  <link rel="stylesheet" href="./data.css">
+  <title>RAPPter Plays Pokémon — Data Warehouse</title>
+</head>
+<body>
+  <header>
+    <a href="../">RAPPter Plays Pokémon</a>
+    <a href="https://github.com/kody-w/rappter-plays-pokemon">Source</a>
+  </header>
+  <main>
+    <p class="kicker">RAPP static API · read only</p>
+    <h1>The run, queryable by commit.</h1>
+    <p class="lede">
+      This warehouse materializes every public story revision and sanitized
+      execution receipt into one downloadable SQLite database. Git preserves
+      each warehouse snapshot; immutable commit URLs make analyses reproducible.
+    </p>
+    <div class="actions">
+      <a id="database-link" class="primary" href="#">Download SQLite</a>
+      <a id="manifest-link" href="#">Read manifest</a>
+      <a id="datasette-link" href="#">Open in Datasette Lite</a>
+    </div>
+    <section aria-labelledby="status-title">
+      <p class="kicker">Latest build</p>
+      <h2 id="status-title">Warehouse status</h2>
+      <dl>
+        <div><dt>State</dt><dd id="state">Loading…</dd></div>
+        <div><dt>Source commit</dt><dd id="source">—</dd></div>
+        <div><dt>Story commits</dt><dd id="commits">—</dd></div>
+        <div><dt>Logical events</dt><dd id="events">—</dd></div>
+        <div><dt>Execution receipts</dt><dd id="receipts">—</dd></div>
+        <div><dt>Database hash</dt><dd id="digest">—</dd></div>
+      </dl>
+    </section>
+    <section aria-labelledby="boundary-title">
+      <p class="kicker">Publication boundary</p>
+      <h2 id="boundary-title">Structured facts, not private game data.</h2>
+      <p>
+        The public projection excludes ROMs, saves, screenshots, video, audio,
+        coordinates, collision maps, prompts, raw model output, chat,
+        identities, secrets, and local paths. Static files support GET and
+        HEAD only; there is no server-side query or dynamic chat endpoint.
+      </p>
+    </section>
+    <p id="error" role="status"></p>
+  </main>
+  <script src="./data.js"></script>
+</body>
+</html>

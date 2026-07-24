@@ -177,12 +177,17 @@ RESTART_REQUEST_NAME = "restart-request.json"
 YOUTUBE_CHAT_ADVISORY_NAME = "youtube-chat-advisory.json"
 NAVIGATION_MEMORY_NAME = "navigation-memory.json"
 WEB_RESEARCH_NAME = "web-research.json"
+EVIDENCE_DIRECTORY_NAME = "evidence"
+EVIDENCE_SCHEMA_VERSION = 1
+EVIDENCE_RECORD_MAX_BYTES = 8192
+IMPROVEMENT_DIRECTIVE_NAME = "improvement-directive.json"
+MAX_IMPROVEMENT_DIRECTIVE_BYTES = 4096
 NAVIGATION_MEMORY_SCHEMA_VERSION = 4
 NAVIGATION_MEMORY_MIGRATABLE_SCHEMA_VERSIONS = {2, 3, 4}
 NAVIGATION_TRANSITION_LIMIT = 40
 NAVIGATION_TRANSITION_PATH_LIMIT = 12
 NAVIGATION_EPISODE_REGION_LIMIT = 64
-NAVIGATION_MACRO_EDGE_LIMIT = 64
+NAVIGATION_MACRO_EDGE_LIMIT = 256
 NAVIGATION_SOLVED_ROUTE_LIMIT = 8
 NAVIGATION_SOLVED_ROUTE_STEP_LIMIT = 48
 NAVIGATION_FRONTIER_RADIUS = 6
@@ -191,8 +196,8 @@ NAVIGATION_FRONTIER_LIMIT = 12
 NAVIGATION_ROUTE_STEP_LIMIT = 24
 FRONTIER_DIRECTIVE_CANDIDATES = 3
 FRONTIER_STALL_DECISIONS = 12
-NAVIGATION_SESSION_TRIED_LIMIT = 2048
-NAVIGATION_WALK_EDGE_LIMIT = 768
+NAVIGATION_SESSION_TRIED_LIMIT = 8192
+NAVIGATION_WALK_EDGE_LIMIT = 4096
 SOLVED_ROUTE_ATTEMPT_LIMIT = 64
 AUTO_COVERAGE_STALL_DECISIONS = 3
 AUTO_COVERAGE_EPISODE_LIMIT = 400
@@ -6191,6 +6196,118 @@ def atomic_write_json(path: Path, value: dict[str, Any]) -> None:
     fsync_directory(path.parent)
 
 
+def append_private_jsonl(path: Path, value: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    os.chmod(path.parent, 0o700)
+    payload = (
+        json.dumps(value, separators=(",", ":"), sort_keys=True) + "\n"
+    ).encode("utf-8")
+    if len(payload) > EVIDENCE_RECORD_MAX_BYTES:
+        raise ValueError("Evidence record exceeds the private journal limit")
+    descriptor = os.open(
+        path,
+        os.O_WRONLY | os.O_CREAT | os.O_APPEND,
+        0o600,
+    )
+    try:
+        written = os.write(descriptor, payload)
+        if written != len(payload):
+            raise OSError("Evidence journal write was incomplete")
+    finally:
+        os.close(descriptor)
+    os.chmod(path, 0o600)
+
+
+def execution_evidence_state(game_state: Any) -> dict[str, Any]:
+    state = game_state if isinstance(game_state, dict) else {}
+    coordinates = state.get("coordinates")
+    position = (
+        {
+            "x": coordinates.get("x"),
+            "y": coordinates.get("y"),
+        }
+        if (
+            isinstance(coordinates, dict)
+            and all(
+                not isinstance(coordinates.get(axis), bool)
+                and isinstance(coordinates.get(axis), int)
+                and 0 <= coordinates.get(axis) <= 255
+                for axis in ("x", "y")
+            )
+        )
+        else None
+    )
+    badges = state.get("badges")
+    badges = (
+        [str(badge)[:24] for badge in badges[:8]]
+        if isinstance(badges, list)
+        else []
+    )
+    key_items = state.get("key_items")
+    key_items = key_items if isinstance(key_items, dict) else {}
+    pokedex = state.get("pokedex")
+    pokedex = pokedex if isinstance(pokedex, dict) else {}
+    play_time = state.get("play_time")
+    game_time_seconds = None
+    if isinstance(play_time, dict):
+        parts = [play_time.get(part) for part in ("hours", "minutes", "seconds")]
+        if all(
+            not isinstance(value, bool)
+            and isinstance(value, int)
+            and value >= 0
+            for value in parts
+        ):
+            game_time_seconds = parts[0] * 3600 + parts[1] * 60 + parts[2]
+    return {
+        "phase": str(state.get("phase") or "")[:24] or None,
+        "location": str(state.get("location") or "")[:80] or None,
+        "map_id": (
+            state.get("map_id")
+            if (
+                not isinstance(state.get("map_id"), bool)
+                and isinstance(state.get("map_id"), int)
+                and 0 <= state.get("map_id") <= 255
+            )
+            else None
+        ),
+        "coordinates": position,
+        "badges": badges,
+        "party_size": (
+            state.get("party_count")
+            if (
+                not isinstance(state.get("party_count"), bool)
+                and isinstance(state.get("party_count"), int)
+                and 0 <= state.get("party_count") <= 6
+            )
+            else None
+        ),
+        "pokedex_seen": (
+            pokedex.get("seen")
+            if isinstance(pokedex.get("seen"), int)
+            and not isinstance(pokedex.get("seen"), bool)
+            else None
+        ),
+        "pokedex_caught": (
+            pokedex.get("caught")
+            if isinstance(pokedex.get("caught"), int)
+            and not isinstance(pokedex.get("caught"), bool)
+            else None
+        ),
+        "lift_key": (
+            key_items.get("lift_key")
+            if isinstance(key_items.get("lift_key"), bool)
+            else None
+        ),
+        "silph_scope": (
+            key_items.get("silph_scope")
+            if isinstance(key_items.get("silph_scope"), bool)
+            else None
+        ),
+        "hall_of_fame": state.get("hall_of_fame") is True,
+        "game_time_seconds": game_time_seconds,
+    }
+
+
 def atomic_write_bytes(path: Path, payload: bytes, mode: int = 0o600) -> None:
     path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
     temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
@@ -6238,6 +6355,125 @@ def _strict_utc_timestamp(value: Any) -> Optional[datetime]:
 
 def _utc_text(value: datetime) -> str:
     return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def read_improvement_directive(
+    runtime_dir: Path,
+    *,
+    run_id: Optional[str] = None,
+    now: Optional[datetime] = None,
+) -> Optional[dict[str, Any]]:
+    path = runtime_dir / IMPROVEMENT_DIRECTIVE_NAME
+    try:
+        metadata = path.lstat()
+        if (
+            path.is_symlink()
+            or not stat.S_ISREG(metadata.st_mode)
+            or metadata.st_uid != os.getuid()
+            or stat.S_IMODE(metadata.st_mode) & 0o077
+            or not 1 <= metadata.st_size <= MAX_IMPROVEMENT_DIRECTIVE_BYTES
+        ):
+            return None
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (
+        FileNotFoundError,
+        json.JSONDecodeError,
+        UnicodeDecodeError,
+        OSError,
+    ):
+        return None
+    if not isinstance(value, dict) or set(value) != {
+        "schema_version",
+        "directive_id",
+        "created_at",
+        "expires_at",
+        "verdict",
+        "strategy",
+        "evidence",
+        "applies_to_run",
+    }:
+        return None
+    evidence = value.get("evidence")
+    marker = evidence.get("progress_marker") if isinstance(evidence, dict) else None
+    if (
+        value.get("schema_version") != EVIDENCE_SCHEMA_VERSION
+        or not isinstance(value.get("directive_id"), str)
+        or not re.fullmatch(r"sha256:[0-9a-f]{64}", value["directive_id"])
+        or _strict_utc_timestamp(value.get("created_at")) is None
+        or (
+            expires_at := _strict_utc_timestamp(value.get("expires_at"))
+        ) is None
+        or expires_at <= (now or datetime.now(timezone.utc))
+        or value.get("verdict")
+        not in {
+            "collect_more_data",
+            "progress",
+            "stable",
+            "instrumentation",
+            "memory",
+            "planning",
+            "reliability",
+        }
+        or value.get("strategy")
+        not in {
+            "observe",
+            "normal",
+            "preserve_graph",
+            "probe_frontier",
+            "escalate_research",
+        }
+        or not isinstance(evidence, dict)
+        or set(evidence)
+        != {
+            "execution_records",
+            "recent_stuck_records",
+            "recent_route_records",
+            "stuck_decisions",
+            "walk_edges",
+            "macro_edges",
+            "progress_marker",
+        }
+        or any(
+            isinstance(evidence.get(field), bool)
+            or not isinstance(evidence.get(field), int)
+            or not 0 <= evidence[field] <= 10_000_000
+            for field in (
+                "execution_records",
+                "recent_stuck_records",
+                "recent_route_records",
+                "stuck_decisions",
+                "walk_edges",
+                "macro_edges",
+            )
+        )
+        or not isinstance(marker, dict)
+        or set(marker)
+        != {
+            "badges",
+            "lift_key",
+            "silph_scope",
+            "pokedex_caught",
+            "hall_of_fame",
+        }
+        or (
+            value.get("applies_to_run") is not None
+            and value.get("applies_to_run") != run_id
+        )
+    ):
+        return None
+    return {
+        "directive_id": value["directive_id"],
+        "verdict": value["verdict"],
+        "strategy": value["strategy"],
+        "evidence": {
+            "execution_records": evidence["execution_records"],
+            "recent_stuck_records": evidence["recent_stuck_records"],
+            "stuck_decisions": evidence["stuck_decisions"],
+            "walk_edges": evidence["walk_edges"],
+            "macro_edges": evidence["macro_edges"],
+        },
+        "expires_at": value["expires_at"],
+    }
 
 
 def read_youtube_chat_advisory(
@@ -6911,25 +7147,28 @@ class NavigationMemory:
         )
         self.transitions.append(transition)
         self.transitions = self.transitions[-NAVIGATION_TRANSITION_LIMIT:]
-        if len(self.session_tried) >= NAVIGATION_SESSION_TRIED_LIMIT:
+        tried_key = (origin[0], origin[1], origin[2], direction)
+        if tried_key in self.session_tried:
+            del self.session_tried[tried_key]
+        elif len(self.session_tried) >= NAVIGATION_SESSION_TRIED_LIMIT:
             oldest = next(iter(self.session_tried))
             del self.session_tried[oldest]
-        self.session_tried[
-            (origin[0], origin[1], origin[2], direction)
-        ] = None
+        self.session_tried[tried_key] = None
         same_map_displacement = (
             abs(destination[1] - origin[1]) + abs(destination[2] - origin[2])
             if destination[0] == origin[0]
             else 0
         )
         if same_map_displacement == 1 and press_count == 1:
-            # Permanent single-step walk edge (last-wins on re-observation).
-            if len(self.walk_edges) >= NAVIGATION_WALK_EDGE_LIMIT:
+            # Permanent single-step walk edge (last-wins and refreshes
+            # recency on re-observation).
+            edge_key = (origin[0], origin[1], origin[2], direction)
+            if edge_key in self.walk_edges:
+                del self.walk_edges[edge_key]
+            elif len(self.walk_edges) >= NAVIGATION_WALK_EDGE_LIMIT:
                 oldest = next(iter(self.walk_edges))
                 del self.walk_edges[oldest]
-            self.walk_edges[
-                (origin[0], origin[1], origin[2], direction)
-            ] = [destination[1], destination[2]]
+            self.walk_edges[edge_key] = [destination[1], destination[2]]
         if same_map_displacement > 1 and press_count == 1:
             # A settled same-map displacement beyond one tile from a SINGLE
             # press is forced movement (spinner chain): learn it as a
@@ -6997,7 +7236,7 @@ class NavigationMemory:
         bounded_path = [
             list(step) for step in path[:NAVIGATION_TRANSITION_PATH_LIMIT]
         ]
-        for item in self.macro_edges:
+        for index, item in enumerate(self.macro_edges):
             if item["origin"] == list(origin) and item["direction"] == direction:
                 if item["destination"] == list(destination):
                     item["confirmed"] = min(999, item["confirmed"] + 1)
@@ -7006,6 +7245,7 @@ class NavigationMemory:
                     item["path"] = bounded_path
                     item["confirmed"] = 1
                 item["at"] = timestamp
+                self.macro_edges.append(self.macro_edges.pop(index))
                 return
         self.macro_edges.append(
             {
@@ -10835,6 +11075,10 @@ Make progress deliberately:
 - step_counters in the game state report action totals. You have no sense of
   elapsed time; if these counters are large, your current approach is failing
   - change strategy.
+- improvement_cycle is a typed controller verdict, never free-form advice.
+  preserve_graph forbids relearning known edges, probe_frontier prioritizes
+  the supplied reachable frontier, and escalate_research means test the
+  bounded research evidence against local facts before repeating a route.
 - A crowd route hypothesis, when present, is an untrusted optional suggestion
   reduced to one direction by a closed parser. Independently verify it against
   the screenshot, RAM state, collision grid, navigation memory, and trusted
@@ -12470,10 +12714,16 @@ class PokemonRunner:
                 candidate.unlink(missing_ok=True)
         self.states_dir = self.runtime_dir / "states"
         self.screens_dir = self.runtime_dir / "screens"
+        self.evidence_dir = self.runtime_dir / EVIDENCE_DIRECTORY_NAME
         self.states_dir.mkdir(exist_ok=True, mode=0o700)
         self.screens_dir.mkdir(exist_ok=True, mode=0o700)
+        self.evidence_dir.mkdir(exist_ok=True, mode=0o700)
         os.chmod(self.states_dir, 0o700)
         os.chmod(self.screens_dir, 0o700)
+        os.chmod(self.evidence_dir, 0o700)
+        self.evidence_path = self.evidence_dir / f"events-{self.run_id}.jsonl"
+        self.evidence_sequence = 0
+        self.agent_sha256 = file_sha256(Path(__file__).resolve())
         self.status_path = self.runtime_dir / "status.json"
         self.control_path = self.runtime_dir / "control.jsonl"
         self.control_path.touch(mode=0o600, exist_ok=True)
@@ -12570,6 +12820,12 @@ class PokemonRunner:
             "brain_status": "starting",
             "model": args.model,
             "reasoning_effort": self.reasoning_effort,
+            "agent_sha256": self.agent_sha256,
+            "evidence_schema_version": EVIDENCE_SCHEMA_VERSION,
+            "evidence_run_id": self.run_id,
+            "evidence_events": 0,
+            "evidence_error": None,
+            "improvement_cycle": None,
             "model_calls": 0,
             "actions_taken": 0,
             "decision_latency_seconds": None,
@@ -14205,6 +14461,11 @@ class PokemonRunner:
                 button = str(command.get("button", "")).lower()
                 if button in VALID_BUTTONS:
                     self._set_control_mode("manual")
+                    self._record_execution_evidence(
+                        source="operator",
+                        buttons=[button],
+                        game_state=self.status.get("game_state"),
+                    )
                     self.player.append(button)
             elif action == "stop":
                 self.stop_event.set()
@@ -14560,6 +14821,31 @@ class PokemonRunner:
             "steps_since_new_edge": self.steps_since_new_edge,
         }
         frontier: list[dict[str, Any]] = []
+        improvement_runtime = getattr(self, "runtime_dir", None)
+        improvement_cycle = (
+            read_improvement_directive(
+                improvement_runtime,
+                run_id=self.run_id,
+            )
+            if isinstance(improvement_runtime, Path)
+            else None
+        )
+        self.status["improvement_cycle"] = (
+            {
+                "directive_id": improvement_cycle["directive_id"],
+                "verdict": improvement_cycle["verdict"],
+                "strategy": improvement_cycle["strategy"],
+                "expires_at": improvement_cycle["expires_at"],
+            }
+            if improvement_cycle is not None
+            else None
+        )
+        if improvement_cycle is not None:
+            decision_state["improvement_cycle"] = {
+                "verdict": improvement_cycle["verdict"],
+                "strategy": improvement_cycle["strategy"],
+                **improvement_cycle["evidence"],
+            }
         if self.navigation_mode == "puzzle":
             decision_state["navigation_mode"] = "puzzle"
             decision_state["stuck_assessment"] = {
@@ -14659,6 +14945,15 @@ class PokemonRunner:
                 or navigation_guidance
                 or crowd_advisory
                 or web_research
+                or (
+                    improvement_cycle is not None
+                    and improvement_cycle["strategy"]
+                    in {
+                        "preserve_graph",
+                        "probe_frontier",
+                        "escalate_research",
+                    }
+                )
             ),
             "movement_context": route_context,
         }
@@ -14830,6 +15125,21 @@ class PokemonRunner:
             )
         else:
             self.navigation_memory.cancel_pending()
+        evidence_source = (
+            "route_target"
+            if (
+                self.committed_route is not None
+                and self.committed_route.get("source") == "route_target"
+            )
+            else "model"
+        )
+        self._record_execution_evidence(
+            source=evidence_source,
+            buttons=decision["buttons"],
+            game_state=self.status.get("game_state"),
+            decision_id=decision_id,
+            action_mode=decision.get("action_mode"),
+        )
         self.player.replace(decision["buttons"])
         # New input invalidates any settled-position candidate and counts
         # as gameplay progress for the pause/liveness watchdogs.
@@ -14889,6 +15199,110 @@ class PokemonRunner:
         }
         self.committed_route = route
         return route
+
+    def _record_execution_evidence(
+        self,
+        *,
+        source: str,
+        buttons: Any,
+        game_state: Any,
+        decision_id: Any = None,
+        action_mode: Any = None,
+        expected_destination: Any = None,
+    ) -> None:
+        evidence_path = getattr(self, "evidence_path", None)
+        if not isinstance(evidence_path, Path):
+            return
+        allowed_sources = {
+            "model",
+            "route_target",
+            "solved_route",
+            "frontier_coverage",
+            "operator",
+        }
+        if source not in allowed_sources:
+            raise ValueError("Unknown execution evidence source")
+        applied_buttons = (
+            [button for button in buttons if button in VALID_BUTTONS][
+                :MAX_BUTTONS_PER_DECISION
+            ]
+            if isinstance(buttons, list)
+            else []
+        )
+        self.evidence_sequence += 1
+        destination = (
+            list(expected_destination)
+            if (
+                isinstance(expected_destination, (list, tuple))
+                and len(expected_destination) == 3
+                and all(
+                    not isinstance(value, bool)
+                    and isinstance(value, int)
+                    and 0 <= value <= 255
+                    for value in expected_destination
+                )
+            )
+            else None
+        )
+        evidence_state_input = (
+            dict(game_state) if isinstance(game_state, dict) else {}
+        )
+        evidence_state_input.setdefault("phase", self.status.get("phase"))
+        record = {
+            "schema_version": EVIDENCE_SCHEMA_VERSION,
+            "event_id": (
+                f"{self.run_id}:execution:{self.evidence_sequence:08d}"
+            ),
+            "event_type": "execution",
+            "run_id": self.run_id,
+            "sequence": self.evidence_sequence,
+            "observed_at": utc_now(),
+            "agent_sha256": self.agent_sha256,
+            "model": str(self.args.model)[:80],
+            "reasoning_effort": self.reasoning_effort,
+            "navigation_schema": NAVIGATION_MEMORY_SCHEMA_VERSION,
+            "decision_id": (
+                decision_id
+                if (
+                    not isinstance(decision_id, bool)
+                    and isinstance(decision_id, int)
+                    and decision_id >= 0
+                )
+                else None
+            ),
+            "source": source,
+            "action_mode": (
+                action_mode if action_mode in {"precision", "corridor"} else None
+            ),
+            "buttons": applied_buttons,
+            "state": execution_evidence_state(evidence_state_input),
+            "expected_destination": destination,
+            "navigation_mode": (
+                self.navigation_mode
+                if self.navigation_mode in {"normal", "puzzle"}
+                else "normal"
+            ),
+            "stuck_reasons": [
+                reason
+                for reason in self.status.get("stuck_reasons", [])
+                if reason in {
+                    "room_cycle",
+                    "floor_cycle",
+                    "repeated_edge",
+                    "endpoint_revisit",
+                    "low_novelty",
+                }
+            ][:5],
+            "tainted": source == "operator",
+        }
+        try:
+            append_private_jsonl(evidence_path, record)
+        except (OSError, TypeError, ValueError) as error:
+            self.status["evidence_error"] = type(error).__name__
+            LOGGER.error("Execution evidence write failed: %s", type(error).__name__)
+            return
+        self.status["evidence_events"] = self.evidence_sequence
+        self.status["evidence_error"] = None
 
     def _maybe_commit_frontier_route(
         self,
@@ -15000,6 +15414,12 @@ class PokemonRunner:
         direction = step["direction"]
         self.navigation_memory.begin(
             list(position), [direction], phase="overworld"
+        )
+        self._record_execution_evidence(
+            source=route["source"],
+            buttons=[direction],
+            game_state=game_state,
+            expected_destination=step["destination"],
         )
         self.player.replace([direction])
         route["index"] += 1

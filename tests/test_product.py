@@ -311,6 +311,22 @@ def test_launchers_preserve_rom_paths_as_single_arguments():
     assert "refusing to replace the registered agent" in launch
 
 
+def test_data_warehouse_surface_is_static_and_machine_discoverable():
+    html = (ROOT / "docs" / "data" / "index.html").read_text(encoding="utf-8")
+    script = (ROOT / "docs" / "data" / "data.js").read_text(encoding="utf-8")
+    manifest = json.loads(
+        (ROOT / "warehouse-manifest.json").read_text(encoding="utf-8")
+    )
+
+    assert manifest["schema"] == "rapp-static-api/1.0"
+    assert "connect-src https://raw.githubusercontent.com" in html
+    assert "script-src 'self'" in html
+    assert "refs/heads/story-warehouse" in script
+    assert "rapp-static-api/1.0" in script
+    assert "innerHTML" not in script
+    assert "localhost" not in script
+
+
 def test_raw_chat_artifacts_are_ignored_and_rejected_by_ci():
     ignore = (ROOT / ".gitignore").read_text()
     workflow = (ROOT / ".github" / "workflows" / "ci.yml").read_text()

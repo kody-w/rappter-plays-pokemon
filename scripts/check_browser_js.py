@@ -50,6 +50,10 @@ def browser_scripts() -> dict[str, str]:
     scripts[str(diagnostics.relative_to(ROOT))] = diagnostics.read_text(
         encoding="utf-8"
     )
+    data_explorer = ROOT / "docs/data/data.js"
+    scripts[str(data_explorer.relative_to(ROOT))] = data_explorer.read_text(
+        encoding="utf-8"
+    )
     overlay_path = ROOT / "scripts/overlay/overlay.html"
     overlay_html = overlay_path.read_text(encoding="utf-8")
     overlay_script = re.search(

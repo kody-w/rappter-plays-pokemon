@@ -40,6 +40,7 @@ from openrappter.agents.pokemon_agent import (
     parse_agent_action,
     precision_route_buttons,
     public_runtime_status,
+    read_improvement_directive,
     read_youtube_chat_advisory,
     rock_tunnel_route_guidance,
     rocket_hideout_route_guidance,
@@ -71,6 +72,109 @@ def test_agent_contract():
     assert "checkpoint" in agent.metadata["parameters"]["properties"]["action"]["enum"]
     assert "manual" in agent.metadata["parameters"]["properties"]["action"]["enum"]
     assert "autonomy" in agent.metadata["parameters"]["properties"]["action"]["enum"]
+
+
+def test_execution_evidence_is_bounded_private_and_free_of_model_prose(tmp_path):
+    state = {
+        "phase": "overworld",
+        "location": "Rocket Hideout B3F",
+        "map_id": 0xC9,
+        "coordinates": {"x": 18, "y": 15},
+        "badges": ["Boulder"],
+        "party_count": 3,
+        "pokedex": {"seen": 62, "caught": 5},
+        "key_items": {"lift_key": False, "silph_scope": False},
+        "play_time": {"hours": 143, "minutes": 0, "seconds": 1},
+    }
+    runner = PokemonRunner.__new__(PokemonRunner)
+    runner.evidence_path = tmp_path / "evidence" / "events-test.jsonl"
+    runner.evidence_sequence = 0
+    runner.run_id = "test-run"
+    runner.agent_sha256 = "a" * 64
+    runner.args = SimpleNamespace(model="gpt-5.6-sol")
+    runner.reasoning_effort = "medium"
+    runner.navigation_mode = "puzzle"
+    runner.status = {
+        "stuck_reasons": ["floor_cycle"],
+        "evidence_events": 0,
+        "evidence_error": None,
+    }
+
+    runner._record_execution_evidence(
+        source="model",
+        buttons=["down"],
+        game_state=state,
+        decision_id=7,
+        action_mode="precision",
+    )
+
+    evidence_file = runner.evidence_path
+    assert evidence_file.stat().st_mode & 0o777 == 0o600
+    record = json.loads(evidence_file.read_text())
+    assert record["event_id"] == "test-run:execution:00000001"
+    assert record["buttons"] == ["down"]
+    assert record["state"]["coordinates"] == {"x": 18, "y": 15}
+    assert record["state"]["game_time_seconds"] == 514801
+    assert record["state"]["lift_key"] is False
+
+    def keys(value):
+        if isinstance(value, dict):
+            return set(value).union(*(keys(item) for item in value.values()))
+        if isinstance(value, list):
+            return set().union(*(keys(item) for item in value))
+        return set()
+
+    evidence_keys = keys(record)
+    for forbidden in ("objective", "observation", "reason", "screen_text"):
+        assert forbidden not in evidence_keys
+
+
+def test_improvement_directive_is_run_bound_expiring_and_enum_only(tmp_path):
+    path = tmp_path / "improvement-directive.json"
+    now = datetime.now(timezone.utc)
+    value = {
+        "schema_version": 1,
+        "directive_id": "sha256:" + "a" * 64,
+        "created_at": now.isoformat(),
+        "expires_at": (now + timedelta(minutes=10)).isoformat(),
+        "verdict": "planning",
+        "strategy": "probe_frontier",
+        "evidence": {
+            "execution_records": 100,
+            "recent_stuck_records": 80,
+            "recent_route_records": 10,
+            "stuck_decisions": 120,
+            "walk_edges": 900,
+            "macro_edges": 60,
+            "progress_marker": {
+                "badges": 4,
+                "lift_key": False,
+                "silph_scope": False,
+                "pokedex_caught": 5,
+                "hall_of_fame": False,
+            },
+        },
+        "applies_to_run": "run-a",
+    }
+    path.write_text(json.dumps(value))
+    path.chmod(0o600)
+
+    directive = read_improvement_directive(
+        tmp_path,
+        run_id="run-a",
+        now=now,
+    )
+    assert directive["strategy"] == "probe_frontier"
+    assert directive["evidence"]["walk_edges"] == 900
+    assert read_improvement_directive(tmp_path, run_id="run-b", now=now) is None
+    assert (
+        read_improvement_directive(
+            tmp_path,
+            run_id="run-a",
+            now=now + timedelta(minutes=11),
+        )
+        is None
+    )
 
 
 def test_rom_validation_uses_header(tmp_path):
@@ -3955,3 +4059,58 @@ def test_walk_edges_survive_transition_fifo_churn(tmp_path):
     route = reloaded.route_to((0xC9, 5, 5), [7, 5])
     assert route is not None and len(route) == 2
     assert (0xC9, 5, 5, "right") in reloaded.session_tried
+
+
+def test_navigation_edge_refresh_does_not_evict_unrelated_facts(
+    monkeypatch,
+    tmp_path,
+):
+    monkeypatch.setattr(pokemon_module, "NAVIGATION_SESSION_TRIED_LIMIT", 2)
+    monkeypatch.setattr(pokemon_module, "NAVIGATION_WALK_EDGE_LIMIT", 2)
+    memory = NavigationMemory(tmp_path / "navigation-memory.json")
+    now = datetime.now(timezone.utc)
+
+    for origin, destination in (
+        ((0xC9, 1, 1), (0xC9, 2, 1)),
+        ((0xC9, 3, 1), (0xC9, 4, 1)),
+        ((0xC9, 1, 1), (0xC9, 2, 1)),
+        ((0xC9, 5, 1), (0xC9, 6, 1)),
+    ):
+        memory.begin(origin, ["right"], phase="overworld")
+        memory.finish(destination, now=now)
+
+    refreshed = (0xC9, 1, 1, "right")
+    stale = (0xC9, 3, 1, "right")
+    newest = (0xC9, 5, 1, "right")
+    assert list(memory.walk_edges) == [refreshed, newest]
+    assert list(memory.session_tried) == [refreshed, newest]
+    assert stale not in memory.walk_edges
+    assert stale not in memory.session_tried
+
+
+def test_macro_edge_refresh_preserves_recent_fact_at_capacity(
+    monkeypatch,
+    tmp_path,
+):
+    monkeypatch.setattr(pokemon_module, "NAVIGATION_MACRO_EDGE_LIMIT", 2)
+    memory = NavigationMemory(tmp_path / "navigation-memory.json")
+
+    def record(x, destination_x):
+        memory._record_macro_edge(
+            (0xC9, x, 1),
+            "right",
+            (0xC9, destination_x, 1),
+            [[destination_x, 1]],
+            "2026-07-24T01:00:00Z",
+        )
+
+    record(1, 5)
+    record(6, 10)
+    record(1, 5)
+    record(11, 15)
+
+    assert [item["origin"] for item in memory.macro_edges] == [
+        [0xC9, 1, 1],
+        [0xC9, 11, 1],
+    ]
+    assert memory.macro_edges[0]["confirmed"] == 2

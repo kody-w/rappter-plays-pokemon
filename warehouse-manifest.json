@@ -1,0 +1,12 @@
+{
+  "schema": "rapp-static-api/1.0",
+  "name": "rappter-plays-pokemon-warehouse",
+  "description": "Public-safe gameplay evidence and story history",
+  "license": "CC0-1.0",
+  "source": {
+    "repository": "kody-w/rappter-plays-pokemon",
+    "branch": "story-archive",
+    "path": "v1/story.json"
+  },
+  "build": "python -m rappter_plays_pokemon.warehouse all"
+}

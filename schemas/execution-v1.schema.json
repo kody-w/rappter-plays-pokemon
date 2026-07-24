@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kody-w.github.io/rappter-plays-pokemon/schemas/execution-v1.schema.json",
+  "title": "RAPPter Plays Pokemon public execution receipt",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "record_id",
+    "schema",
+    "run_id",
+    "sequence",
+    "agent_sha256",
+    "inference",
+    "game_time_seconds",
+    "phase",
+    "progress",
+    "action",
+    "outcome",
+    "quality",
+    "provenance"
+  ],
+  "properties": {
+    "record_id": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "schema": {"const": "rappter-pokemon-execution/1.0"},
+    "run_id": {"type": "string", "minLength": 1, "maxLength": 80},
+    "sequence": {"type": "integer", "minimum": 1},
+    "agent_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "game_time_seconds": {"type": ["integer", "null"], "minimum": 0},
+    "phase": {
+      "enum": ["intro", "menu", "dialogue", "overworld", "battle", "other"]
+    },
+    "inference": {"type": "object"},
+    "progress": {"type": "object"},
+    "action": {"type": "object"},
+    "outcome": {"type": "object"},
+    "quality": {"type": "object"},
+    "provenance": {"type": "object"}
+  }
+}

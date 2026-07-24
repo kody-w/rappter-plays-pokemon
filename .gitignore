@@ -46,11 +46,14 @@ brain.json
 clips/
 states/
 screens/
+evidence/
 runtime/
 *.live_chat.json*
 youtube-chat-advisory.json
 navigation-memory.json
 web-research.json
+improvement-directive.json
+diagnoses.jsonl
 
 # Overlay encoder dependencies
 node_modules/
