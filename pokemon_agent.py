@@ -15326,7 +15326,15 @@ class PokemonRunner:
         """
         if self.navigation_mode != "puzzle":
             return None
-        if self.steps_since_new_edge < AUTO_COVERAGE_STALL_DECISIONS:
+        improvement_cycle = self.status.get("improvement_cycle")
+        directed_probe = bool(
+            isinstance(improvement_cycle, dict)
+            and improvement_cycle.get("strategy") == "probe_frontier"
+        )
+        if (
+            self.steps_since_new_edge < AUTO_COVERAGE_STALL_DECISIONS
+            and not directed_probe
+        ):
             return None
         episode = self.navigation_memory.episode
         if episode is None:

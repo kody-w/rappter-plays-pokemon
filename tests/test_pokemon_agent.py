@@ -1759,6 +1759,21 @@ def test_auto_coverage_requires_stall_and_puzzle_mode(tmp_path):
     )
 
 
+def test_governor_probe_frontier_bypasses_local_stall_counter(tmp_path):
+    memory = NavigationMemory(tmp_path / "navigation-memory.json")
+    runner = _coverage_runner(tmp_path, memory)
+    runner.steps_since_new_edge = 0
+    runner.status["improvement_cycle"] = {"strategy": "probe_frontier"}
+
+    assert (
+        runner._advance_committed_route(
+            {"map_id": 0xC9, "coordinates": {"x": 15, "y": 11}}
+        )
+        is True
+    )
+    assert runner.status["auto_coverage_rides"] == 1
+
+
 def test_auto_coverage_episode_cap_and_reset(tmp_path):
     memory = NavigationMemory(tmp_path / "navigation-memory.json")
     runner = _coverage_runner(tmp_path, memory)
