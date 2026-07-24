@@ -331,6 +331,11 @@ def judge(
     elif status.get("stuck_state") is True and stuck_count >= stuck_budget:
         if navigation["walk_edges"] >= 3800 or navigation["macro_edges"] >= 240:
             verdict, strategy = "memory", "preserve_graph"
+        elif (
+            stuck_count >= stuck_budget * 2
+            and status.get("web_research_state") in {"ready", "searching"}
+        ):
+            verdict, strategy = "planning", "escalate_research"
         elif status.get("web_research_state") in {"ready", "searching"}:
             verdict, strategy = "planning", "probe_frontier"
         else:
