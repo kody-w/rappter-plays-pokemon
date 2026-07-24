@@ -7053,6 +7053,75 @@ class NavigationMemory:
     def cancel_pending(self) -> None:
         self.pending = None
 
+    def invalidate_route_step(
+        self,
+        step: Any,
+        actual: Optional[tuple[int, int, int]],
+        *,
+        now: Optional[datetime] = None,
+    ) -> bool:
+        """Quarantine a learned edge contradicted by a settled route surprise."""
+        if (
+            not _valid_route_step(step)
+            or actual is None
+            or list(actual) == step["destination"]
+        ):
+            return False
+        origin = step["origin"]
+        direction = step["direction"]
+        key = (origin[0], origin[1], origin[2], direction)
+        removed = False
+        if self.walk_edges.get(key) == step["destination"][1:]:
+            del self.walk_edges[key]
+            removed = True
+        retained_macro_edges = [
+            item
+            for item in self.macro_edges
+            if not (
+                item["origin"] == origin
+                and item["direction"] == direction
+                and item["destination"] == step["destination"]
+            )
+        ]
+        if len(retained_macro_edges) != len(self.macro_edges):
+            self.macro_edges = retained_macro_edges
+            removed = True
+        if not removed:
+            return False
+        if key in self.session_tried:
+            del self.session_tried[key]
+        elif len(self.session_tried) >= NAVIGATION_SESSION_TRIED_LIMIT:
+            del self.session_tried[next(iter(self.session_tried))]
+        self.session_tried[key] = None
+        timestamp = _utc_text(now or datetime.now(timezone.utc))
+        existing = next(
+            (
+                item
+                for item in self.attempts
+                if item["map_id"] == origin[0]
+                and item["origin"] == origin[1:]
+                and item["buttons"] == [direction]
+                and item["outcome"] == "cycle"
+            ),
+            None,
+        )
+        if existing is None:
+            self.attempts.append(
+                {
+                    "map_id": origin[0],
+                    "origin": origin[1:],
+                    "buttons": [direction],
+                    "outcome": "cycle",
+                    "count": 1,
+                    "last_at": timestamp,
+                }
+            )
+        else:
+            existing["count"] = min(999, existing["count"] + 1)
+            existing["last_at"] = timestamp
+        self._write(now=now)
+        return True
+
     def finish(
         self,
         destination: Optional[tuple[int, int, int]],
@@ -15445,6 +15514,12 @@ class PokemonRunner:
             return False
         step = route["steps"][route["index"]]
         if list(position) != step["origin"]:
+            if route["index"] > 0:
+                previous_step = route["steps"][route["index"] - 1]
+                self.navigation_memory.invalidate_route_step(
+                    previous_step,
+                    position,
+                )
             self.committed_route = None
             self.status["committed_route"] = None
             return False

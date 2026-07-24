@@ -1840,6 +1840,7 @@ def test_committed_route_executes_stepwise_and_aborts_on_surprise(tmp_path):
         "generation": 0,
         "source": "route_target",
     }
+    runner.navigation_memory.walk_edges[(0xC8, 5, 5, "right")] = [6, 5]
 
     issued = runner._advance_committed_route(
         {"map_id": 0xC8, "coordinates": {"x": 5, "y": 5}}
@@ -1866,6 +1867,13 @@ def test_committed_route_executes_stepwise_and_aborts_on_surprise(tmp_path):
     )
     assert runner.committed_route is None
     assert runner.status["committed_route"] is None
+    assert (0xC8, 5, 5, "right") not in runner.navigation_memory.walk_edges
+    assert any(
+        item["origin"] == [5, 5]
+        and item["buttons"] == ["right"]
+        and item["outcome"] == "cycle"
+        for item in runner.navigation_memory.attempts
+    )
 
     # Dialogue or battle text is a surprise even on the expected tile.
     runner.committed_route = {
