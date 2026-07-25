@@ -584,6 +584,51 @@ def test_navigation_memory_aggregates_button_count_variants(tmp_path):
     assert guidance["avoid_repeating"][0]["buttons"] == ["right"]
 
 
+def test_collision_warp_tile_stays_probeable_after_a_wall_bump(tmp_path):
+    """A Gen 1 elevator mat only fires when you walk INTO the closed doors.
+
+    The first press reads as a wall bump, and `tried` is never cleared, so
+    without a warp-tile exemption the one input that leaves the floor is
+    suppressed forever — the Rocket Hideout B4F closed loop.
+    """
+    memory = NavigationMemory(tmp_path / "navigation-memory.json")
+    mat = (0xCA, 24, 15)
+    plain = (0xCA, 24, 14)
+    now = datetime.now(timezone.utc)
+
+    for origin in (mat, plain):
+        memory.begin(origin, ["down"], phase="overworld")
+        memory.finish(origin, now=now)
+
+    def directions(frontier, tile):
+        return {
+            entry["direction"]
+            for entry in frontier
+            if entry["origin"] == [tile[1], tile[2]]
+        }
+
+    suppressed = memory.untried_frontier(mat)
+    assert "down" not in directions(suppressed, mat)
+
+    memory.observe_warps(
+        0xCA, [{"x": 24, "y": 15, "destination_map": 0xCB}]
+    )
+    exempt = memory.untried_frontier(mat)
+
+    assert "down" in directions(exempt, mat)
+    # Only the warp tile is exempt; ordinary wall bumps stay suppressed.
+    assert "down" not in directions(exempt, plain)
+
+
+def test_observe_warps_replaces_only_the_reloaded_map(tmp_path):
+    memory = NavigationMemory(tmp_path / "navigation-memory.json")
+    memory.observe_warps(0xCA, [{"x": 24, "y": 15}])
+    memory.observe_warps(0xC7, [{"x": 21, "y": 2}])
+    memory.observe_warps(0xCA, [{"x": 25, "y": 15}])
+
+    assert memory.warp_tiles == {(0xC7, 21, 2), (0xCA, 25, 15)}
+
+
 def test_navigation_trail_does_not_turn_one_failed_step_into_a_cycle(tmp_path):
     memory = NavigationMemory(tmp_path / "navigation-memory.json")
     a = (0xC9, 15, 11)

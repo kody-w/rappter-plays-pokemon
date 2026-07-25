@@ -6705,7 +6705,32 @@ class NavigationMemory:
         # bounded but never expired by transition-list FIFO churn, so the
         # untried frontier converges and distinct_edge_count is monotonic.
         self.session_tried: dict[tuple[int, int, int, str], None] = {}
+        # (map, x, y) warp tiles read from RAM for the loaded map. Gen 1 warps
+        # come in two flavours: step-on (doors, stairs, ladders) and
+        # collision (exit mats and elevator doors, which only fire when you
+        # walk INTO the wall while already standing on the mat). A collision
+        # warp therefore looks exactly like a wall bump the first time, so it
+        # must stay probeable after being tried once.
+        self.warp_tiles: set[tuple[int, int, int]] = set()
         self._load()
+
+    def observe_warps(
+        self, map_id: Optional[int], warps: Any
+    ) -> None:
+        """Record the loaded map's warp tiles from a game-state snapshot."""
+        if map_id is None or not isinstance(warps, list):
+            return
+        tiles = set()
+        for warp in warps:
+            if not isinstance(warp, dict):
+                continue
+            x = warp.get("x")
+            y = warp.get("y")
+            if isinstance(x, int) and isinstance(y, int):
+                tiles.add((map_id, x, y))
+        self.warp_tiles = {
+            tile for tile in self.warp_tiles if tile[0] != map_id
+        } | tiles
 
     def _load(self) -> None:
         value = read_json(self.path)
@@ -7742,6 +7767,14 @@ class NavigationMemory:
         for position in self.trail:
             if position[0] == map_id:
                 known.add((position[1], position[2]))
+        # A collision warp (elevator mat, exit mat) reads as a wall bump on
+        # the first try, and `tried` is never cleared — so without this the
+        # one input that actually fires the warp is suppressed forever and
+        # the floor becomes a closed loop. Keep warp tiles permanently
+        # probeable in every direction.
+        tried = {
+            key for key in tried if (map_id, key[0], key[1]) not in self.warp_tiles
+        }
         entries = []
         for x, y in known:
             distance = abs(x - center_x) + abs(y - center_y)
@@ -10582,6 +10615,37 @@ class PokemonMemoryReader:
         deduplicated = list(dict.fromkeys(line for line in lines if len(line) > 1))
         return " | ".join(deduplicated[-8:])[:600]
 
+    def warps(self) -> list[dict[str, Any]]:
+        """The current map's warp table, straight from RAM.
+
+        Gen 1 keeps wNumberOfWarps at 0xD3AE followed by 4-byte entries
+        (y, x, destination warp index, destination map). Reading it removes
+        the need to discover exits by stepping on them: a floor's real doors,
+        stairs, and elevator mats are known the moment the map loads.
+        """
+        count = self._read_optional(0xD3AE)
+        if count is None or not 0 < count <= 32:
+            return []
+        entries = []
+        for index in range(count):
+            base = 0xD3AF + index * 4
+            warp_y = self._read_optional(base)
+            warp_x = self._read_optional(base + 1)
+            destination_map = self._read_optional(base + 3)
+            if warp_x is None or warp_y is None or destination_map is None:
+                continue
+            entries.append(
+                {
+                    "x": warp_x,
+                    "y": warp_y,
+                    "destination_map": destination_map,
+                    "destination_name": MAP_NAMES.get(
+                        destination_map, f"Map 0x{destination_map:02X}"
+                    ),
+                }
+            )
+        return entries
+
     def position(self) -> Optional[tuple[int, int, int]]:
         """Cheap (map, x, y) read for the settled-position decision gate."""
         map_id = self._read_optional(0xD35E)
@@ -10640,6 +10704,7 @@ class PokemonMemoryReader:
                 "total": 151,
             },
             "key_items": self.key_items(),
+            "warps": self.warps(),
             "play_time": self.play_time(),
             "screen_text": self._screen_text(),
             "hall_of_fame": map_id == 0x76 if map_id is not None else False,
@@ -10774,7 +10839,11 @@ def rocket_hideout_route_guidance(
         if map_id == 0xCA:
             return prefix + (
                 "Silph Scope is owned. Enter the elevator at either (24,15) or "
-                "(25,15), then choose B1F."
+                "(25,15), then choose B1F. Those mats are COLLISION warps: "
+                "stepping onto them does nothing, so once you are standing on "
+                "(24,15) or (25,15) press DOWN AGAIN into the closed doors. "
+                "The first down press reads as a wall bump; that bump IS the "
+                "warp input, so repeat it instead of recording a wall."
             )
         if map_id == 0xC9:
             return prefix + (
@@ -11140,6 +11209,13 @@ Make progress deliberately:
 - Navigation memory is trusted runtime evidence. When it marks an attempt as
   repeatedly ineffective or cycling, do not repeat that attempt; choose a
   materially different route and verify that coordinates change.
+- Exception, and the only one: game_state.warps lists the loaded map's real
+  exits read from RAM. If your coordinates equal a warp tile and stepping onto
+  it did not change the map, it is a COLLISION warp (elevator mat, exit mat).
+  Press the direction that faces the adjacent wall — usually the one already
+  recorded as a wall bump — and repeat it. There the wall bump is the warp
+  input, not evidence of a dead end. Try each direction once before concluding
+  the warp is unreachable.
 - When the game state includes "navigation_mode":"puzzle", a deterministic
   monitor confirmed a movement loop. Reason over the learned settled edges in
   transition_graph, where each entry means pressing direction once at origin
@@ -14851,6 +14927,9 @@ class PokemonRunner:
         )
         image.save(screenshot, format="PNG")
         position = navigation_position(game_state)
+        self.navigation_memory.observe_warps(
+            game_state.get("map_id"), game_state.get("warps")
+        )
         route_context = bool(
             self.status.get("phase") == "overworld"
             and position is not None
