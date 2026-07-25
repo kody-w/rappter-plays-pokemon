@@ -158,6 +158,29 @@ Build or publish the public-safe story without stopping the game:
   --youtube-started-at UTC_BROADCAST_START
 ```
 
+Watch run health from your phone without opening the livestream:
+
+```bash
+./ops.sh                # serve on loopback and publish over your tailnet
+./ops.sh --no-publish   # loopback only
+./ops.sh --once         # print one metrics document and exit
+./ops.sh --unpublish    # withdraw the tailnet route
+```
+
+This is a private operator view, not the spectator page: it answers "is the run
+healthy" with tabs for **Stuck** (stuck counters, reasons, recovery stage),
+**Run** (party HP, badges, key items), **Brain** (decision latency, model
+calls, effort), and **Infra** (encoder state, storage, last error). It is
+watch-only by construction — the server reads `status.json`, never writes to
+the runtime directory, serves no control endpoints, and answers `405` to every
+method except `GET` and `HEAD`.
+
+Reachability comes from the tailnet rather than a pairing handshake, so there
+is nothing to re-scan after a restart and it works off your LAN. Access is
+whatever your tailnet ACLs already allow; `tailscale serve` keeps the route
+tailnet-only and never exposes it publicly (that would be `tailscale funnel`,
+which this never calls).
+
 Run the improvement and warehouse loops independently:
 
 ```bash
