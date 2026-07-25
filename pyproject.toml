@@ -40,6 +40,7 @@ rappter-pokemon-story = "rappter_plays_pokemon.story:main"
 rappter-youtube-chat = "rappter_plays_pokemon.youtube_chat:main"
 rappter-pokemon-improve = "rappter_plays_pokemon.improvement:main"
 rappter-pokemon-warehouse = "rappter_plays_pokemon.warehouse:main"
+rappter-pokemon-ops = "rappter_plays_pokemon.ops:main"
 
 [project.urls]
 Homepage = "https://github.com/kody-w/rappter-plays-pokemon"
