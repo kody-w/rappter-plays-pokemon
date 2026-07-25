@@ -10792,6 +10792,70 @@ def celadon_route_guidance(game_state: dict[str, Any]) -> Optional[str]:
     return None
 
 
+POKEMON_TOWER_MAP_IDS = frozenset({0x8E, 0x8F, 0x90, 0x91, 0x92, 0x93, 0x94})
+
+
+def pokemon_tower_route_guidance(
+    game_state: dict[str, Any],
+) -> Optional[str]:
+    """Name this floor's ascending staircase from the live warp table.
+
+    The Tower's two staircases swap sides floor to floor — 4F ascends at
+    (3,9) and descends at (18,9), 5F is the mirror image — so hardcoded
+    coordinates would be wrong half the time. game_state.warps is read from
+    RAM for the loaded map, so the ascending exit is simply the warp whose
+    destination is a higher floor.
+    """
+    map_id = game_state.get("map_id")
+    if map_id not in POKEMON_TOWER_MAP_IDS:
+        return None
+    warps = game_state.get("warps")
+    if not isinstance(warps, list) or not warps:
+        return None
+    ascending = [
+        warp
+        for warp in warps
+        if isinstance(warp, dict)
+        and isinstance(warp.get("destination_map"), int)
+        and warp["destination_map"] in POKEMON_TOWER_MAP_IDS
+        and warp["destination_map"] > map_id
+    ]
+    coordinates = game_state.get("coordinates")
+    position = (
+        (coordinates.get("x"), coordinates.get("y"))
+        if isinstance(coordinates, dict)
+        else (None, None)
+    )
+    prefix = (
+        "Authoritative Pokemon Tower route. Climb to 7F for the Poke Flute; "
+        f"do not descend. Current map is 0x{map_id:02X}, coordinates "
+        f"{position}. "
+    )
+    if not ascending:
+        return prefix + (
+            "This floor has no ascending staircase in the warp table, so you "
+            "are on 7F or the table is unavailable. Do not invent one."
+        )
+    target = ascending[0]
+    body = (
+        f"The ONLY objective is the staircase at "
+        f"({target['x']},{target['y']}), which leads to "
+        f"{target['destination_name']}. Route to it and ignore every other "
+        "warp on this floor — the second staircase descends and undoes "
+        "progress. Gravestones form the maze walls, so when a direction is "
+        "blocked, step around the row rather than retrying the same tile."
+    )
+    if map_id == 0x92:
+        body += (
+            " The white tiles in the centre are the purified zone: stepping "
+            "in prints 'Entered purified, protected zone!' and heals the "
+            "party, and that message CONSUMES your next inputs. Clear it "
+            "with B and reobserve before moving; do not read the swallowed "
+            "presses as walls, and do not re-enter the zone once healed."
+        )
+    return prefix + body
+
+
 def rocket_hideout_route_guidance(
     game_state: dict[str, Any],
 ) -> Optional[str]:
@@ -15060,6 +15124,7 @@ class PokemonRunner:
         route_guidance = (
             rock_tunnel_route_guidance(game_state)
             or celadon_route_guidance(game_state)
+            or pokemon_tower_route_guidance(game_state)
             or rocket_hideout_route_guidance(route_state)
         )
         if route_guidance:

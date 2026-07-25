@@ -38,6 +38,7 @@ from openrappter.agents.pokemon_agent import (
     normalize_web_research,
     overworld_action_buttons,
     parse_agent_action,
+    pokemon_tower_route_guidance,
     precision_route_buttons,
     public_runtime_status,
     read_improvement_directive,
@@ -582,6 +583,84 @@ def test_navigation_memory_aggregates_button_count_variants(tmp_path):
 
     assert guidance["avoid_repeating"][0]["attempts"] == 2
     assert guidance["avoid_repeating"][0]["buttons"] == ["right"]
+
+
+def tower_state(map_id, warps, x=11, y=9):
+    return {
+        "map_id": map_id,
+        "coordinates": {"x": x, "y": y},
+        "warps": warps,
+    }
+
+
+def test_tower_guidance_picks_the_ascending_stairs_on_each_floor():
+    """The staircases swap sides floor to floor, so this must come from RAM.
+
+    Both coordinate sets below were read from wWarpEntries on a live run.
+    """
+    fifth = pokemon_tower_route_guidance(
+        tower_state(
+            0x92,
+            [
+                {"x": 3, "y": 9, "destination_map": 0x91,
+                 "destination_name": "Pokemon Tower 4F"},
+                {"x": 18, "y": 9, "destination_map": 0x93,
+                 "destination_name": "Pokemon Tower 6F"},
+            ],
+        )
+    )
+    fourth = pokemon_tower_route_guidance(
+        tower_state(
+            0x91,
+            [
+                {"x": 3, "y": 9, "destination_map": 0x92,
+                 "destination_name": "Pokemon Tower 5F"},
+                {"x": 18, "y": 9, "destination_map": 0x90,
+                 "destination_name": "Pokemon Tower 3F"},
+            ],
+        )
+    )
+
+    assert "staircase at (18,9)" in fifth
+    assert "Pokemon Tower 6F" in fifth
+    # Same y, opposite side — a hardcoded coordinate would be wrong here.
+    assert "staircase at (3,9)" in fourth
+    assert "Pokemon Tower 5F" in fourth
+
+
+def test_tower_guidance_warns_about_the_purified_zone_only_on_5f():
+    warps = [
+        {"x": 18, "y": 9, "destination_map": 0x93,
+         "destination_name": "Pokemon Tower 6F"},
+    ]
+
+    assert "purified zone" in pokemon_tower_route_guidance(
+        tower_state(0x92, warps)
+    )
+    assert "purified zone" not in pokemon_tower_route_guidance(
+        tower_state(0x91, warps)
+    )
+
+
+def test_tower_guidance_invents_no_staircase_on_the_top_floor():
+    guidance = pokemon_tower_route_guidance(
+        tower_state(
+            0x94,
+            [
+                {"x": 3, "y": 9, "destination_map": 0x93,
+                 "destination_name": "Pokemon Tower 6F"},
+            ],
+        )
+    )
+
+    assert "do not invent one" in guidance.lower()
+
+
+def test_tower_guidance_is_silent_off_the_tower_and_without_warps():
+    assert pokemon_tower_route_guidance(
+        tower_state(0xCA, [{"x": 1, "y": 1, "destination_map": 0xCB}])
+    ) is None
+    assert pokemon_tower_route_guidance(tower_state(0x92, [])) is None
 
 
 def test_collision_warp_tile_stays_probeable_after_a_wall_bump(tmp_path):
