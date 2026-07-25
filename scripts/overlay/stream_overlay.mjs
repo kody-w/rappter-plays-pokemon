@@ -120,6 +120,10 @@ const qriousRuntime = await readFile(
     'qrious-4.0.2.runtime.min.js'
   )
 );
+// Deliberate, fixed presentation latency for the audio branch. It absorbs
+// pipeline jitter; it is not a drift correction and must never be retuned to
+// chase one.
+const AUDIO_DELAY_MS = 200;
 const encoderMetrics = {
   audioSent: 0,
   audioWindow: [],
@@ -147,6 +151,12 @@ function tuningSnapshot(sourceAgeMs) {
   const audioClock = encoderMetrics.audioSent > 0
     ? encoderMetrics.audioSent / (48000 * 2 * 2) * 1000
     : null;
+  // piped/FRAME_RATE is the timeline the pipe WOULD have produced under the
+  // old assumed-cadence stamping, so this stays the pipe-shortfall signal:
+  // how far behind real time the frame cadence is running. Video PTS now come
+  // from the wall clock instead, so a shortfall no longer skews A/V -- it
+  // shows up as duplicated frames rather than drift. True output-vs-wallclock
+  // alignment is ffmpeg's own time= against elapsed= in the encoder log.
   const videoClock = encoderMetrics.piped > 0
     ? encoderMetrics.piped / FRAME_RATE * 1000
     : null;
@@ -156,7 +166,7 @@ function tuningSnapshot(sourceAgeMs) {
       audioClock === null || videoClock === null
         ? null
         : Math.round(audioClock - videoClock),
-    configured_audio_delay_ms: 200,
+    configured_audio_delay_ms: AUDIO_DELAY_MS,
     audio_fill_percent:
       audioTotal > 0 ? Math.round(audioReal / audioTotal * 1000) / 10 : null,
     source_age_ms:
@@ -320,15 +330,26 @@ const ffmpeg = spawn('ffmpeg', [
   '-loglevel', 'warning',
   '-stats',
   ...(args.testOutput ? ['-y'] : []),
+  // Stamp video with real arrival time instead of assuming every piped frame
+  // is exactly 1/FRAME_RATE. Under x264 backpressure slightly fewer than
+  // FRAME_RATE frames reach the pipe each second, so the assumed cadence made
+  // the video timeline run ~0.8% slow while the wall-clock-paced audio stayed
+  // exact -- an unbounded skew that reached 88s over three hours. Wall-clock
+  // stamps put both streams on one clock, and -r below re-times to CFR by
+  // duplicating into real gaps rather than silently shortening the timeline.
   '-f', 'image2pipe',
-  '-framerate', String(FRAME_RATE),
+  '-use_wallclock_as_timestamps', '1',
   '-i', '-',
   '-f', 's16le',
   '-ar', '48000',
   '-ac', '2',
   '-i', 'pipe:3',
   '-vf', 'format=yuv420p',
-  '-af', 'highpass=f=10,aresample=async=1:first_pts=0,adelay=200|200',
+  // No aresample=async: with a shared clock there is no runaway gap to chase,
+  // and continuously stretching audio to chase one was the background
+  // artefact. adelay is now the only audio offset -- a fixed, deliberate
+  // presentation latency, not a correction.
+  '-af', `highpass=f=10,adelay=${AUDIO_DELAY_MS}|${AUDIO_DELAY_MS}`,
   '-r', '30',
   '-c:v', 'libx264',
   '-preset', 'veryfast',
