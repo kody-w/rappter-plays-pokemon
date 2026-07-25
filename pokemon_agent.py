@@ -10737,6 +10737,35 @@ def collision_ascii(pyboy: Any) -> Optional[str]:
         return None
 
 
+def item_gate_guidance(game_state: dict[str, Any]) -> Optional[str]:
+    """Obstacles that no sequence of movements can ever clear.
+
+    The Route 12 Snorlax cost 475 stuck decisions: frontier exploration
+    searched for a way around a sprite whose solution is not in the movement
+    action space at all. Unlike a mislearned wall, no amount of probing can
+    discover the answer, so the message itself has to name it.
+    """
+    text = game_state.get("screen_text")
+    if not isinstance(text, str) or not text.strip():
+        return None
+    lowered = text.lower()
+    if "blocks the way" not in lowered:
+        return None
+    if "sleeping" not in lowered:
+        return None
+    return (
+        "Authoritative obstacle rule. A sleeping POKEMON (Snorlax) blocks "
+        "this tile and CANNOT be walked around, pushed, or battled from the "
+        "overworld — there is no route past it and probing for one is wasted. "
+        "Clear the message, then open the item menu and use the POKE FLUTE: "
+        "press START, choose ITEM, scroll down to POKE FLUTE (it is near the "
+        "bottom of the bag, after SILPH SCOPE), press A, then choose USE. "
+        "That wakes it into a battle you can win or run from, after which the "
+        "tile is permanently clear. Do not resume navigation until the "
+        "message is gone and the sprite has moved."
+    )
+
+
 def rock_tunnel_route_guidance(game_state: dict[str, Any]) -> Optional[str]:
     map_id = game_state.get("map_id")
     coordinates = game_state.get("coordinates")
@@ -15122,7 +15151,8 @@ class PokemonRunner:
         ):
             route_state["previous_map_id"] = floor_trail[-2]
         route_guidance = (
-            rock_tunnel_route_guidance(game_state)
+            item_gate_guidance(game_state)
+            or rock_tunnel_route_guidance(game_state)
             or celadon_route_guidance(game_state)
             or pokemon_tower_route_guidance(game_state)
             or rocket_hideout_route_guidance(route_state)
