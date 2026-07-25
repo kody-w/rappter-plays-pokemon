@@ -250,6 +250,7 @@ W_NUM_BAG_ITEMS = 0xD31D
 W_BAG_ITEMS = 0xD31E
 BAG_ITEM_CAPACITY = 20
 SILPH_SCOPE_ITEM_ID = 0x48
+POKE_FLUTE_ITEM_ID = 0x49
 LIFT_KEY_ITEM_ID = 0x4A
 YOUTUBE_VIDEO_ID_RE = re.compile(r"^[A-Za-z0-9_-]{11}$")
 CHAT_ADVISORY_STALE_SECONDS = 90
@@ -10497,7 +10498,7 @@ class PokemonMemoryReader:
     def key_items(self) -> dict[str, Optional[bool]]:
         count = self._read_optional(W_NUM_BAG_ITEMS)
         if count is None or not 0 <= count <= BAG_ITEM_CAPACITY:
-            return {"silph_scope": None, "lift_key": None}
+            return {"silph_scope": None, "poke_flute": None, "lift_key": None}
         item_ids: list[int] = []
         for index in range(count):
             item_id = self._read_optional(W_BAG_ITEMS + index * 2)
@@ -10508,13 +10509,14 @@ class PokemonMemoryReader:
                 or quantity is None
                 or not 1 <= quantity <= 99
             ):
-                return {"silph_scope": None, "lift_key": None}
+                return {"silph_scope": None, "poke_flute": None, "lift_key": None}
             item_ids.append(item_id)
         terminator = self._read_optional(W_BAG_ITEMS + count * 2)
         if terminator != 0xFF:
-            return {"silph_scope": None, "lift_key": None}
+            return {"silph_scope": None, "poke_flute": None, "lift_key": None}
         return {
             "silph_scope": SILPH_SCOPE_ITEM_ID in item_ids,
+            "poke_flute": POKE_FLUTE_ITEM_ID in item_ids,
             "lift_key": LIFT_KEY_ITEM_ID in item_ids,
         }
 
@@ -10841,6 +10843,35 @@ def pokemon_tower_route_guidance(
     warps = game_state.get("warps")
     if not isinstance(warps, list) or not warps:
         return None
+    key_items = game_state.get("key_items")
+    poke_flute = (
+        key_items.get("poke_flute") if isinstance(key_items, dict) else None
+    )
+    if poke_flute:
+        # The Tower is finished. Without this the climb directive below keeps
+        # firing on re-entry and marches the run back up a cleared dungeon.
+        leaving = [
+            warp
+            for warp in warps
+            if isinstance(warp, dict)
+            and isinstance(warp.get("destination_map"), int)
+            and (
+                warp["destination_map"] not in POKEMON_TOWER_MAP_IDS
+                or warp["destination_map"] < map_id
+            )
+        ]
+        exit_text = (
+            f"Descend at ({leaving[0]['x']},{leaving[0]['y']}) toward "
+            f"{leaving[0]['destination_name']}."
+            if leaving
+            else "Take the downward staircase."
+        )
+        return (
+            "Authoritative Pokemon Tower route. The POKE FLUTE is already "
+            "owned and this dungeon is COMPLETE — there is nothing left here "
+            f"and climbing again is pure waste. {exit_text} Keep descending "
+            "until you exit to Lavender Town, then leave the Tower behind."
+        )
     ascending = [
         warp
         for warp in warps

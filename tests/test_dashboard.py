@@ -60,12 +60,14 @@ def test_key_item_state_uses_validated_bag_pairs_and_terminator():
 
     assert PokemonMemoryReader(memory).key_items() == {
         "silph_scope": True,
+        "poke_flute": False,
         "lift_key": True,
     }
 
     memory[0xD31E + 6] = LIFT_KEY_ITEM_ID
     assert PokemonMemoryReader(memory).key_items() == {
         "silph_scope": None,
+        "poke_flute": None,
         "lift_key": None,
     }
 
@@ -79,12 +81,14 @@ def test_key_item_state_handles_capacity_and_invalid_bags():
 
     assert PokemonMemoryReader(memory).key_items() == {
         "silph_scope": False,
+        "poke_flute": False,
         "lift_key": True,
     }
 
     memory[0xD31D] = BAG_ITEM_CAPACITY + 1
     assert PokemonMemoryReader(memory).key_items() == {
         "silph_scope": None,
+        "poke_flute": None,
         "lift_key": None,
     }
 

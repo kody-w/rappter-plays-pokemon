@@ -655,6 +655,40 @@ def test_tower_guidance_picks_the_ascending_stairs_on_each_floor():
     assert "Pokemon Tower 5F" in fourth
 
 
+def test_tower_guidance_sends_you_out_once_the_flute_is_owned():
+    """Re-entering a cleared Tower must not restart the climb directive."""
+    warps = [
+        {"x": 3, "y": 9, "destination_map": 0x8F,
+         "destination_name": "Pokemon Tower 2F"},
+        {"x": 18, "y": 9, "destination_map": 0x91,
+         "destination_name": "Pokemon Tower 4F"},
+    ]
+    state = tower_state(0x90, warps)
+    state["key_items"] = {"poke_flute": True}
+
+    guidance = pokemon_tower_route_guidance(state)
+
+    assert "COMPLETE" in guidance
+    # It must point at the DOWN staircase (2F), never the up one (4F).
+    assert "(3,9)" in guidance
+    assert "(18,9)" not in guidance
+    assert "Climb to 7F" not in guidance
+
+
+def test_tower_guidance_still_climbs_before_the_flute():
+    warps = [
+        {"x": 18, "y": 9, "destination_map": 0x93,
+         "destination_name": "Pokemon Tower 6F"},
+    ]
+    for key_items in ({"poke_flute": False}, {}, None):
+        state = tower_state(0x92, warps)
+        if key_items is not None:
+            state["key_items"] = key_items
+        guidance = pokemon_tower_route_guidance(state)
+        assert "Climb to 7F" in guidance
+        assert "staircase at (18,9)" in guidance
+
+
 def test_tower_guidance_warns_about_the_purified_zone_only_on_5f():
     warps = [
         {"x": 18, "y": 9, "destination_map": 0x93,
