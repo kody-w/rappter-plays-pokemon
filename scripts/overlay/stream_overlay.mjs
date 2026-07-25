@@ -376,6 +376,74 @@ let audioFifoRetryAt = 0;
 let audioSent = 0;
 const audioStartedAt = Date.now();
 const audioChunk = Buffer.alloc(AUDIO_BYTES_PER_SECOND / 10);
+// Jitter buffer. The pacer used to demand bytes on a rigid wall-clock
+// schedule and zero-fill whatever the FIFO could not supply that instant, so
+// every hitch in the emulator's frame pacing punched silence into the middle
+// of the waveform -- 15% of the stream, in 100ms slices. Those splices are
+// discontinuities, and discontinuities are broadband clicks: the harshness.
+//
+// Instead, drain the FIFO greedily into a reservoir and play out of that. A
+// deliberate prebuffer means a short producer stall is covered by audio we
+// already hold, exactly like a synchronised playback system trading a little
+// fixed latency for continuity. Silence is now a last resort for a real,
+// sustained outage rather than the routine response to ordinary jitter.
+const AUDIO_PREBUFFER_BYTES = AUDIO_BYTES_PER_SECOND / 2;   // 500ms
+const AUDIO_RESERVOIR_MAX = AUDIO_BYTES_PER_SECOND * 2;     // cap unbounded growth
+const audioDrainChunk = Buffer.alloc(AUDIO_BYTES_PER_SECOND / 4);
+let audioReservoir = [];
+let audioReservoirBytes = 0;
+let audioPrimed = false;
+
+function drainFifoIntoReservoir() {
+  if (audioFifoFd === null && Date.now() >= audioFifoRetryAt) {
+    try {
+      audioFifoFd = openSync(
+        audioFifoPath, fsConstants.O_RDONLY | fsConstants.O_NONBLOCK
+      );
+    } catch (_error) {
+      audioFifoRetryAt = Date.now() + 3000;
+    }
+  }
+  if (audioFifoFd === null) return;
+  for (;;) {
+    if (audioReservoirBytes >= AUDIO_RESERVOIR_MAX) return;
+    let got = 0;
+    try {
+      got = readSync(audioFifoFd, audioDrainChunk, 0, audioDrainChunk.length, null);
+    } catch (error) {
+      if (error.code !== 'EAGAIN') {
+        try { closeSync(audioFifoFd); } catch (_closeError) {}
+        audioFifoFd = null;
+        audioFifoRetryAt = Date.now() + 3000;
+      }
+      return;
+    }
+    if (got <= 0) return;
+    audioReservoir.push(Buffer.from(audioDrainChunk.subarray(0, got)));
+    audioReservoirBytes += got;
+  }
+}
+
+// Take up to `want` bytes of real audio out of the reservoir.
+function takeFromReservoir(want) {
+  const parts = [];
+  let taken = 0;
+  while (taken < want && audioReservoir.length) {
+    const head = audioReservoir[0];
+    const need = want - taken;
+    if (head.length <= need) {
+      parts.push(head);
+      taken += head.length;
+      audioReservoir.shift();
+    } else {
+      parts.push(head.subarray(0, need));
+      audioReservoir[0] = head.subarray(need);
+      taken += need;
+    }
+  }
+  audioReservoirBytes -= taken;
+  return taken ? Buffer.concat(parts, taken) : null;
+}
 const audioTimer = setInterval(() => {
   const audioPipe = ffmpeg.stdio[3];
   if (audioPipe && audioPipe.writableNeedDrain) {
@@ -394,30 +462,36 @@ const audioTimer = setInterval(() => {
   if (deficit <= 0 || !audioPipe || ffmpeg.exitCode !== null) return;
   let tickReal = 0;
   let tickTotal = 0;
+  drainFifoIntoReservoir();
+  // Hold the first half second back so the reservoir has something to cover
+  // hitches with. Until then the stream is silent rather than choppy.
+  if (!audioPrimed) {
+    if (audioReservoirBytes < AUDIO_PREBUFFER_BYTES) {
+      audioPrimed = false;
+    } else {
+      audioPrimed = true;
+    }
+  }
   while (deficit > 0) {
     const want = Math.min(deficit, audioChunk.length);
-    let got = 0;
-    if (audioFifoFd === null && Date.now() >= audioFifoRetryAt) {
-      try {
-        audioFifoFd = openSync(audioFifoPath, fsConstants.O_RDONLY | fsConstants.O_NONBLOCK);
-      } catch (_error) {
-        audioFifoRetryAt = Date.now() + 3000;
-      }
+    const real = audioPrimed ? takeFromReservoir(want) : null;
+    const got = real ? real.length : 0;
+    let payload;
+    if (got === want) {
+      payload = real;
+    } else {
+      // Reservoir short: pad only the shortfall, exactly as the pacer did
+      // before the buffer existed. Deliberately NOT re-priming here -- waiting
+      // for a refill would convert a run of brief gaps into a half-second
+      // dropout, which is worse. The buffer can only help from here: it
+      // covers jitter it has audio for, and degrades to the old behaviour when
+      // it genuinely has none.
+      audioChunk.fill(0);
+      if (got) real.copy(audioChunk, 0);
+      payload = Buffer.from(audioChunk.subarray(0, want));
     }
-    if (audioFifoFd !== null) {
-      try {
-        got = readSync(audioFifoFd, audioChunk, 0, want, null);
-      } catch (error) {
-        if (error.code !== 'EAGAIN') {
-          try { closeSync(audioFifoFd); } catch (_error) {}
-          audioFifoFd = null;
-          audioFifoRetryAt = Date.now() + 3000;
-        }
-      }
-    }
-    if (got < want) audioChunk.fill(0, got, want);
     try {
-      audioPipe.write(Buffer.from(audioChunk.subarray(0, want)));
+      audioPipe.write(payload);
     } catch (_error) {
       return;
     }

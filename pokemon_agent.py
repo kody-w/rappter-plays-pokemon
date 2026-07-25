@@ -249,6 +249,13 @@ CARDINAL_BUTTONS = ("up", "down", "left", "right")
 W_NUM_BAG_ITEMS = 0xD31D
 W_BAG_ITEMS = 0xD31E
 BAG_ITEM_CAPACITY = 20
+# Fixed gain mapping the Game Boy APU's small integer mix onto int16 after DC
+# removal. Measured over 10s of play: DC +24.0, peak deviation 24 counts, so
+# this lands at -8.5 dBFS with no clipped samples and keeps headroom for
+# louder scenes (1024 would sit at -2.5 dBFS, too hot to be safe). Fixed on
+# purpose: an adaptive or normalising gain would pump audibly between quiet
+# menus and battle music.
+AUDIO_PCM_GAIN = 512.0
 SILPH_SCOPE_ITEM_ID = 0x48
 POKE_FLUTE_ITEM_ID = 0x49
 LIFT_KEY_ITEM_ID = 0x4A
@@ -15880,7 +15887,27 @@ class PokemonRunner:
             samples = self.pyboy.sound.ndarray
             if samples is None or not len(samples):
                 return
-            pcm = (samples.astype(np.int16) << 8).tobytes()
+            # PyBoy hands back the APU's raw mix: int8, sitting on a DC
+            # pedestal of about +24 and spanning roughly 39 levels, because a
+            # Game Boy DAC is 4 bits per channel. Shifting left by 8 kept that
+            # pedestal and left the result near 11% of full scale, so the
+            # stream was ~19 dB quiet and listeners turned it up until the
+            # 5-bit quantisation grit became audible.
+            #
+            # Remove DC first -- amplifying a pedestal of 24 would clip long
+            # before the music does -- with a slow one-pole tracker rather
+            # than a per-block mean, which would wobble with the bass line.
+            block = samples.astype(np.float32)
+            level = float(block.mean())
+            previous = getattr(self, "_audio_dc", None)
+            dc = level if previous is None else previous + 0.05 * (level - previous)
+            self._audio_dc = dc
+            centred = block - dc
+            pcm = (
+                np.clip(centred * AUDIO_PCM_GAIN, -32768.0, 32767.0)
+                .astype(np.int16)
+                .tobytes()
+            )
         except Exception:
             self._audio_disabled = True
             return
