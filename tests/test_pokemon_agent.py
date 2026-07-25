@@ -33,6 +33,7 @@ from openrappter.agents.pokemon_agent import (
     file_sha256,
     is_cloud_placeholder,
     is_pokemon_red_rom,
+    item_gate_guidance,
     list_clips,
     normalize_brain_decision,
     normalize_web_research,
@@ -583,6 +584,32 @@ def test_navigation_memory_aggregates_button_count_variants(tmp_path):
 
     assert guidance["avoid_repeating"][0]["attempts"] == 2
     assert guidance["avoid_repeating"][0]["buttons"] == ["right"]
+
+
+def test_item_gate_guidance_names_the_poke_flute_for_a_sleeping_blocker():
+    """The exact string the Route 12 Snorlax prints, as read from the game."""
+    guidance = item_gate_guidance(
+        {"screen_text": "A sleeping POKMON | blocks the way!"}
+    )
+
+    assert guidance is not None
+    assert "POKE FLUTE" in guidance
+    assert "ITEM" in guidance
+    # It must say the obstacle is unroutable, or the agent keeps probing.
+    assert "cannot be walked around" in guidance.lower()
+
+
+def test_item_gate_guidance_ignores_unrelated_and_empty_text():
+    assert item_gate_guidance({"screen_text": ""}) is None
+    assert item_gate_guidance({"screen_text": None}) is None
+    assert item_gate_guidance({}) is None
+    assert item_gate_guidance(
+        {"screen_text": "RED POKMON | are fully healed!"}
+    ) is None
+    # A boulder also "blocks the way" but is a Strength puzzle, not an item.
+    assert item_gate_guidance(
+        {"screen_text": "A boulder blocks the way!"}
+    ) is None
 
 
 def tower_state(map_id, warps, x=11, y=9):
