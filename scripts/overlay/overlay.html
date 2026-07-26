@@ -57,10 +57,10 @@
     gap: 16px; padding: 16px; height: 100%;
   }
   .col {
-    display: flex; flex-direction: column; gap: 10px;
+    display: flex; flex-direction: column; gap: 9px;
     min-width: 0; min-height: 0; overflow: hidden;
   }
-  .col.center { gap: 8px; padding: 0 6px; align-items: center; }
+  .col.center { gap: 6px; padding: 0 6px; align-items: center; }
 
   .masthead { text-align: center; }
   .masthead .eyebrow {
@@ -89,15 +89,16 @@
     border-radius: 10px; padding: 10px 12px; width: 100%;
     flex-shrink: 0;
   }
-  /* The one card allowed to absorb a tight column: live telemetry (party,
-     badges, agent) keeps its full height, and this static blurb truncates
-     instead. */
-  .card.about-card { flex-shrink: 1; min-height: 0; overflow: hidden; }
-  /* Fade the last line so a truncated blurb reads as deliberate rather than
-     as a panel that got cut off. */
+  /* Does not shrink: its text is line-clamped to a height that already fits
+     the worst case, so squeezing the card further would slice the clamped
+     text and put us right back where we started. */
+  .card.about-card { flex-shrink: 0; }
+  /* Whole lines or nothing: clamp to the worst-case space a full 6-Pokemon
+     party leaves, so the blurb ends on a line boundary with an ellipsis
+     rather than being sliced through the middle of one. */
   .card.about-card .about {
-    -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 18px), transparent 100%);
-    mask-image: linear-gradient(to bottom, #000 calc(100% - 18px), transparent 100%);
+    display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;
+    overflow: hidden;
   }
   .label {
     font-size: 11px; letter-spacing: .18em; color: var(--ink-muted);
@@ -116,7 +117,11 @@
   }
   #objective {
     font-size: 14px; line-height: 1.4; color: var(--ink-secondary);
-    min-height: 39px; max-height: 59px; overflow: hidden;
+    /* Clamp to whole lines with an ellipsis. A max-height cut mid-line
+       instead: 59px against a 19.6px line box left a third line sliced in
+       half, which on a broadcast reads as broken rather than trimmed. */
+    display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;
+    overflow: hidden; min-height: 39px;
   }
 
   .mini-party { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 12px; }
@@ -249,10 +254,8 @@
     <div class="card about-card">
       <div class="label">ABOUT THIS STREAM</div>
       <div class="about">
-        An AI agent plays Pokémon Red fully autonomously, 24/7 — reading the
-        screen, choosing goals, battling, and checkpointing its own progress.
-        Copilot controls every button. Optional <b>!hint direction</b> crowd
-        ballots are advisory and may be ignored.
+        An AI agent plays Pokémon Red autonomously, 24/7 — reading the screen,
+        choosing goals, battling, and checkpointing its own progress.
       </div>
     </div>
     <div class="marquee">
