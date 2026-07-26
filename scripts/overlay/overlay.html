@@ -50,9 +50,16 @@
      Shorts viewer needs must live inside it. */
   .scene {
     display: grid; grid-template-columns: 1fr 405px 1fr;
+    /* minmax(0,1fr) stops the row from auto-growing past the frame: a full
+       6-Pokemon party used to push the About card and marquee off the bottom,
+       where body{overflow:hidden} silently sliced them off. */
+    grid-template-rows: minmax(0, 1fr);
     gap: 16px; padding: 16px; height: 100%;
   }
-  .col { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+  .col {
+    display: flex; flex-direction: column; gap: 10px;
+    min-width: 0; min-height: 0; overflow: hidden;
+  }
   .col.center { gap: 8px; padding: 0 6px; align-items: center; }
 
   .masthead { text-align: center; }
@@ -80,6 +87,17 @@
   .card {
     background: var(--panel); border: 1px solid var(--panel-edge);
     border-radius: 10px; padding: 10px 12px; width: 100%;
+    flex-shrink: 0;
+  }
+  /* The one card allowed to absorb a tight column: live telemetry (party,
+     badges, agent) keeps its full height, and this static blurb truncates
+     instead. */
+  .card.about-card { flex-shrink: 1; min-height: 0; overflow: hidden; }
+  /* Fade the last line so a truncated blurb reads as deliberate rather than
+     as a panel that got cut off. */
+  .card.about-card .about {
+    -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 18px), transparent 100%);
+    mask-image: linear-gradient(to bottom, #000 calc(100% - 18px), transparent 100%);
   }
   .label {
     font-size: 11px; letter-spacing: .18em; color: var(--ink-muted);
@@ -134,6 +152,11 @@
   .checkpoint-card .sub { font-size: 12px; color: var(--ink-muted); margin-top: 3px; }
 
   .party-row { display: flex; align-items: center; gap: 8px; padding: 5px 0; }
+  /* A full party is 6 rows of sprite + bar, which alone can crowd the column.
+     Tighten the rows once the party passes four so the About blurb keeps its
+     text instead of being squeezed down to a bare heading. */
+  #party:has(.party-row:nth-child(5)) .party-row { padding: 2px 0; }
+  #party:has(.party-row:nth-child(5)) .party-row .sprite { width: 34px; height: 34px; }
   .party-row .sprite {
     width: 42px; height: 42px; object-fit: contain;
     image-rendering: pixelated; flex: none;
@@ -183,7 +206,8 @@
   .where-big .chips { display: flex; gap: 8px; margin-top: 6px; flex-wrap: wrap; }
 
   .marquee {
-    margin-top: auto; display: flex; align-items: center; gap: 8px;
+    margin-top: auto; flex-shrink: 0;
+    display: flex; align-items: center; gap: 8px;
     background: var(--panel); border: 1px solid var(--panel-edge);
     border-radius: 10px; padding: 9px 12px;
     font-size: 12px; color: var(--ink-secondary);
@@ -222,7 +246,7 @@
       <div class="agent-line">Crowd hints <b id="crowd-hints">OFF</b> · advisory only</div>
       <div class="agent-line">Web recovery <b id="web-research">OFF</b> · stuck states only</div>
     </div>
-    <div class="card">
+    <div class="card about-card">
       <div class="label">ABOUT THIS STREAM</div>
       <div class="about">
         An AI agent plays Pokémon Red fully autonomously, 24/7 — reading the
