@@ -62,6 +62,8 @@ def test_key_item_state_uses_validated_bag_pairs_and_terminator():
         "silph_scope": True,
         "poke_flute": False,
         "lift_key": True,
+        "card_key": False,
+        "master_ball": False,
     }
 
     memory[0xD31E + 6] = LIFT_KEY_ITEM_ID
@@ -69,6 +71,8 @@ def test_key_item_state_uses_validated_bag_pairs_and_terminator():
         "silph_scope": None,
         "poke_flute": None,
         "lift_key": None,
+        "card_key": None,
+        "master_ball": None,
     }
 
 
@@ -83,6 +87,8 @@ def test_key_item_state_handles_capacity_and_invalid_bags():
         "silph_scope": False,
         "poke_flute": False,
         "lift_key": True,
+        "card_key": False,
+        "master_ball": True,
     }
 
     memory[0xD31D] = BAG_ITEM_CAPACITY + 1
@@ -90,6 +96,8 @@ def test_key_item_state_handles_capacity_and_invalid_bags():
         "silph_scope": None,
         "poke_flute": None,
         "lift_key": None,
+        "card_key": None,
+        "master_ball": None,
     }
 
 

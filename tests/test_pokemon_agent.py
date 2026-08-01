@@ -51,6 +51,7 @@ from openrappter.agents.pokemon_agent import (
     runtime_status,
     search_pokemon_web,
     seed_legacy_ram_provenance,
+    silph_co_route_guidance,
     supervisor_main,
     terminate_isolated_process_group,
     wait_for_stopping_supervisor,
@@ -722,6 +723,128 @@ def test_tower_guidance_is_silent_off_the_tower_and_without_warps():
         tower_state(0xCA, [{"x": 1, "y": 1, "destination_map": 0xCB}])
     ) is None
     assert pokemon_tower_route_guidance(tower_state(0x92, [])) is None
+
+
+# Warp coordinates below are the real ones from pret/pokered's map object
+# data, so these tests pin the guidance to the shipped game, not to a guess.
+SILPH_5F_WARPS = [
+    {"x": 24, "y": 0, "destination_map": 0xD3,
+     "destination_name": "Silph Co. 6F"},
+    {"x": 26, "y": 0, "destination_map": 0xD1,
+     "destination_name": "Silph Co. 4F"},
+    {"x": 20, "y": 0, "destination_map": 0xEC,
+     "destination_name": "Silph Co. Elevator"},
+    {"x": 27, "y": 3, "destination_map": 0xD4,
+     "destination_name": "Silph Co. 7F"},
+    {"x": 9, "y": 15, "destination_map": 0xE9,
+     "destination_name": "Silph Co. 9F"},
+    {"x": 11, "y": 5, "destination_map": 0xD0,
+     "destination_name": "Silph Co. 3F"},
+]
+SILPH_9F_WARPS = [
+    {"x": 14, "y": 0, "destination_map": 0xEA,
+     "destination_name": "Silph Co. 10F"},
+    {"x": 16, "y": 0, "destination_map": 0xD5,
+     "destination_name": "Silph Co. 8F"},
+    {"x": 18, "y": 0, "destination_map": 0xEC,
+     "destination_name": "Silph Co. Elevator"},
+    {"x": 17, "y": 15, "destination_map": 0xD2,
+     "destination_name": "Silph Co. 5F"},
+]
+
+
+def silph_state(map_id, warps=None, x=28, y=5, **key_items):
+    return {
+        "map_id": map_id,
+        "coordinates": {"x": x, "y": y},
+        "warps": warps if warps is not None else [],
+        "key_items": {"card_key": False, "master_ball": False, **key_items},
+    }
+
+
+def test_silph_guidance_names_the_card_key_tile_on_its_own_floor():
+    """The run burned 345 stuck decisions on 5F without ever being told
+    the Card Key was lying on that very floor."""
+    guidance = silph_co_route_guidance(silph_state(0xD2, SILPH_5F_WARPS))
+
+    assert "(21,16)" in guidance
+    assert "ONLY objective" in guidance
+    # The Rocket sprite it kept walking "up" into is permanent scenery.
+    assert "(28,4)" in guidance
+
+
+def test_silph_guidance_routes_other_floors_to_the_lift_not_the_pads():
+    guidance = silph_co_route_guidance(silph_state(0xE9, SILPH_9F_WARPS))
+
+    assert "reach 5F" in guidance
+    assert "(21,16)" in guidance
+    # 9F's lift is at (18,0); 5F's is at (20,0). Hardcoding would misfire.
+    assert "elevator at (18,0)" in guidance
+
+
+def test_silph_guidance_calls_out_the_exact_teleport_cycle():
+    """5F (9,15) and 9F (17,15) are a closed pair — the observed floor cycle."""
+    fifth = silph_co_route_guidance(silph_state(0xD2, SILPH_5F_WARPS))
+    ninth = silph_co_route_guidance(silph_state(0xE9, SILPH_9F_WARPS))
+
+    assert "(9,15)->Silph Co. 9F" in fifth
+    assert "(17,15)->Silph Co. 5F" in ninth
+    for guidance in (fifth, ninth):
+        assert "TELEPORT PADS" in guidance
+        # Stairs and the lift sit at y=0 and must never be called pads.
+        assert "(20,0)" not in guidance.split("TELEPORT PADS")[-1]
+
+
+def test_silph_guidance_switches_to_giovanni_once_the_card_key_is_owned():
+    guidance = silph_co_route_guidance(
+        silph_state(0xE9, SILPH_9F_WARPS, card_key=True)
+    )
+    top = silph_co_route_guidance(
+        silph_state(0xEB, [], card_key=True)
+    )
+
+    assert "11F" in guidance
+    assert "(21,16)" not in guidance
+    assert "Giovanni at (6,9)" in top
+    assert "master_ball" in top
+
+
+def test_silph_guidance_sends_you_out_once_the_building_is_cleared():
+    """Re-entry must not restart the climb, the mistake the Tower once made."""
+    exits = [
+        {"x": 10, "y": 17, "destination_map": 0x05,
+         "destination_name": "Saffron City"},
+    ]
+    for owned in ({"card_key": True, "master_ball": True},):
+        state = silph_state(0xB5, exits, **owned)
+        guidance = silph_co_route_guidance(state)
+        assert "COMPLETE" in guidance
+        assert "(10,17)" in guidance
+        assert "reach 11F" not in guidance
+        assert "ONLY objective" not in guidance
+
+    # The Marsh Badge is gated behind clearing Silph, so it proves the same
+    # thing even after the Master Ball has been spent on a legendary.
+    spent = silph_state(0xB5, exits, card_key=True)
+    spent["badges"] = ["Boulder", "Marsh"]
+    assert "COMPLETE" in silph_co_route_guidance(spent)
+
+
+def test_silph_guidance_never_claims_ownership_it_cannot_read():
+    state = silph_state(0xD2, SILPH_5F_WARPS)
+    state["key_items"] = {"card_key": None, "master_ball": None}
+
+    guidance = silph_co_route_guidance(state)
+
+    assert "do not claim" in guidance
+    assert "ONLY objective" not in guidance
+
+
+def test_silph_guidance_is_silent_outside_the_building():
+    assert silph_co_route_guidance(silph_state(0xCA, [])) is None
+    assert silph_co_route_guidance(silph_state(0x92, [])) is None
+    # The elevator is a separate map and must still be handled.
+    assert "panel at (3,0)" in silph_co_route_guidance(silph_state(0xEC, []))
 
 
 def test_collision_warp_tile_stays_probeable_after_a_wall_bump(tmp_path):

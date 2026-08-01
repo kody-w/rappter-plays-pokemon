@@ -259,6 +259,18 @@ AUDIO_PCM_GAIN = 512.0
 SILPH_SCOPE_ITEM_ID = 0x48
 POKE_FLUTE_ITEM_ID = 0x49
 LIFT_KEY_ITEM_ID = 0x4A
+CARD_KEY_ITEM_ID = 0x30
+MASTER_BALL_ITEM_ID = 0x01
+# Bag contents worth surfacing to the model. Each entry either opens a dungeon
+# that no sequence of movements can open, or proves one is finished; ownership
+# the model cannot see is ownership it will not act on.
+TRACKED_KEY_ITEMS: dict[str, int] = {
+    "silph_scope": SILPH_SCOPE_ITEM_ID,
+    "poke_flute": POKE_FLUTE_ITEM_ID,
+    "lift_key": LIFT_KEY_ITEM_ID,
+    "card_key": CARD_KEY_ITEM_ID,
+    "master_ball": MASTER_BALL_ITEM_ID,
+}
 YOUTUBE_VIDEO_ID_RE = re.compile(r"^[A-Za-z0-9_-]{11}$")
 CHAT_ADVISORY_STALE_SECONDS = 90
 MAX_CHAT_ADVISORY_BYTES = 2048
@@ -3813,6 +3825,7 @@ MAP_NAMES = {
     0xE9: "Silph Co. 9F",
     0xEA: "Silph Co. 10F",
     0xEB: "Silph Co. 11F",
+    0xEC: "Silph Co. Elevator",
     0xF5: "Lorelei",
     0xF6: "Bruno",
     0xF7: "Agatha",
@@ -10503,9 +10516,10 @@ class PokemonMemoryReader:
         }
 
     def key_items(self) -> dict[str, Optional[bool]]:
+        unknown: dict[str, Optional[bool]] = dict.fromkeys(TRACKED_KEY_ITEMS)
         count = self._read_optional(W_NUM_BAG_ITEMS)
         if count is None or not 0 <= count <= BAG_ITEM_CAPACITY:
-            return {"silph_scope": None, "poke_flute": None, "lift_key": None}
+            return unknown
         item_ids: list[int] = []
         for index in range(count):
             item_id = self._read_optional(W_BAG_ITEMS + index * 2)
@@ -10516,15 +10530,14 @@ class PokemonMemoryReader:
                 or quantity is None
                 or not 1 <= quantity <= 99
             ):
-                return {"silph_scope": None, "poke_flute": None, "lift_key": None}
+                return unknown
             item_ids.append(item_id)
         terminator = self._read_optional(W_BAG_ITEMS + count * 2)
         if terminator != 0xFF:
-            return {"silph_scope": None, "poke_flute": None, "lift_key": None}
+            return unknown
         return {
-            "silph_scope": SILPH_SCOPE_ITEM_ID in item_ids,
-            "poke_flute": POKE_FLUTE_ITEM_ID in item_ids,
-            "lift_key": LIFT_KEY_ITEM_ID in item_ids,
+            name: item_id in item_ids
+            for name, item_id in TRACKED_KEY_ITEMS.items()
         }
 
     def play_time(self) -> Optional[dict[str, Any]]:
@@ -11091,6 +11104,209 @@ def rocket_hideout_route_guidance(
         "up the Silph Scope at (25,2). Do not leave until "
         "key_items.silph_scope becomes true."
     )
+
+
+SILPH_CO_MAP_IDS = frozenset(
+    {0xB5, 0xCF, 0xD0, 0xD1, 0xD2, 0xD3, 0xD4, 0xD5, 0xE9, 0xEA, 0xEB}
+)
+SILPH_CO_ELEVATOR_MAP_ID = 0xEC
+SILPH_CO_CARD_KEY_MAP_ID = 0xD2
+SILPH_CO_CARD_KEY_TILE = (21, 16)
+SILPH_CO_GIOVANNI_MAP_ID = 0xEB
+
+
+def _silph_co_warp_groups(
+    game_state: dict[str, Any],
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]], Optional[dict[str, Any]]]:
+    """Split this floor's live warps into stairs, teleport pads, and the lift.
+
+    Silph's floors are laid out identically in one respect: every staircase
+    and the elevator sit in the top wall at y=0, and every interior warp is a
+    teleport pad. That single rule classifies the whole building from RAM, so
+    the eleven floors need no hardcoded tables and stay correct if the run
+    enters on a floor nobody has mapped.
+    """
+    warps = game_state.get("warps")
+    if not isinstance(warps, list):
+        return [], [], None
+    stairs: list[dict[str, Any]] = []
+    pads: list[dict[str, Any]] = []
+    elevator: Optional[dict[str, Any]] = None
+    for warp in warps:
+        if not isinstance(warp, dict):
+            continue
+        destination = warp.get("destination_map")
+        x, y = warp.get("x"), warp.get("y")
+        if not isinstance(destination, int):
+            continue
+        if not isinstance(x, int) or not isinstance(y, int):
+            continue
+        if destination == SILPH_CO_ELEVATOR_MAP_ID:
+            elevator = elevator or warp
+        elif destination not in SILPH_CO_MAP_IDS:
+            continue
+        elif y == 0:
+            stairs.append(warp)
+        else:
+            pads.append(warp)
+    return stairs, pads, elevator
+
+
+def _silph_co_pad_warning(pads: list[dict[str, Any]]) -> str:
+    if not pads:
+        return ""
+    listed = ", ".join(
+        f"({pad['x']},{pad['y']})->{pad['destination_name']}" for pad in pads
+    )
+    return (
+        " The interior tiles on this floor are TELEPORT PADS with FIXED "
+        f"destinations: {listed}. A pad always lands in the same place, and "
+        "its partner sends you straight back — 5F (9,15) and 9F (17,15) are "
+        "one such pair, and alternating them is the floor cycle that has "
+        "already cost this run hundreds of decisions. Never ride a pad hoping "
+        "for a different result; ride one only when its named destination is "
+        "where you actually need to go."
+    )
+
+
+def silph_co_route_guidance(
+    game_state: dict[str, Any],
+) -> Optional[str]:
+    """Name the Card Key, the one Silph Co. obstacle movement cannot solve.
+
+    Silph is the first dungeon locked by an item rather than by topology: its
+    doors open only with the Card Key, which lies on 5F. Frontier exploration
+    cannot tell a locked door from an unmapped one, so it rode the 5F/9F
+    teleport pair for 345 consecutive stuck decisions hunting a route that no
+    input can open. The same lesson as the Route 12 Snorlax — when the answer
+    is not in the movement action space, the message has to say so.
+    """
+    map_id = game_state.get("map_id")
+    if map_id not in SILPH_CO_MAP_IDS and map_id != SILPH_CO_ELEVATOR_MAP_ID:
+        return None
+    coordinates = game_state.get("coordinates")
+    position = (
+        (coordinates.get("x"), coordinates.get("y"))
+        if isinstance(coordinates, dict)
+        else (None, None)
+    )
+    key_items = game_state.get("key_items")
+    key_items = key_items if isinstance(key_items, dict) else {}
+    card_key = key_items.get("card_key")
+    master_ball = key_items.get("master_ball")
+    badges = game_state.get("badges")
+    prefix = (
+        "Authoritative Silph Co. route. This objective is required; do not "
+        "replace it with search, exploration, items, or NPCs. Current map is "
+        f"0x{map_id:02X}, coordinates {position}. "
+    )
+    stairs, pads, elevator = _silph_co_warp_groups(game_state)
+
+    # Master Ball is the president's reward and the Marsh Badge is gated behind
+    # clearing the building, so either one proves there is nothing left here.
+    # Without this the climb directive re-fires on re-entry and marches the run
+    # back up a finished dungeon, exactly as the Tower once did.
+    if master_ball or (isinstance(badges, list) and "Marsh" in badges):
+        exits = [
+            warp
+            for warp in (game_state.get("warps") or [])
+            if isinstance(warp, dict)
+            and isinstance(warp.get("destination_map"), int)
+            and warp["destination_map"] not in SILPH_CO_MAP_IDS
+            and warp["destination_map"] != SILPH_CO_ELEVATOR_MAP_ID
+        ]
+        exit_text = (
+            f"The exit to Saffron City is at ({exits[0]['x']},{exits[0]['y']})."
+            if exits
+            else "Descend to 1F and leave through the south doors."
+        )
+        return prefix + (
+            "Silph Co. is COMPLETE — Giovanni is beaten and there is nothing "
+            f"left in this building. {exit_text} Leave and do not climb again."
+        )
+
+    if map_id == SILPH_CO_ELEVATOR_MAP_ID:
+        floor = "5F" if card_key is False else "11F"
+        return prefix + (
+            "This is the Silph Co. elevator. Interact once with the panel at "
+            f"(3,0), choose {floor}, then step out through the doors at (1,3) "
+            "or (2,3) and reobserve before any further input."
+        )
+
+    if card_key is None:
+        return prefix + (
+            "Bag ownership is unavailable, so do not claim the Card Key is "
+            "owned or missing. Reobserve, keep inputs to 1-3 near warps, and "
+            "remember that Silph's locked doors open only with the Card Key "
+            "found on 5F." + _silph_co_pad_warning(pads)
+        )
+
+    if not card_key:
+        if map_id == SILPH_CO_CARD_KEY_MAP_ID:
+            target_x, target_y = SILPH_CO_CARD_KEY_TILE
+            body = (
+                "You are ON the Card Key floor. The ONLY objective is the "
+                f"item ball at ({target_x},{target_y}) — walk onto it and "
+                "press A. Nothing else on this floor matters. A Rocket stands "
+                "at (28,4) and trainers are permanent solid sprites even after "
+                "they are beaten, so never read a blocked step into an NPC as "
+                "an unexplored wall."
+            )
+            return prefix + body + _silph_co_pad_warning(pads)
+        body = (
+            "The Card Key is NOT owned, and without it every locked door in "
+            "this building is impassable — no route, no item, and no amount "
+            "of probing opens one. The ONLY objective is to reach 5F and pick "
+            f"up the Card Key at ({SILPH_CO_CARD_KEY_TILE[0]},"
+            f"{SILPH_CO_CARD_KEY_TILE[1]}). "
+        )
+        if elevator is not None:
+            body += (
+                f"Take the elevator at ({elevator['x']},{elevator['y']}), "
+                "interact with the panel, and choose 5F; the elevator reaches "
+                "every floor directly and is the reliable way to move."
+            )
+        elif stairs:
+            listed = ", ".join(
+                f"({warp['x']},{warp['y']})->{warp['destination_name']}"
+                for warp in stairs
+            )
+            body += f"Use the staircases in the top wall: {listed}."
+        else:
+            body += (
+                "No staircase or elevator appears in this floor's warp table, "
+                "so you are in a teleporter room: ride the pad back out rather "
+                "than searching this room for an exit."
+            )
+        return prefix + body + _silph_co_pad_warning(pads)
+
+    if map_id == SILPH_CO_GIOVANNI_MAP_ID:
+        return prefix + (
+            "Card Key is owned and this is the top floor. Defeat the Rocket at "
+            "(15,9), reach Giovanni at (6,9) and beat him, then speak to the "
+            "Silph president at (7,5) to receive the MASTER BALL. Do not leave "
+            "until key_items.master_ball becomes true."
+        )
+
+    body = (
+        "Card Key is owned, so the locked doors now open — step into a closed "
+        "door once to unlock it instead of routing around it. Stage: reach 11F "
+        "and defeat Giovanni. "
+    )
+    if elevator is not None:
+        body += (
+            f"Take the elevator at ({elevator['x']},{elevator['y']}), interact "
+            "with the panel, and choose 11F."
+        )
+    else:
+        upward = [warp for warp in stairs if warp["destination_map"] > map_id]
+        body += (
+            f"Climb using the staircase at ({upward[0]['x']},{upward[0]['y']}) "
+            f"toward {upward[0]['destination_name']}."
+            if upward
+            else "Find the elevator or an ascending staircase in the top wall."
+        )
+    return prefix + body + _silph_co_pad_warning(pads)
 
 
 class ClipRecorder:
@@ -15193,6 +15409,7 @@ class PokemonRunner:
             or rock_tunnel_route_guidance(game_state)
             or celadon_route_guidance(game_state)
             or pokemon_tower_route_guidance(game_state)
+            or silph_co_route_guidance(game_state)
             or rocket_hideout_route_guidance(route_state)
         )
         if route_guidance:
