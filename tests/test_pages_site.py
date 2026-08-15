@@ -523,6 +523,65 @@ def test_pages_story_player_has_a_strict_public_data_boundary():
     assert "min-width: 320px" in css
 
 
+def test_journey_dna_is_deterministic_interactive_and_public_safe():
+    dna_dir = DOCS / "dna"
+    html = (dna_dir / "index.html").read_text(encoding="utf-8")
+    css = (dna_dir / "dna.css").read_text(encoding="utf-8")
+    javascript = (dna_dir / "dna.js").read_text(encoding="utf-8")
+    parser = ParsedHTML()
+    parser.feed(html)
+
+    csp = next(
+        meta["content"]
+        for meta in parser.attributes("meta")
+        if meta.get("http-equiv") == "Content-Security-Policy"
+    )
+    assert csp == (
+        "default-src 'none'; base-uri 'none'; form-action 'none'; "
+        "object-src 'none'; script-src 'self'; style-src 'self'; "
+        "connect-src https://raw.githubusercontent.com"
+    )
+    assert {script["src"] for script in parser.attributes("script")} == {
+        "./dna.js"
+    }
+    assert {link["href"] for link in parser.attributes("link")} >= {"./dna.css"}
+    assert "./dna/" in (DOCS / "index.html").read_text(encoding="utf-8")
+    assert "Published runprint" in html
+    assert "CENTER · EARLIEST RETAINED" in html
+    assert "RIM · LATEST ARCHIVED" in html
+    assert "Retained events" in html
+    assert "<noscript>" in html
+    assert "buildRunprint" in javascript
+    assert "nearestPoint" in javascript
+    assert "__RPP_DNA_TEST_HOOK__" in javascript
+    assert "coverage.incomplete_before" in javascript
+    assert "coverage.continuous_source" in javascript
+    assert "setLineDash" in javascript
+    assert "aria-valuetext" in javascript
+    assert "prefers-reduced-motion: reduce" in javascript
+    assert "gapFilter.disabled = !hasGaps" in javascript
+    assert "restoreRetryFocus" in javascript
+    assert "Date.now()" not in javascript
+    for forbidden in (
+        "innerHTML",
+        "eval(",
+        "localStorage",
+        "sessionStorage",
+        "document.cookie",
+        "serviceWorker",
+        "127.0.0.1",
+        "localhost",
+        "/api/",
+        "rom_path",
+        "screen_text",
+        "raw_manifest",
+    ):
+        assert forbidden not in javascript
+    assert "@media (prefers-reduced-motion: reduce)" in css
+    assert "@media (forced-colors: active)" in css
+    assert "min-width: 320px" in css
+
+
 def test_pages_qr_destination_is_project_first_and_fragment_only():
     diagnostics_dir = DOCS / "d"
     html = (diagnostics_dir / "index.html").read_text(encoding="utf-8")

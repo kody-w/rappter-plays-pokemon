@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta
+    http-equiv="Content-Security-Policy"
+    content="default-src 'none'; base-uri 'none'; form-action 'none'; object-src 'none'; script-src 'self'; style-src 'self'; connect-src https://raw.githubusercontent.com"
+  >
+  <meta name="referrer" content="no-referrer">
+  <meta name="theme-color" content="#070914">
+  <meta
+    name="description"
+    content="Explore the unique visual fingerprint of the autonomous RAPPter Plays Pokémon adventure."
+  >
+  <link rel="canonical" href="https://kody-w.github.io/rappter-plays-pokemon/dna/">
+  <link rel="stylesheet" href="./dna.css">
+  <script src="./dna.js" defer></script>
+  <title>Journey DNA — RAPPter Plays Pokémon</title>
+</head>
+<body>
+  <noscript>
+    <p class="noscript">
+      Journey DNA needs JavaScript to sequence the public archive.
+      <a href="../story/">Read the story instead.</a>
+    </p>
+  </noscript>
+  <header class="site-header">
+    <a class="brand" href="../">
+      <span class="brand-mark" aria-hidden="true">RPP</span>
+      <span>RAPPter Plays Pokémon</span>
+    </a>
+    <a class="header-link" href="../story/">Story so far</a>
+  </header>
+
+  <main>
+    <section class="hero" aria-labelledby="page-title">
+      <p class="eyebrow">Journey DNA · one evolving adventure</p>
+      <h1 id="page-title">The run has a shape.</h1>
+      <p class="lede">
+        Every retained, verified event leaves a mark. Badges burn brighter,
+        coverage gaps fracture the path, and hundreds of autonomous detours
+        spiral into a fingerprint no scripted playthrough could reproduce.
+      </p>
+    </section>
+
+    <p id="dna-status" class="status" role="status" aria-live="polite">
+      Sequencing the public story archive…
+    </p>
+
+    <section id="dna-experience" class="experience" hidden>
+      <div class="runprint-shell">
+        <div class="runprint-heading">
+          <div>
+            <p class="section-kicker">Published runprint</p>
+            <h2>A constellation made by Copilot</h2>
+          </div>
+          <div class="signature">
+            <span>Archive signature</span>
+            <strong id="run-signature">—</strong>
+          </div>
+        </div>
+
+        <div class="canvas-shell">
+          <canvas
+            id="run-canvas"
+            width="1200"
+            height="760"
+            tabindex="0"
+            role="application"
+            aria-label="Interactive map of verified journey events. Use arrow keys to step, Home for the earliest retained event, and End for the latest archived event."
+          ></canvas>
+          <div class="canvas-hud" aria-hidden="true">
+            <span>CENTER · EARLIEST RETAINED</span>
+            <span>RIM · LATEST ARCHIVED</span>
+          </div>
+        </div>
+
+        <div class="view-controls" aria-label="Runprint view">
+          <button class="filter active" type="button" data-filter="all" aria-pressed="true">Highlight all</button>
+          <button class="filter" type="button" data-filter="milestones" aria-pressed="false">Highlight milestones</button>
+          <button class="filter" type="button" data-filter="gaps" aria-pressed="false">Highlight gaps</button>
+          <button id="trace-run" class="trace" type="button">Trace the run</button>
+        </div>
+
+        <div class="legend" aria-label="Runprint legend">
+          <span data-kind="opening"><i class="legend-opening" aria-hidden="true"></i>Opening</span>
+          <span data-kind="badge"><i class="legend-badge" aria-hidden="true"></i>Badge</span>
+          <span data-kind="party"><i class="legend-party" aria-hidden="true"></i>Party</span>
+          <span data-kind="pokedex"><i class="legend-pokedex" aria-hidden="true"></i>Pokédex</span>
+          <span data-kind="progress"><i class="legend-progress" aria-hidden="true"></i>Progress</span>
+          <span data-kind="journey"><i class="legend-journey" aria-hidden="true"></i>Journey</span>
+          <span data-kind="continuity"><i class="legend-continuity" aria-hidden="true"></i>Continuity</span>
+          <span data-kind="completion"><i class="legend-completion" aria-hidden="true"></i>Completion</span>
+          <span data-gap><i class="legend-gap" aria-hidden="true"></i>Unretained interval</span>
+        </div>
+      </div>
+
+      <aside class="event-panel" aria-live="polite">
+        <div class="event-index">
+          <span id="event-number">—</span>
+          <span id="event-kind">—</span>
+        </div>
+        <p id="event-chapter" class="chapter"></p>
+        <h2 id="event-title"></h2>
+        <p id="event-summary" class="event-summary"></p>
+        <dl class="event-facts">
+          <div><dt>Location</dt><dd id="event-location">—</dd></div>
+          <div><dt>Badges</dt><dd id="event-badges">—</dd></div>
+          <div><dt>Party</dt><dd id="event-party">—</dd></div>
+          <div><dt>Pokédex</dt><dd id="event-pokedex">—</dd></div>
+          <div><dt>Game clock</dt><dd id="event-clock">—</dd></div>
+          <div><dt>Signal</dt><dd id="event-signal">—</dd></div>
+        </dl>
+        <label for="event-scrubber">Move through the journey</label>
+        <input id="event-scrubber" type="range" min="0" value="0" step="1">
+        <div class="step-controls">
+          <button id="previous-event" type="button">Previous</button>
+          <button id="next-event" type="button">Next</button>
+        </div>
+      </aside>
+
+      <section class="decode" aria-labelledby="decode-title">
+        <div>
+          <p class="section-kicker">Decoded</p>
+          <h2 id="decode-title">Not telemetry. A biography.</h2>
+          <p>
+            The geometry is deterministic: the same verified archive always
+            produces the same runprint. Its spiral is chronology, its color is
+            event type, its bright nodes are milestones, and broken paths mark
+            where source coverage was not retained.
+          </p>
+          <p id="archive-note" class="archive-note"></p>
+        </div>
+        <dl class="run-stats">
+          <div><dt>Retained events</dt><dd id="stat-events">—</dd></div>
+          <div><dt>Distinct places</dt><dd id="stat-locations">—</dd></div>
+          <div><dt>Badges observed</dt><dd id="stat-badges">—</dd></div>
+          <div><dt>Game clock</dt><dd id="stat-hours">—</dd></div>
+        </dl>
+      </section>
+    </section>
+
+    <section id="dna-fallback" class="fallback" role="status" aria-live="polite" hidden>
+      <h2>The runprint could not be sequenced.</h2>
+      <p>The live run continues while the public story archive refreshes.</p>
+      <div class="fallback-actions">
+        <button id="retry-dna" type="button">Retry sequencing</button>
+        <a href="../story/">Read the story</a>
+        <a href="https://www.youtube.com/channel/UCz0Tfe07OAwnQR-fd3E1y4Q/live">Watch live</a>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <span>Generated entirely from allowlisted public facts.</span>
+    <a href="../data/">Inspect the reproducible warehouse</a>
+  </footer>
+</body>
+</html>

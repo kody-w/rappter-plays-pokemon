@@ -58,6 +58,9 @@ reasoning.
   key-event JSON from a dedicated public data branch. Its static theater can
   play bounded YouTube highlight segments without publishing local gameplay
   files or raw model output to GitHub.
+- **Journey DNA:** a deterministic, interactive constellation turns every
+  retained event, badge, detour, and source gap into a unique visual
+  fingerprint of the continuous autonomous run.
 - **Opt-in crowd route hints:** a separate Top Chat bridge accepts only exact
   `!hint up|down|left|right` ballots. Raw comments and identities never reach
   Copilot; a strict-majority direction is considered only after repeated

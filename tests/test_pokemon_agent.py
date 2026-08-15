@@ -16,11 +16,13 @@ import openrappter.agents.pokemon_agent as pokemon_module
 import pytest
 from openrappter.agents.pokemon_agent import (
     GAME_SYSTEM_PROMPT,
+    GOLD_SYSTEM_PROMPT,
     ActionPlayer,
     ClipRecorder,
     CopilotBrain,
     NavigationMemory,
     PokemonAgent,
+    PokemonGoldMemoryReader,
     PokemonRunner,
     StartupConfigurationError,
     ViewerServer,
@@ -29,17 +31,22 @@ from openrappter.agents.pokemon_agent import (
     celadon_route_guidance,
     collision_allows_direction,
     discover_pokemon_red_rom,
+    discover_pokemon_rom,
     endgame_route_guidance,
     ensure_copilot_runtime,
     file_sha256,
+    gold_route_guidance,
     is_cloud_placeholder,
+    is_pokemon_gold_rom,
     is_pokemon_red_rom,
     item_gate_guidance,
     list_clips,
+    navigation_position,
     normalize_brain_decision,
     normalize_web_research,
     overworld_action_buttons,
     parse_agent_action,
+    pokemon_game_id,
     pokemon_tower_route_guidance,
     precision_route_buttons,
     public_runtime_status,
@@ -55,6 +62,11 @@ from openrappter.agents.pokemon_agent import (
     silph_co_route_guidance,
     supervisor_main,
     terminate_isolated_process_group,
+    trusted_cerulean_cave_flee_buttons,
+    trusted_gold_route_action,
+    trusted_mewtwo_capture_buttons,
+    trusted_mewtwo_finalize_buttons,
+    trusted_mewtwo_surf_buttons,
     trusted_story_route_action,
     wait_for_stopping_supervisor,
     wait_for_supervised_child,
@@ -197,6 +209,327 @@ def test_rom_validation_rejects_other_game(tmp_path):
     assert not is_pokemon_red_rom(rom)
     with pytest.raises(FileNotFoundError):
         discover_pokemon_red_rom(str(rom))
+
+
+def test_gold_rom_validation_uses_generation_two_header(tmp_path):
+    rom = make_rom(tmp_path / "Pokemon Gold.gbc", b"POKEMON_GLDAAUE")
+
+    assert is_pokemon_gold_rom(rom)
+    assert not is_pokemon_red_rom(rom)
+    assert pokemon_game_id(rom) == "gold"
+    assert discover_pokemon_rom(str(rom)) == rom.resolve()
+    assert "sixteen badges" in GOLD_SYSTEM_PROMPT
+    assert "defeat Red" in GOLD_SYSTEM_PROMPT
+
+
+def test_gold_memory_reader_does_not_expose_red_wram_as_facts():
+    memory = bytearray([0xFF]) * 65536
+
+    snapshot = PokemonGoldMemoryReader(memory).snapshot()
+
+    assert snapshot["game_id"] == "gold"
+    assert snapshot["map_id"] is None
+    assert snapshot["coordinates"] == {"x": None, "y": None}
+    assert snapshot["badges"] == []
+    assert snapshot["party"] == []
+    assert snapshot["hall_of_fame_completed"] is False
+    assert snapshot["red_defeated"] is False
+    assert trusted_story_route_action(snapshot) is None
+    assert navigation_position({
+        "map_id": 0x1803,
+        "coordinates": {"x": 14, "y": 15},
+    }) == (0x1803, 14, 15)
+    assert navigation_position({
+        "map_id": 0x10000,
+        "coordinates": {"x": 14, "y": 15},
+    }) is None
+    assert "downstairs warp is (7,0)" in gold_route_guidance({
+        **snapshot,
+        "map_group": 0x18,
+        "map_number": 0x07,
+        "coordinates": {"x": 1, "y": 4},
+    })
+    assert "middle Poke Ball is at (7,3)" in gold_route_guidance({
+        **snapshot,
+        "map_group": 0x18,
+        "map_number": 0x05,
+        "coordinates": {"x": 5, "y": 5},
+        "party_count": 0,
+    })
+    assert "WEST to Cherrygrove" in gold_route_guidance({
+        **snapshot,
+        "map_group": 0x18,
+        "map_number": 0x03,
+        "coordinates": {"x": 40, "y": 8},
+        "party_count": 1,
+        "key_items": {"mystery_egg": False},
+    })
+    assert "EAST to New Bark" in gold_route_guidance({
+        **snapshot,
+        "map_group": 0x18,
+        "map_number": 0x03,
+        "coordinates": {"x": 20, "y": 8},
+        "party_count": 1,
+        "story_events": {
+            "got_mystery_egg": True,
+            "gave_mystery_egg_to_elm": False,
+        },
+    })
+    assert "Route 31 branch to Violet" in gold_route_guidance({
+        **snapshot,
+        "map_group": 0x1A,
+        "map_number": 0x03,
+        "coordinates": {"x": 20, "y": 8},
+        "party_count": 1,
+        "story_events": {
+            "got_mystery_egg": True,
+            "gave_mystery_egg_to_elm": True,
+        },
+    })
+    assert "Sprout Tower at (23,5)" in gold_route_guidance({
+        **snapshot,
+        "map_group": 0x0A,
+        "map_number": 0x05,
+        "coordinates": {"x": 39, "y": 25},
+        "story_events": {"got_hm_flash": False},
+        "badges": [],
+    })
+    assert "Violet Gym at (18,17)" in gold_route_guidance({
+        **snapshot,
+        "map_group": 0x0A,
+        "map_number": 0x05,
+        "coordinates": {"x": 23, "y": 6},
+        "story_events": {"got_hm_flash": True},
+        "badges": [],
+    })
+    assert "Falkner at (5,1)" in gold_route_guidance({
+        **snapshot,
+        "map_group": 0x0A,
+        "map_number": 0x07,
+        "coordinates": {"x": 5, "y": 10},
+        "badges": [],
+        "story_events": {"beat_bird_keeper_rod": True},
+    })
+    assert "Bird Keeper Rod's left-facing" in gold_route_guidance({
+        **snapshot,
+        "map_group": 0x0A,
+        "map_number": 0x07,
+        "coordinates": {"x": 5, "y": 8},
+        "badges": [],
+        "story_events": {"beat_bird_keeper_rod": False},
+    })
+    assert "Union Cave at (6,79)" in gold_route_guidance({
+        **snapshot,
+        "map_group": 0x0A,
+        "map_number": 0x01,
+        "coordinates": {"x": 8, "y": 1},
+    })
+    assert "south exit (17,31)" in gold_route_guidance({
+        **snapshot,
+        "map_group": 0x03,
+        "map_number": 0x1D,
+        "coordinates": {"x": 17, "y": 3},
+    })
+    assert "Kurt's House at (9,5)" in gold_route_guidance({
+        **snapshot,
+        "map_group": 0x08,
+        "map_number": 0x07,
+        "coordinates": {"x": 39, "y": 9},
+        "badges": ["Zephyr"],
+        "story_events": {"cleared_slowpoke_well": False},
+    })
+    assert "Parlyz Heal item ball at (16,7)" in gold_route_guidance({
+        **snapshot,
+        "map_group": 0x03,
+        "map_number": 0x01,
+        "coordinates": {"x": 17, "y": 7},
+        "story_events": {
+            "sprout_1f_parlyz_heal_collected": False,
+        },
+    })
+    assert "(6,4), which enters 2F's first component" in gold_route_guidance({
+        **snapshot,
+        "map_group": 0x03,
+        "map_number": 0x01,
+        "coordinates": {"x": 5, "y": 6},
+        "story_events": {
+            "sprout_1f_parlyz_heal_collected": True,
+        },
+    })
+    assert "Stop opening the Pack" in gold_route_guidance({
+        **snapshot,
+        "map_group": 0x03,
+        "map_number": 0x02,
+        "coordinates": {"x": 17, "y": 3},
+        "party": [{"hp": 3, "max_hp": 35}],
+        "story_events": {"got_hm_flash": False},
+    })
+    assert trusted_gold_route_action({
+        **snapshot,
+        "map_group": 0x03,
+        "map_number": 0x02,
+        "coordinates": {"x": 7, "y": 3},
+        "screen_text": "",
+        "story_events": {},
+        "party": [{"hp": 3, "max_hp": 35}],
+    }) == "left"
+    assert trusted_gold_route_action({
+        **snapshot,
+        "map_group": 0x0A,
+        "map_number": 0x05,
+        "coordinates": {"x": 28, "y": 28},
+        "screen_text": "",
+        "badges": ["Zephyr"],
+        "story_events": {"got_hm_flash": True},
+        "party": [{"hp": 42, "max_hp": 42}],
+    }) == "left"
+    assert trusted_gold_route_action({
+        **snapshot,
+        "map_group": 0x0A,
+        "map_number": 0x05,
+        "coordinates": {"x": 23, "y": 6},
+        "screen_text": "",
+        "story_events": {"got_hm_flash": False},
+        "party": [{"hp": 3, "max_hp": 35}],
+    }) is None
+    assert trusted_gold_route_action({
+        **snapshot,
+        "map_group": 0x03,
+        "map_number": 0x01,
+        "coordinates": {"x": 16, "y": 1},
+        "screen_text": "",
+        "story_events": {"beat_sage_chow": True},
+        "party": [{"hp": 35, "max_hp": 35}],
+    }) == "left"
+    assert trusted_gold_route_action({
+        **snapshot,
+        "map_group": 0x03,
+        "map_number": 0x02,
+        "coordinates": {"x": 5, "y": 5},
+        "screen_text": "",
+        "story_events": {"beat_sage_chow": True},
+        "party": [{"hp": 35, "max_hp": 35}],
+    }) == "up"
+    assert trusted_gold_route_action({
+        **snapshot,
+        "map_group": 0x03,
+        "map_number": 0x01,
+        "coordinates": {"x": 17, "y": 3},
+        "screen_text": "",
+        "story_events": {"beat_sage_chow": True},
+        "party": [{"hp": 35, "max_hp": 35}],
+    }) == "up"
+    assert trusted_gold_route_action({
+        **snapshot,
+        "map_group": 0x03,
+        "map_number": 0x01,
+        "coordinates": {"x": 3, "y": 6},
+        "screen_text": "",
+        "story_events": {"beat_sage_chow": True},
+        "party": [{"hp": 35, "max_hp": 35}],
+    }) == "left"
+    route29_state = {
+        **snapshot,
+        "map_group": 0x18,
+        "map_number": 0x03,
+        "coordinates": {"x": 20, "y": 15},
+        "screen_text": "",
+        "story_events": {
+            "got_mystery_egg": False,
+            "gave_mystery_egg_to_elm": False,
+        },
+    }
+    assert trusted_gold_route_action(route29_state) == "up"
+    assert trusted_gold_route_action({
+        **route29_state,
+        "coordinates": {"x": 14, "y": 15},
+    }) == "right"
+    assert trusted_gold_route_action({
+        **route29_state,
+        "coordinates": {"x": 24, "y": 11},
+    }) == "right"
+    assert trusted_gold_route_action({
+        **route29_state,
+        "coordinates": {"x": 31, "y": 14},
+    }) == "up"
+    assert trusted_gold_route_action({
+        **route29_state,
+        "map_group": 0x1A,
+        "map_number": 0x02,
+        "coordinates": {"x": 25, "y": 11},
+        "story_events": {
+            "got_mystery_egg": True,
+            "gave_mystery_egg_to_elm": True,
+        },
+    }) == "down"
+    assert trusted_gold_route_action({
+        **route29_state,
+        "map_group": 0x1A,
+        "map_number": 0x0B,
+        "coordinates": {"x": 9, "y": 5},
+        "story_events": {
+            "got_mystery_egg": True,
+            "gave_mystery_egg_to_elm": True,
+        },
+    }) == "left"
+    assert trusted_gold_route_action({
+        **route29_state,
+        "map_group": 0x0A,
+        "map_number": 0x05,
+        "coordinates": {"x": 27, "y": 28},
+        "story_events": {"got_hm_flash": False},
+    }) == "right"
+    assert trusted_gold_route_action({
+        **route29_state,
+        "map_group": 0x0A,
+        "map_number": 0x05,
+        "coordinates": {"x": 23, "y": 6},
+        "story_events": {"got_hm_flash": False},
+    }) == "up"
+    assert trusted_gold_route_action({
+        **route29_state,
+        "coordinates": {"x": 22, "y": 6},
+    }) == "up"
+    assert trusted_gold_route_action({
+        **route29_state,
+        "coordinates": {"x": 17, "y": 4},
+    }) == "down"
+    assert trusted_gold_route_action({
+        **route29_state,
+        "coordinates": {"x": 21, "y": 15},
+        "story_events": {
+            "got_mystery_egg": True,
+            "gave_mystery_egg_to_elm": False,
+        },
+    }) == "up"
+    assert trusted_gold_route_action({
+        **route29_state,
+        "coordinates": {"x": 40, "y": 9},
+        "story_events": {
+            "got_mystery_egg": True,
+            "gave_mystery_egg_to_elm": False,
+        },
+    }) == "right"
+    assert trusted_gold_route_action({
+        **route29_state,
+        "map_group": 0x1A,
+        "map_number": 0x01,
+        "coordinates": {"x": 4, "y": 31},
+        "story_events": {
+            "got_mystery_egg": True,
+            "gave_mystery_egg_to_elm": True,
+        },
+    }) == "right"
+    assert trusted_gold_route_action({
+        **route29_state,
+        "map_group": 0x1A,
+        "map_number": 0x01,
+        "coordinates": {"x": 2, "y": 24},
+        "story_events": {
+            "got_mystery_egg": True,
+            "gave_mystery_egg_to_elm": True,
+        },
+    }) == "up"
 
 
 def test_normalize_brain_decision_filters_buttons():
@@ -1918,7 +2251,7 @@ def test_postgame_guidance_routes_to_master_ball_mewtwo_capture():
 
     assert "choose CONTINUE" in endgame_route_guidance(completed)
     assert "Do not choose NEW GAME" in endgame_route_guidance(completed)
-    assert "cave entrance warp at (4,11)" in endgame_route_guidance({
+    assert "cave warp at (4,11)" in endgame_route_guidance({
         **completed,
         "map_id": 0x03,
         "hall_of_fame": False,
@@ -1929,25 +2262,55 @@ def test_postgame_guidance_routes_to_master_ball_mewtwo_capture():
         "hall_of_fame": False,
     })
     assert "Cross Nugget Bridge" in route24
-    assert "travel SOUTH" in route24
+    assert "Travel SOUTH" in route24
+    assert "safe shoreline tile (5,16)" in route24
+    assert "cursor from DODUO to BLASTOISE" in route24
+    assert trusted_story_route_action({
+        **completed,
+        "map_id": 0x23,
+        "hall_of_fame": False,
+        "hall_of_fame_completed": True,
+        "coordinates": {"x": 11, "y": 24},
+    }) == "up"
+    assert trusted_story_route_action({
+        **completed,
+        "map_id": 0x23,
+        "hall_of_fame": False,
+        "hall_of_fame_completed": True,
+        "coordinates": {"x": 7, "y": 14},
+    }) == "down"
+    assert trusted_story_route_action({
+        **completed,
+        "map_id": 0x23,
+        "hall_of_fame": False,
+        "hall_of_fame_completed": True,
+        "coordinates": {"x": 6, "y": 15},
+    }) == "left"
+    assert trusted_story_route_action({
+        **completed,
+        "map_id": 0x23,
+        "hall_of_fame": False,
+        "hall_of_fame_completed": True,
+        "coordinates": {"x": 5, "y": 15},
+    }) == "down"
     assert "water west of Nugget Bridge" in endgame_route_guidance({
         **completed,
         "map_id": 0x24,
         "hall_of_fame": False,
     })
-    assert "ladder (27,1)" in endgame_route_guidance({
+    assert "ladder (23,7)" in endgame_route_guidance({
         **completed,
         "map_id": 0xE4,
         "hall_of_fame": False,
         "coordinates": {"x": 24, "y": 17},
     })
-    assert "ladder (19,7)" in endgame_route_guidance({
+    assert "ladder (29,1)" in endgame_route_guidance({
         **completed,
         "map_id": 0xE2,
         "hall_of_fame": False,
-        "coordinates": {"x": 29, "y": 1},
+        "coordinates": {"x": 22, "y": 6},
     })
-    assert "ladder (3,11)" in endgame_route_guidance({
+    assert "trusted coordinate route" in endgame_route_guidance({
         **completed,
         "map_id": 0xE4,
         "hall_of_fame": False,
@@ -1969,6 +2332,128 @@ def test_postgame_guidance_routes_to_master_ball_mewtwo_capture():
     assert "MASTER BALL immediately" in mewtwo
     assert "NEVER ATTACK" in mewtwo
     assert "Dex 150 ownership" in mewtwo
+    surf_state = {
+        **completed,
+        "map_id": 0xE4,
+        "hall_of_fame": False,
+        "hall_of_fame_completed": True,
+        "coordinates": {"x": 23, "y": 3},
+        "screen_text": "",
+        "surfing": False,
+        "party": [{"nickname": "BLASTOISE"}],
+    }
+    assert trusted_mewtwo_surf_buttons(surf_state) == [
+        "down",
+        "start",
+    ]
+    assert trusted_mewtwo_surf_buttons({
+        **surf_state,
+        "screen_text": (
+            "POKDEX | POKMON | ITEM | RED | SAVE | OPTION | EXIT"
+        ),
+        "menu_cursor_index": 0,
+    }) == ["down"]
+    assert trusted_mewtwo_surf_buttons({
+        **surf_state,
+        "screen_text": "BLASTOISE | ODDISH | Choose a POKMON.",
+        "menu_cursor_index": 0,
+    }) == ["a"]
+    assert trusted_mewtwo_surf_buttons({
+        **surf_state,
+        "screen_text": "SURF | STRENGTH | STATS | SWITCH | CANCEL",
+        "menu_cursor_index": 0,
+    }) == ["a", "a"]
+    assert trusted_mewtwo_surf_buttons({
+        **surf_state,
+        "surfing": True,
+    }) is None
+    capture_state = {
+        **completed,
+        "map_id": 0xE3,
+        "hall_of_fame": False,
+        "hall_of_fame_completed": True,
+        "coordinates": {"x": 27, "y": 14},
+        "screen_text": "MEWTWO 70 | FIGHT | ITEM RUN",
+        "in_battle": True,
+        "enemy_species_id": 0x83,
+        "menu_cursor_index": 0,
+        "master_ball_bag_index": 15,
+    }
+    assert trusted_mewtwo_capture_buttons(capture_state) == ["down", "a"]
+    assert trusted_mewtwo_capture_buttons({
+        **capture_state,
+        "screen_text": "TOWN MAP | HELIX FOSSIL | S.S.TICKET | HM01",
+    }) == ["down"]
+    assert trusted_mewtwo_capture_buttons({
+        **capture_state,
+        "screen_text": "HM04 | CARD KEY | MASTER BALL | HM02",
+        "menu_cursor_index": 15,
+    }) == ["a"]
+    assert trusted_mewtwo_capture_buttons({
+        **capture_state,
+        "enemy_species_id": 0x2D,
+    }) is None
+    finalize_state = {
+        **capture_state,
+        "mewtwo_caught": True,
+        "in_battle": True,
+        "screen_text": "YES | NO | give a nickname | to MEWTWO?",
+    }
+    assert trusted_mewtwo_finalize_buttons(finalize_state) == ["down", "a"]
+    assert trusted_mewtwo_finalize_buttons({
+        **finalize_state,
+        "in_battle": False,
+        "mewtwo_encounter_resolved": True,
+        "screen_text": "POKDEX | POKMON | ITEM | RED | SAVE | OPTION | EXIT",
+        "menu_cursor_index": 0,
+    }) == ["down"]
+    assert trusted_mewtwo_finalize_buttons({
+        **finalize_state,
+        "in_battle": False,
+        "mewtwo_encounter_resolved": True,
+        "screen_text": "YES | NO | Would you like to SAVE the game?",
+        "menu_cursor_index": 0,
+    }) == ["a"]
+    assert trusted_mewtwo_finalize_buttons({
+        **finalize_state,
+        "in_battle": False,
+        "mewtwo_encounter_resolved": True,
+        "screen_text": "RED saved | the game!",
+    }) is None
+    wild_state = {
+        **capture_state,
+        "map_id": 0xE2,
+        "coordinates": {"x": 19, "y": 13},
+        "enemy_species_id": 0x2D,
+    }
+    assert trusted_cerulean_cave_flee_buttons(wild_state) == [
+        "down",
+        "right",
+        "a",
+    ]
+    assert trusted_cerulean_cave_flee_buttons({
+        **wild_state,
+        "menu_cursor_index": 3,
+    }) == ["a"]
+    assert trusted_cerulean_cave_flee_buttons({
+        **wild_state,
+        "map_id": 0xE3,
+        "coordinates": {"x": 27, "y": 14},
+    }) is None
+    assert trusted_story_route_action({
+        **completed,
+        "map_id": 0xE4,
+        "hall_of_fame": False,
+        "hall_of_fame_completed": True,
+        "coordinates": {"x": 21, "y": 11},
+    }) == "up"
+    assert trusted_story_route_action({
+        **completed,
+        "map_id": 0xE3,
+        "hall_of_fame": False,
+        "hall_of_fame_completed": True,
+        "coordinates": {"x": 27, "y": 8},
+    }) == "down"
     assert "static Mewtwo encounter is resolved" in endgame_route_guidance({
         **completed,
         "hall_of_fame": False,

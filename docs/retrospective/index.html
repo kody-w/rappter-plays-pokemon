@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta
+    http-equiv="Content-Security-Policy"
+    content="default-src 'none'; base-uri 'none'; form-action 'none'; object-src 'none'; style-src 'self'; img-src 'none'; connect-src 'none'; script-src 'none'"
+  >
+  <meta name="referrer" content="strict-origin-when-cross-origin">
+  <meta name="theme-color" content="#090d18">
+  <meta
+    name="description"
+    content="An engineering retrospective on completing Pokémon Red with a long-running GitHub Copilot agent."
+  >
+  <meta property="og:title" content="How an AI Agent Finished Pokémon Red">
+  <meta
+    property="og:description"
+    content="What a month-long autonomous playthrough taught us about perception, memory, recovery, and reliable action."
+  >
+  <meta property="og:type" content="article">
+  <meta
+    property="og:url"
+    content="https://kody-w.github.io/rappter-plays-pokemon/retrospective/"
+  >
+  <link
+    rel="canonical"
+    href="https://kody-w.github.io/rappter-plays-pokemon/retrospective/"
+  >
+  <link rel="stylesheet" href="../site.css">
+  <link rel="stylesheet" href="./article.css">
+  <title>How an AI Agent Finished Pokémon Red</title>
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="../" aria-label="RAPPter Plays Pokémon home">
+      <span class="brand-mark" aria-hidden="true">RPP</span>
+      <span>RAPPter Plays Pokémon</span>
+    </a>
+    <a class="header-link" href="../story/">Verified timeline</a>
+  </header>
+
+  <main class="article-shell">
+    <article>
+      <header class="article-hero">
+        <p class="eyebrow">Engineering retrospective · July 17–August 15, 2026</p>
+        <h1>How an AI agent finished Pokémon Red</h1>
+        <p class="lede">
+          A screenshot-driven GitHub Copilot agent reached the Hall of Fame,
+          returned after the credits, navigated Cerulean Cave, and caught
+          Mewtwo. The interesting result was not that a model could press Game
+          Boy buttons. It was discovering what reliable autonomy needs when a
+          task lasts for weeks instead of minutes.
+        </p>
+        <dl class="outcome-grid" aria-label="Verified final outcome">
+          <div><dt>League completed</dt><dd>August 11, 06:31 UTC</dd></div>
+          <div><dt>Mewtwo caught</dt><dd>August 15, 03:54 UTC</dd></div>
+          <div><dt>Badges</dt><dd>8 of 8</dd></div>
+          <div><dt>Lead Pokémon</dt><dd>Blastoise, level 76</dd></div>
+          <div><dt>Final Pokédex</dt><dd>13 caught, 125 seen</dd></div>
+          <div><dt>Completion proof</dt><dd>Hall event + Dex 150 bit</dd></div>
+        </dl>
+      </header>
+
+      <section>
+        <p class="section-kicker">The experiment</p>
+        <h2>Not a speedrun, and not a prerecorded script</h2>
+        <p>
+          The game ran locally in PyBoy from a privately supplied Pokémon Red
+          cartridge image. Copilot observed the same 160×144 frames as a
+          viewer, described the situation, chose a short controller sequence,
+          and repeated. The runtime checkpointed emulator state, persisted
+          cartridge RAM, recorded bounded video clips, and published health
+          telemetry while a supervisor recovered failed processes.
+        </p>
+        <p>
+          The first version treated every obstacle as a movement problem. That
+          worked on routes and failed in the places that make Pokémon a game:
+          item gates, one-time events, menus, switches, teleporters, boulders,
+          and battles. The successful system became a hybrid. The model kept
+          responsibility for perception and open-ended decisions; RAM supplied
+          facts the screen could not reliably reveal; deterministic controllers
+          replayed only routes that had been proven in disposable emulator
+          copies.
+        </p>
+        <aside>
+          <strong>What “autonomous” means here:</strong> the live agent played
+          the game and recovered continuously, but the controller itself was
+          improved when evidence exposed a new failure class. This was an
+          autonomous run inside an active engineering loop—not a claim that one
+          untouched prompt solved the game.
+        </aside>
+      </section>
+
+      <section>
+        <p class="section-kicker">The playthrough</p>
+        <h2>A month of verified milestones</h2>
+        <div class="timeline" role="list">
+          <div role="listitem"><time datetime="2026-07-17">Jul 17</time><p>Boulder, Cascade, and Thunder Badges; the retained public story begins in Pewter City.</p></div>
+          <div role="listitem"><time datetime="2026-07-18">Jul 18</time><p>Rainbow Badge and the first major dungeon/item-gate lessons.</p></div>
+          <div role="listitem"><time datetime="2026-07-25">Jul 25</time><p>Pokémon Tower, the Poké Flute route, Fuchsia City, and the Soul Badge.</p></div>
+          <div role="listitem"><time datetime="2026-08-09">Aug 9</time><p>Silph Co. completed, Master Ball secured, Sabrina defeated for the Marsh Badge.</p></div>
+          <div role="listitem"><time datetime="2026-08-10">Aug 10</time><p>Seafoam, Pokémon Mansion, Blaine, Giovanni, all eight badges, and Victory Road.</p></div>
+          <div role="listitem"><time datetime="2026-08-11">Aug 11</time><p>Lorelei, Bruno, Agatha, Lance, BLUE, and the persistent Hall of Fame event.</p></div>
+          <div role="listitem"><time datetime="2026-08-15">Aug 15</time><p>Postgame continuation, Cerulean Cave, and a guarded Master Ball capture of Mewtwo.</p></div>
+        </div>
+      </section>
+
+      <section>
+        <p class="section-kicker">Where it broke</p>
+        <h2>The failures were more useful than the victories</h2>
+        <h3>Topology could not explain semantic gates</h3>
+        <p>
+          A collision mapper can learn that a Snorlax or a locked Silph door is
+          impassable. It cannot infer that the answer is the Poké Flute or Card
+          Key. The run spent hundreds of decisions re-probing impossible edges
+          until key-item ownership became explicit state and story guidance
+          outranked generic exploration.
+        </p>
+
+        <h3>Teleporters made valid movement look like progress</h3>
+        <p>
+          Silph Co. exposed a closed two-pad cycle between 5F and 9F. Every
+          transition was real, so a naive novelty metric rewarded the loop.
+          Reading the live warp table and naming fixed destinations turned
+          teleporters from “new movement” into a graph with detectable cycles.
+        </p>
+
+        <h3>Puzzles needed event state, not screenshots alone</h3>
+        <p>
+          Seafoam and Victory Road depended on boulder coordinates, switch
+          flags, holes, currents, and one-way transitions. The controller began
+          reading the same event bits the game uses, then searched disposable
+          emulator states with breadth-first search. A route was promoted to
+          trusted execution only after the destination map and coordinates were
+          reproduced.
+        </p>
+
+        <h3>Long-running autonomy is an operations problem</h3>
+        <p>
+          The gameplay process once remained dead for 6.3 days after transient
+          authentication failures exhausted a restart circuit. Other incidents
+          included stale stop-command replay, configuration drift on bare
+          restarts, an independent manual driver repeatedly stealing control,
+          and stream processes outliving the player. Durable desired-state
+          replay, cooldown-and-retry supervision, health events, and strict AI
+          ownership mattered as much as game reasoning.
+        </p>
+
+        <h3>Menus are state machines too</h3>
+        <p>
+          The final Cerulean Cave route was emulator-proven, but the first Surf
+          macro opened the Pokédex because the START cursor had moved. The fix
+          did not add more blind buttons. It read the cursor, verified each
+          menu screen, selected Pokémon, selected Blastoise, selected Surf, and
+          resumed the coordinate route only after RAM confirmed the surfing
+          state.
+        </p>
+      </section>
+
+      <section>
+        <p class="section-kicker">The final capture</p>
+        <h2>Safety constraints became executable</h2>
+        <p>
+          Mewtwo was too important to leave to a probabilistic battle choice.
+          The controller stood at <code>(27,14)</code>, verified the static
+          opponent’s internal species ID, refused the FIGHT branch, opened the
+          item menu, scrolled to the Master Ball’s observed bag slot, and used
+          it. Ordinary cave encounters used a separate RUN controller, and the
+          Mewtwo tile was explicitly excluded from that behavior.
+        </p>
+        <p>
+          Success was not inferred from dialogue. The definitive assertion was
+          Pokédex ownership bit 150. When that bit changed, the runtime created
+          a checkpoint and paused before any further action could endanger the
+          result.
+        </p>
+      </section>
+
+      <section>
+        <p class="section-kicker">What we learned</p>
+        <h2>Principles for agents that must keep going</h2>
+        <ol>
+          <li><strong>Separate observation from truth.</strong> Screens explain context; machine-readable state proves irreversible facts.</li>
+          <li><strong>Escalate by failure class.</strong> Repeated movement cannot solve an item gate, and repeated prompting cannot repair a dead supervisor.</li>
+          <li><strong>Make routes falsifiable.</strong> Store expected map/coordinate transitions and abort on any surprise.</li>
+          <li><strong>Preserve ownership.</strong> Operator tools must not silently switch an autonomous controller into manual mode.</li>
+          <li><strong>Persist desired state, not just process state.</strong> A restart is only recovery if model, flags, save, and control mode return unchanged.</li>
+          <li><strong>Turn safety language into code.</strong> “Never attack Mewtwo” became a battle-menu invariant rather than a hopeful prompt.</li>
+          <li><strong>Keep the evidence.</strong> Hash-checked checkpoints, event receipts, and a sanitized timeline made the result auditable.</li>
+        </ol>
+      </section>
+
+      <section>
+        <p class="section-kicker">Reproduce responsibly</p>
+        <h2>The code is public; game content is not</h2>
+        <p>
+          The repository contains the agent, tests, supervisor, viewer,
+          streaming system, and public-safe story tooling. It does not contain
+          or distribute a ROM. Saves, screenshots, raw decisions, credentials,
+          and the final cartridge-linked archive remain local and private.
+        </p>
+        <div class="article-actions">
+          <a class="button button-primary" href="../story/">Explore the verified story</a>
+          <a
+            class="button button-secondary"
+            href="https://github.com/kody-w/rappter-plays-pokemon"
+          >Read the source</a>
+        </div>
+      </section>
+
+      <footer class="article-footer">
+        <p>
+          The next experiment begins with Pokémon Gold: a longer campaign,
+          sixteen badges, a second region, another Elite Four, and Red waiting
+          at the end.
+        </p>
+      </footer>
+    </article>
+  </main>
+</body>
+</html>

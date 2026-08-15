@@ -176,6 +176,18 @@ def test_node_parses_all_browser_javascript_and_runs_contracts():
         story_player_contract.stderr or story_player_contract.stdout
     )
 
+    journey_dna_contract = subprocess.run(
+        [node, str(ROOT / "tests" / "journey_dna_contract_harness.js")],
+        cwd=ROOT,
+        input=(ROOT / "docs" / "dna" / "dna.js").read_text(encoding="utf-8"),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert journey_dna_contract.returncode == 0, (
+        journey_dna_contract.stderr or journey_dna_contract.stdout
+    )
+
     diagnostics_contract = subprocess.run(
         [node, str(ROOT / "tests" / "diagnostics_contract_harness.js")],
         cwd=ROOT,

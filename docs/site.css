@@ -210,6 +210,7 @@ h3 {
 
 .stream-section,
 .catchup,
+.journey-dna,
 .about,
 .project-note {
   border-top: 1px solid var(--line);
@@ -275,6 +276,61 @@ h3 {
 .catchup .button {
   flex: none;
 }
+
+.journey-dna {
+  display: grid;
+  grid-template-columns: minmax(240px, 0.7fr) minmax(0, 1.3fr);
+  gap: clamp(48px, 9vw, 120px);
+  align-items: center;
+}
+
+.journey-dna > div:last-child {
+  max-width: 700px;
+}
+
+.journey-dna p:not(.section-kicker) {
+  margin-bottom: 26px;
+  color: var(--muted);
+  line-height: 1.7;
+}
+
+.dna-orbit {
+  position: relative;
+  aspect-ratio: 1;
+  border: 1px solid rgba(110, 231, 255, 0.16);
+  border-radius: 50%;
+  background:
+    radial-gradient(circle, rgba(110, 231, 255, 0.16) 0 2%, transparent 2.5%),
+    repeating-radial-gradient(
+      circle,
+      transparent 0 13%,
+      rgba(110, 231, 255, 0.07) 13.2% 13.7%
+    );
+}
+
+.dna-orbit::before {
+  position: absolute;
+  inset: 10%;
+  border: 1px dashed rgba(255, 204, 51, 0.24);
+  border-radius: 50%;
+  content: "";
+  transform: rotate(-18deg) scaleY(0.62);
+}
+
+.dna-orbit span {
+  position: absolute;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #6ee7ff;
+  box-shadow: 0 0 18px rgba(110, 231, 255, 0.8);
+}
+
+.dna-orbit span:nth-child(1) { top: 14%; left: 46%; }
+.dna-orbit span:nth-child(2) { top: 37%; right: 8%; background: var(--accent); }
+.dna-orbit span:nth-child(3) { right: 26%; bottom: 10%; }
+.dna-orbit span:nth-child(4) { bottom: 22%; left: 12%; background: #a78bfa; }
+.dna-orbit span:nth-child(5) { top: 28%; left: 22%; }
 
 .about {
   display: grid;
@@ -382,6 +438,7 @@ footer span:first-child {
 
   .stream-section,
   .catchup,
+  .journey-dna,
   .about,
   .project-note {
     padding-block: 48px;
@@ -398,6 +455,14 @@ footer span:first-child {
   .about {
     grid-template-columns: 1fr;
     gap: 30px;
+  }
+
+  .journey-dna {
+    grid-template-columns: 1fr;
+  }
+
+  .dna-orbit {
+    width: min(72vw, 320px);
   }
 
   .player-shell {

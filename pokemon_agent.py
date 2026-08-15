@@ -64,6 +64,213 @@ BADGE_NAMES = (
     "Volcano",
     "Earth",
 )
+GOLD_BADGE_NAMES = (
+    "Zephyr",
+    "Hive",
+    "Plain",
+    "Fog",
+    "Mineral",
+    "Storm",
+    "Glacier",
+    "Rising",
+    "Boulder",
+    "Cascade",
+    "Thunder",
+    "Rainbow",
+    "Soul",
+    "Marsh",
+    "Volcano",
+    "Earth",
+)
+GOLD_MAP_NAMES = {
+    (0x03, 0x01): "Sprout Tower 1F",
+    (0x03, 0x02): "Sprout Tower 2F",
+    (0x03, 0x03): "Sprout Tower 3F",
+    (0x03, 0x1D): "Union Cave 1F",
+    (0x03, 0x1E): "Union Cave B1F",
+    (0x03, 0x1F): "Union Cave B2F",
+    (0x03, 0x20): "Slowpoke Well B1F",
+    (0x03, 0x21): "Slowpoke Well B2F",
+    (0x08, 0x01): "Azalea Pokemon Center",
+    (0x08, 0x04): "Kurt's House",
+    (0x08, 0x05): "Azalea Gym",
+    (0x08, 0x06): "Route 33",
+    (0x08, 0x07): "Azalea Town",
+    (0x0A, 0x01): "Route 32",
+    (0x18, 0x03): "Route 29",
+    (0x18, 0x04): "New Bark Town",
+    (0x18, 0x05): "Professor Elm's Lab",
+    (0x18, 0x06): "Player's House 1F",
+    (0x18, 0x07): "Player's House 2F",
+    (0x1A, 0x01): "Route 30",
+    (0x1A, 0x02): "Route 31",
+    (0x1A, 0x03): "Cherrygrove City",
+    (0x1A, 0x0A): "Mr. Pokemon's House",
+    (0x1A, 0x0B): "Route 31 Violet Gate",
+    (0x0A, 0x05): "Violet City",
+    (0x0A, 0x07): "Violet Gym",
+    (0x10, 0x02): "Indigo Plateau Pokemon Center",
+    (0x10, 0x08): "Hall of Fame",
+    (0x13, 0x02): "Mt. Silver Outside",
+    (0x03, 0x42): "Silver Cave Room 1",
+    (0x03, 0x43): "Silver Cave Room 2",
+    (0x03, 0x44): "Silver Cave Room 3",
+}
+GOLD_KEY_ITEMS = {
+    "bicycle": 0x07,
+    "coin_case": 0x36,
+    "itemfinder": 0x37,
+    "red_scale": 0x42,
+    "secret_potion": 0x43,
+    "ss_ticket": 0x44,
+    "mystery_egg": 0x45,
+    "silver_wing": 0x47,
+    "card_key": 0x7F,
+    "machine_part": 0x80,
+    "lost_item": 0x82,
+    "basement_key": 0x85,
+    "pass": 0x86,
+    "squirt_bottle": 0xAF,
+    "rainbow_wing": 0xB2,
+}
+GOLD_ROUTE_29_ACTIONS = {
+    **{(x, 11): "right" for x in range(0, 27)},
+    (27, 11): "down",
+    (27, 12): "down",
+    (27, 13): "down",
+    **{(x, 15): "right" for x in range(0, 20)},
+    (20, 15): "up",
+    **{(x, 14): "right" for x in range(20, 31)},
+    **{(31, y): "up" for y in range(11, 15)},
+    **{(x, 10): "right" for x in range(31, 36)},
+    **{(36, y): "up" for y in range(7, 11)},
+    **{(x, 6): "left" for x in range(23, 37)},
+    (22, 6): "up",
+    (22, 5): "up",
+    **{(x, 4): "left" for x in range(18, 23)},
+    (17, 4): "down",
+    (17, 5): "down",
+    **{(x, 6): "left" for x in range(0, 18)},
+}
+GOLD_ROUTE_29_RETURN_ACTIONS = {
+    (21, 15): "up",
+    **{(x, 14): "right" for x in range(21, 31)},
+    **{(31, y): "up" for y in range(11, 15)},
+    **{(x, 10): "right" for x in range(31, 40)},
+    (40, 10): "up",
+    **{(x, 9): "right" for x in range(40, 60)},
+}
+GOLD_ROUTE_30_ACTIONS = {
+    (4, 31): "right",
+    **{(5, y): "up" for y in range(25, 32)},
+    **{(x, 24): "left" for x in range(3, 6)},
+    (2, 24): "up",
+    **{(2, y): "up" for y in range(15, 24)},
+    (2, 14): "left",
+    **{(1, y): "up" for y in range(9, 15)},
+    **{(x, 8): "right" for x in range(1, 5)},
+    **{(5, y): "up" for y in range(5, 9)},
+    (5, 4): "right",
+    **{(6, y): "up" for y in range(0, 5)},
+}
+GOLD_ROUTE_31_ACTIONS = {
+    **{(25, y): "down" for y in range(11, 14)},
+    **{(x, 14): "right" for x in range(25, 32)},
+    **{(32, y): "up" for y in range(10, 15)},
+    **{(x, 9): "left" for x in range(18, 33)},
+    (17, 9): "down",
+    (17, 10): "down",
+    **{(x, 12): "left" for x in range(10, 18)},
+    **{(9, y): "up" for y in range(8, 13)},
+    **{(x, 7): "left" for x in range(4, 10)},
+}
+GOLD_ROUTE_31_GATE_ACTIONS = {
+    **{(x, 5): "left" for x in range(0, 10)},
+}
+GOLD_VIOLET_TOWER_ACTIONS = {
+    (27, 28): "right",
+    **{(28, y): "up" for y in range(25, 29)},
+    (28, 24): "left",
+    **{(27, y): "up" for y in range(19, 25)},
+    **{(x, 18): "left" for x in range(24, 28)},
+    **{(24, y): "up" for y in range(10, 19)},
+    (24, 9): "left",
+    **{(23, y): "up" for y in range(6, 10)},
+}
+GOLD_VIOLET_ROUTE32_ACTIONS = {
+    (28, 28): "left",
+    **{(27, y): "up" for y in range(21, 29)},
+    **{(x, 21): "left" for x in range(14, 28)},
+    **{(13, y): "down" for y in range(21, 32)},
+    (13, 31): "right",
+    **{(14, y): "down" for y in range(31, 36)},
+}
+GOLD_UNION_CAVE_DANIEL_ACTIONS = {
+    **{(x, 3): "up" for x in range(14, 18)},
+    **{(x, 2): "left" for x in range(14, 18)},
+    (13, 2): "down",
+    **{(x, 3): "left" for x in range(6, 14)},
+    (5, 3): "down",
+    (5, 4): "down",
+}
+GOLD_UNION_CAVE_LARRY_ACTIONS = {
+    (6, 22): "down",
+    (6, 23): "right",
+    (14, 14): "down",
+    (14, 15): "down",
+    (16, 20): "left",
+    **{(15, y): "up" for y in range(17, 21)},
+    **{(x, 16): "left" for x in range(8, 16)},
+    **{(x, 17): "right" for x in range(5, 8)},
+    **{(8, y): "down" for y in range(17, 24)},
+    (8, 23): "left",
+    **{(7, y): "down" for y in range(23, 27)},
+    **{(x, 26): "left" for x in range(4, 8)},
+    **{(4, y): "up" for y in range(24, 27)},
+}
+GOLD_SPROUT_HEAL_EXIT_ACTIONS = {
+    (0x03, 0x03, 9, 5): "right",
+    (0x03, 0x03, 10, 5): "right",
+    **{(0x03, 0x03, 11, y): "down" for y in range(2, 11)},
+    (0x03, 0x03, 11, 10): "left",
+    **{(0x03, 0x03, 10, y): "down" for y in range(10, 14)},
+    **{(0x03, 0x02, 2, y): "up" for y in range(7, 15)},
+    **{(0x03, 0x01, 2, y): "up" for y in range(3, 7)},
+    (0x03, 0x01, 2, 2): "right",
+    (0x03, 0x01, 3, 2): "up",
+    **{(0x03, 0x01, x, 1): "right" for x in range(3, 17)},
+    (0x03, 0x01, 17, 1): "down",
+    (0x03, 0x01, 17, 2): "down",
+    (0x03, 0x01, 17, 3): "down",
+    **{(0x03, 0x01, 17, y): "up" for y in range(4, 8)},
+    **{(0x03, 0x01, 16, y): "right" for y in range(2, 7)},
+    (0x03, 0x02, 17, 2): "left",
+    (0x03, 0x02, 17, 3): "left",
+    (0x03, 0x02, 16, 2): "down",
+    **{(0x03, 0x02, x, 3): "left" for x in range(7, 17)},
+    (0x03, 0x02, 6, 3): "down",
+    **{(0x03, 0x01, 6, y): "down" for y in range(4, 13)},
+    **{(0x03, 0x01, x, 12): "right" for x in range(6, 9)},
+    (0x03, 0x01, 9, 12): "down",
+    **{(0x03, 0x01, 9, y): "down" for y in range(13, 16)},
+}
+GOLD_SPROUT_POST_CHOW_ACTIONS = {
+    **{(17, y): "up" for y in range(2, 7)},
+    **{(16, y): "right" for y in range(2, 7)},
+    (17, 1): "left",
+    **{(x, 1): "left" for x in range(4, 17)},
+    **{(3, y): "down" for y in range(1, 6)},
+    (3, 6): "left",
+}
+GOLD_SPROUT_2F_EAST_ACTIONS = {
+    (5, 5): "up",
+    (5, 4): "up",
+    **{(x, 3): "right" for x in range(5, 17)},
+    (17, 3): "up",
+}
+GOLD_SPROUT_3F_ENTRY_ACTIONS = {
+    (10, 14): "up",
+}
 DEFAULT_RUNTIME_DIR = Path.home() / ".openrappter" / "pokemon-red"
 DEFAULT_PORT = 8765
 DEFAULT_SPECTATOR_PORT = 8766
@@ -253,6 +460,7 @@ CARDINAL_BUTTONS = ("up", "down", "left", "right")
 W_NUM_BAG_ITEMS = 0xD31D
 W_BAG_ITEMS = 0xD31E
 W_EVENT_FLAGS = 0xD747
+W_WALK_BIKE_SURF_STATE = 0xD700
 BAG_ITEM_CAPACITY = 20
 # Fixed gain mapping the Game Boy APU's small integer mix onto int16 after DC
 # removal. Measured over 10s of play: DC +24.0, peak deviation 24 counts, so
@@ -620,6 +828,124 @@ VICTORY_ROAD_EXIT_ACTIONS = {
     (0xC2, 27, 8): "right",
     (0xC2, 28, 8): "right",
 }
+MEWTWO_SHORE_ROUTE_ACTIONS = {
+    (0x23, 7, 14): "down",
+    (0x23, 11, 24): "up",
+    (0x23, 11, 23): "right",
+    (0x23, 11, 22): "up",
+    (0x23, 11, 21): "up",
+    (0x23, 11, 20): "left",
+    (0x23, 10, 20): "up",
+    (0x23, 10, 19): "up",
+    (0x23, 10, 18): "up",
+    (0x23, 10, 17): "up",
+    (0x23, 10, 16): "up",
+    (0x23, 10, 15): "left",
+    (0x23, 9, 15): "left",
+    (0x23, 8, 15): "left",
+    (0x23, 7, 15): "left",
+    (0x23, 6, 15): "left",
+    (0x23, 5, 15): "down",
+}
+
+
+def _coordinate_route_actions(
+    segments: tuple[tuple[tuple[int, int, int], str], ...],
+) -> dict[tuple[int, int, int], str]:
+    """Expand verified unit-step routes into restart-safe coordinate actions."""
+    deltas = {
+        "up": (0, -1),
+        "down": (0, 1),
+        "left": (-1, 0),
+        "right": (1, 0),
+    }
+    actions: dict[tuple[int, int, int], str] = {}
+    for (map_id, start_x, start_y), route in segments:
+        x, y = start_x, start_y
+        for direction in route.split():
+            key = (map_id, x, y)
+            existing = actions.get(key)
+            if existing is not None and existing != direction:
+                raise ValueError(f"conflicting route action at {key}")
+            actions[key] = direction
+            delta_x, delta_y = deltas[direction]
+            x += delta_x
+            y += delta_y
+    return actions
+
+
+# Derived against disposable emulator states from the completed cartridge.
+# Every segment ends at a warp or begins immediately after Surf moves RED into
+# the water, so ordinary unit deltas are sufficient inside each segment.
+MEWTWO_CAVE_ROUTE_ACTIONS = _coordinate_route_actions((
+    (
+        (0xE4, 24, 17),
+        "up up up left up left up left up up up up up right right",
+    ),
+    (
+        (0xE2, 22, 6),
+        "down right down down down down left left left left left left "
+        "down down right right right right right down down left down down "
+        "right right right right right right up right up up left left up "
+        "up up up up left up up right right up right right up up up left "
+        "up up right",
+    ),
+    ((0xE4, 27, 1), "down left left left left down"),
+    (
+        (0xE4, 23, 4),
+        "down left left left left left left left left down down left left "
+        "left left left left down down down down down down down right right "
+        "up up right right right right down down right right down down left "
+        "down left left left left left left left left left left up left left "
+        "left up left up left up up up right right",
+    ),
+    (
+        (0xE2, 3, 11),
+        "up up right right right right right right right right right down "
+        "down down down down down right down down left left up left left "
+        "left left left down left left left left left up up right up up left "
+        "up left up up up right up up right right right right right up up "
+        "left left left left left left up up right",
+    ),
+    (
+        (0xE4, 1, 3),
+        "right down right right right down down left left left down left "
+        "left up",
+    ),
+    (
+        (0xE3, 3, 6),
+        "up up up up right right right right right right right right right "
+        "right down down down left left left left left left down down left "
+        "down left left down left left left down left down down right down "
+        "right down down down right right right up right up right right "
+        "right up up up up up up right right right right down down down "
+        "down down",
+    ),
+    (
+        (0xE3, 13, 14),
+        "down right down right right right right up up up up right up up "
+        "up up right right right right right up up up up up up up right "
+        "right right right down down down down down left down",
+    ),
+    (
+        (0xE3, 27, 8),
+        "down down down left left left left down down down down down right "
+        "right right up up right",
+    ),
+    (
+        (0xE4, 14, 4),
+        "down down down left left left left left down down down down down "
+        "down down right right up up right right right right down down "
+        "right right down down left down left left left left left left left "
+        "left left left up left left left up left up left up up up right "
+        "right",
+    ),
+))
+MEWTWO_CAVE_SURF_SHORES = frozenset({
+    (0xE4, 23, 3),
+    (0xE3, 13, 13),
+    (0xE3, 27, 7),
+})
 # Bag contents worth surfacing to the model. Each entry either opens a dungeon
 # that no sequence of movements can open, or proves one is finished; ownership
 # the model cannot see is ownership it will not act on.
@@ -6675,7 +7001,7 @@ def execution_evidence_state(game_state: Any) -> dict[str, Any]:
             if (
                 not isinstance(state.get("map_id"), bool)
                 and isinstance(state.get("map_id"), int)
-                and 0 <= state.get("map_id") <= 255
+                and 0 <= state.get("map_id") <= 0xFFFF
             )
             else None
         ),
@@ -6986,7 +7312,7 @@ def navigation_position(game_state: Any) -> Optional[tuple[int, int, int]]:
         or isinstance(y, bool)
         or not isinstance(x, int)
         or not isinstance(y, int)
-        or not 0 <= map_id <= 255
+        or not 0 <= map_id <= 0xFFFF
         or not 0 <= x <= 255
         or not 0 <= y <= 255
     ):
@@ -7044,11 +7370,14 @@ def _valid_position_triplet(value: Any) -> bool:
     return (
         isinstance(value, list)
         and len(value) == 3
+        and not isinstance(value[0], bool)
+        and isinstance(value[0], int)
+        and 0 <= value[0] <= 0xFFFF
         and all(
             not isinstance(item, bool)
             and isinstance(item, int)
             and 0 <= item <= 255
-            for item in value
+            for item in value[1:]
         )
     )
 
@@ -7353,7 +7682,7 @@ class NavigationMemory:
             if (
                 isinstance(item.get("map_id"), bool)
                 or not isinstance(item.get("map_id"), int)
-                or not 0 <= item["map_id"] <= 255
+                or not 0 <= item["map_id"] <= 0xFFFF
                 or not isinstance(entrance, list)
                 or len(entrance) != 2
                 or any(
@@ -7387,13 +7716,13 @@ class NavigationMemory:
         if (
             isinstance(episode.get("map_id"), bool)
             or not isinstance(episode.get("map_id"), int)
-            or not 0 <= episode["map_id"] <= 255
+            or not 0 <= episode["map_id"] <= 0xFFFF
             or not isinstance(maps, list)
             or not 1 <= len(maps) <= 8
             or any(
                 isinstance(value, bool)
                 or not isinstance(value, int)
-                or not 0 <= value <= 255
+                or not 0 <= value <= 0xFFFF
                 for value in maps
             )
             or started_at is None
@@ -9261,7 +9590,9 @@ def rom_title(path: Path) -> str:
     try:
         with path.open("rb") as handle:
             handle.seek(0x134)
-            title = handle.read(16).split(b"\x00", 1)[0]
+            header = handle.read(16)
+        title_length = 11 if len(header) == 16 and header[15] in {0x80, 0xC0} else 16
+        title = header[:title_length].split(b"\x00", 1)[0]
         return title.decode("ascii", errors="ignore").strip()
     except OSError:
         return ""
@@ -9280,6 +9611,72 @@ def is_pokemon_red_rom(path: Path) -> bool:
         return False
     title = rom_title(path).upper()
     return "POKEMON RED" in title
+
+
+def is_pokemon_gold_rom(path: Path) -> bool:
+    if (
+        not path.is_file()
+        or path.suffix.lower() not in {".gb", ".gbc"}
+        or is_cloud_placeholder(path)
+    ):
+        return False
+    return rom_title(path).upper().startswith("POKEMON_GLD")
+
+
+def pokemon_game_id(path: Path) -> Optional[str]:
+    if is_pokemon_red_rom(path):
+        return "red"
+    if is_pokemon_gold_rom(path):
+        return "gold"
+    return None
+
+
+def discover_pokemon_rom(
+    explicit: Optional[str] = None,
+    runtime_dir: Optional[Path] = None,
+) -> Path:
+    if explicit:
+        resolved = Path(explicit).expanduser().resolve()
+        if is_cloud_placeholder(resolved):
+            raise FileNotFoundError(
+                f"Pokemon ROM is still a cloud placeholder: {resolved}"
+            )
+        if pokemon_game_id(resolved) is not None:
+            return resolved
+        raise FileNotFoundError(f"Not a supported Pokemon ROM: {explicit}")
+
+    candidates: list[Path] = []
+    configured = os.environ.get("OPENRAPPTER_POKEMON_ROM")
+    if configured:
+        candidates.append(Path(configured).expanduser())
+    configured_runtime = (
+        Path(runtime_dir).expanduser()
+        if runtime_dir is not None
+        else DEFAULT_RUNTIME_DIR
+    )
+    runtime_config = read_json(configured_runtime / "config.json")
+    if runtime_config.get("rom_path"):
+        candidates.append(Path(str(runtime_config["rom_path"])).expanduser())
+
+    placeholders: list[Path] = []
+    for resolved in sorted(
+        {candidate.expanduser().resolve() for candidate in candidates},
+        key=lambda path: (is_cloud_placeholder(path), str(path)),
+    ):
+        if is_cloud_placeholder(resolved):
+            placeholders.append(resolved)
+        elif pokemon_game_id(resolved) is not None:
+            return resolved
+    if placeholders:
+        raise FileNotFoundError(
+            "Pokemon ROMs were found, but every copy is still a cloud "
+            "placeholder: " + ", ".join(str(path) for path in placeholders)
+        )
+    raise FileNotFoundError(
+        "No supported Pokemon ROM was configured. Pass rom_path or set "
+        "OPENRAPPTER_POKEMON_ROM to your own legally obtained Pokemon Red "
+        "or Pokemon Gold ROM."
+    )
 
 
 def discover_pokemon_red_rom(
@@ -10533,7 +10930,7 @@ class PokemonAgent(BasicAgent):
             )
 
         try:
-            rom = discover_pokemon_red_rom(kwargs.get("rom_path"), runtime_dir)
+            rom = discover_pokemon_rom(kwargs.get("rom_path"), runtime_dir)
         except (FileNotFoundError, OSError) as error:
             return json.dumps({"status": "error", "message": str(error)})
 
@@ -10940,6 +11337,24 @@ class PokemonMemoryReader:
             for name, item_id in TRACKED_KEY_ITEMS.items()
         }
 
+    def bag_item_index(self, wanted_item_id: int) -> Optional[int]:
+        count = self._read_optional(W_NUM_BAG_ITEMS)
+        if count is None or not 0 <= count <= BAG_ITEM_CAPACITY:
+            return None
+        for index in range(count):
+            item_id = self._read_optional(W_BAG_ITEMS + index * 2)
+            quantity = self._read_optional(W_BAG_ITEMS + index * 2 + 1)
+            if (
+                item_id is None
+                or item_id in {0, 0xFF}
+                or quantity is None
+                or not 1 <= quantity <= 99
+            ):
+                return None
+            if item_id == wanted_item_id:
+                return index
+        return None
+
     def _event_flag(self, event: int) -> Optional[bool]:
         byte = self._read_optional(W_EVENT_FLAGS + event // 8)
         return None if byte is None else bool(byte & (1 << (event % 8)))
@@ -11216,6 +11631,11 @@ class PokemonMemoryReader:
             },
             "victory_road_3_boulders": self.victory_road_3_boulders(),
             "strength_active": bool(self._read(0xD728) & 0x01),
+            "surfing": self._read(W_WALK_BIKE_SURF_STATE) == 2,
+            "in_battle": self._read(0xD057) != 0,
+            "enemy_species_id": self._read(0xD059),
+            "menu_cursor_index": self._read(0xCC36) + self._read(0xCC26),
+            "master_ball_bag_index": self.bag_item_index(MASTER_BALL_ITEM_ID),
             "mewtwo_caught": self._bitfield_flag(
                 0xD2F7, MEWTWO_DEX_NUMBER
             ),
@@ -11226,6 +11646,177 @@ class PokemonMemoryReader:
                 map_id == 0x76
                 or self._event_flag(HALL_OF_FAME_COMPLETED_EVENT) is True
             ),
+        }
+
+
+class PokemonGoldMemoryReader(PokemonMemoryReader):
+    """Read guarded USA/Europe Pokemon Gold v0 WRAM facts."""
+
+    def position(self) -> Optional[tuple[int, int, int]]:
+        group = self._read_optional(0xDA00)
+        number = self._read_optional(0xDA01)
+        y = self._read_optional(0xDA02)
+        x = self._read_optional(0xDA03)
+        if (
+            group is None
+            or number is None
+            or x is None
+            or y is None
+            or not 1 <= group <= 26
+            or number == 0
+        ):
+            return None
+        return ((group << 8) | number, x, y)
+
+    def _event_flag_gold(self, event: int) -> Optional[bool]:
+        value = self._read_optional(0xD7B7 + event // 8)
+        return None if value is None else bool(value & (1 << (event % 8)))
+
+    def _screen_text_gold(self) -> str:
+        if self._read(0xD15F) == 0 and self._read(0xD116) == 0:
+            return ""
+        text = self._screen_text()
+        return "" if len(text) > 512 else text
+
+    def key_items(self) -> dict[str, Optional[bool]]:
+        count = self._read_optional(0xD5E1)
+        unknown: dict[str, Optional[bool]] = dict.fromkeys(GOLD_KEY_ITEMS)
+        if count is None or not 0 <= count <= 26:
+            return unknown
+        item_ids = [
+            self._read_optional(0xD5E2 + index)
+            for index in range(count)
+        ]
+        if any(item_id in {None, 0, 0xFF} for item_id in item_ids):
+            return unknown
+        if self._read_optional(0xD5E2 + count) != 0xFF:
+            return unknown
+        owned = {int(item_id) for item_id in item_ids if item_id is not None}
+        return {
+            name: item_id in owned
+            for name, item_id in GOLD_KEY_ITEMS.items()
+        }
+
+    def snapshot(self) -> dict[str, Any]:
+        position = self.position()
+        group = self._read_optional(0xDA00)
+        number = self._read_optional(0xDA01)
+        raw_party_count = (
+            self._read_optional(0xDA22) if position is not None else None
+        )
+        party_count = (
+            raw_party_count
+            if raw_party_count is not None and 0 <= raw_party_count <= 6
+            else None
+        )
+        party = []
+        for index in range(party_count or 0):
+            base = 0xDA2A + index * 0x30
+            party.append(
+                {
+                    "nickname": self._text(0xDB8C + index * 11, 11),
+                    "species_id": self._read(base),
+                    "level": self._read(base + 0x1F),
+                    "hp": (
+                        (self._read(base + 0x22) << 8)
+                        + self._read(base + 0x23)
+                    ),
+                    "max_hp": (
+                        (self._read(base + 0x24) << 8)
+                        + self._read(base + 0x25)
+                    ),
+                }
+            )
+        johto_badges = (
+            self._read_optional(0xD57C) if position is not None else None
+        )
+        kanto_badges = (
+            self._read_optional(0xD57D) if position is not None else None
+        )
+        badges = [
+            name
+            for index, name in enumerate(GOLD_BADGE_NAMES)
+            if (
+                (index < 8 and johto_badges is not None and johto_badges & (1 << index))
+                or (
+                    index >= 8
+                    and kanto_badges is not None
+                    and kanto_badges & (1 << (index - 8))
+                )
+            )
+        ]
+        elite_four_completed = (
+            self._event_flag_gold(0x0044) if position is not None else False
+        )
+        red_absent = (
+            self._event_flag_gold(0x0762) if position is not None else False
+        )
+        red_defeated = bool(
+            elite_four_completed is True
+            and len(badges) == len(GOLD_BADGE_NAMES)
+            and red_absent is True
+        )
+        story_events = {
+            "got_hm_flash": self._event_flag_gold(0x0014),
+            "got_starter": self._event_flag_gold(0x001A),
+            "got_mystery_egg": self._event_flag_gold(0x001E),
+            "gave_mystery_egg_to_elm": self._event_flag_gold(0x001F),
+            "beat_sage_chow": self._event_flag_gold(0x0411),
+            "beat_bird_keeper_rod": self._event_flag_gold(0x03FB),
+            "beat_bird_keeper_abe": self._event_flag_gold(0x03FC),
+            "cleared_slowpoke_well": self._event_flag_gold(0x002A),
+            "beat_hiker_daniel": self._event_flag_gold(0x0533),
+            "beat_pokemaniac_larry": self._event_flag_gold(0x04E2),
+            "sprout_1f_parlyz_heal_collected": self._event_flag_gold(
+                0x0647
+            ),
+        }
+        location = GOLD_MAP_NAMES.get(
+            (group, number),
+            (
+                f"Map {group:02X}:{number:02X}"
+                if group is not None and number is not None
+                else "Pokemon Gold"
+            ),
+        )
+        return {
+            "game_id": "gold",
+            "map_id": position[0] if position is not None else None,
+            "map_group": group,
+            "map_number": number,
+            "location": location,
+            "coordinates": {
+                "x": position[1] if position is not None else None,
+                "y": position[2] if position is not None else None,
+            },
+            "facing_direction": (
+                self._read(0xD205) if position is not None else None
+            ),
+            "player_name": None,
+            "rival_name": None,
+            "badges": badges,
+            "johto_badge_bits": johto_badges,
+            "kanto_badge_bits": kanto_badges,
+            "party_count": party_count,
+            "party": party,
+            "pokedex": {"caught": None, "seen": None, "total": 251},
+            "key_items": self.key_items() if position is not None else {},
+            "story_events": story_events,
+            "warps": [],
+            "play_time": None,
+            "screen_text": self._screen_text_gold(),
+            "in_battle": bool(
+                position is not None and self._read(0xD116) != 0
+            ),
+            "enemy_species_id": (
+                self._read(0xD0EF) if position is not None else 0
+            ),
+            "hall_of_fame": (group, number) == (0x10, 0x08),
+            "hall_of_fame_completed": elite_four_completed,
+            "elite_four_completed": elite_four_completed,
+            "red_currently_absent": red_absent,
+            "red_defeated": red_defeated,
+            "ultimate_run_completed": red_defeated,
         }
 
 
@@ -11425,17 +12016,20 @@ def endgame_route_guidance(game_state: dict[str, Any]) -> Optional[str]:
             )
         if map_id == 0x03:
             return (
-                "Authoritative Mewtwo route. In Cerulean City reach the cave "
-                "entrance warp at (4,11), using SURF around the northwest water "
-                "if required, and enter Cerulean Cave."
+                "Authoritative Mewtwo route. Do NOT use Fly again while already "
+                "in Cerulean. Travel north across Nugget Bridge, move west to "
+                "the water channel, SURF south into Cerulean's northwest basin, "
+                "and enter the cave warp at (4,11)."
             )
         if map_id == 0x23:
             return (
                 "Authoritative Mewtwo route. Cross Nugget Bridge north on "
-                "Route 24, move west to the water channel, activate SURF, and "
-                "travel SOUTH along the water west of the bridge into "
-                "Cerulean City's northwest basin. Enter Cerulean Cave at "
-                "(4,11)."
+                "Route 24 and follow the trusted bridge route to safe shoreline "
+                "tile (5,16). At (5,16), face RIGHT into the water, open "
+                "POKEMON, move the party cursor from DODUO to BLASTOISE, and "
+                "select SURF. Travel SOUTH along the water west of the bridge "
+                "into Cerulean City's northwest basin, then enter Cerulean Cave "
+                "at (4,11). Do not use Fly."
             )
         if map_id == 0x24:
             return (
@@ -11444,40 +12038,47 @@ def endgame_route_guidance(game_state: dict[str, Any]) -> Optional[str]:
                 "Bridge into Cerulean and enter the cave at (4,11)."
             )
         if map_id == 0xE4:
+            if position == (23, 3):
+                return (
+                    "Authoritative Cerulean Cave route. This is the verified "
+                    "shoreline. Face DOWN, open POKEMON, select BLASTOISE, "
+                    "and use SURF. The trusted route will cross the lake to "
+                    "the southwest ladder at (3,11)."
+                )
             if (
                 isinstance(position[0], int)
                 and isinstance(position[1], int)
                 and position[0] >= 20
-                and position[1] >= 12
+                and position[1] >= 7
             ):
                 return (
                     "Authoritative Cerulean Cave route. From the 1F entrance "
-                    "(24,17), follow the dry plateau to ladder (27,1), which "
-                    "enters 2F at (29,1). Ignore optional items."
+                    "(24,17), follow the emulator-verified dry plateau to "
+                    "ladder (23,7), which enters 2F at (22,6). Ignore "
+                    "optional items."
                 )
             if (
                 isinstance(position[0], int)
                 and isinstance(position[1], int)
-                and position[0] >= 12
-                and position[1] >= 7
+                and position[0] >= 20
+                and position[1] <= 6
             ):
                 return (
-                    "Authoritative Cerulean Cave route. This is the 1F landing "
-                    "at (18,9). Descend to the lake, SURF southwest to the "
-                    "central/southern plateau, and reach ladder (3,11). Do not "
-                    "use the misleading northeast ladder (23,7)."
+                    "Authoritative Cerulean Cave route. From the northeast 1F "
+                    "landing at (27,1), follow the trusted dry route to shore "
+                    "(23,3), face DOWN, and use BLASTOISE's SURF."
                 )
             return (
-                "Authoritative Cerulean Cave route. From the southwest 1F "
-                "landing near (1,3), follow the short dry corridor to (0,6), "
-                "which descends to Cerulean Cave B1F."
+                "Authoritative Cerulean Cave route. Follow the trusted "
+                "coordinate route. From the southwest 1F landing near (1,3), "
+                "the short dry corridor reaches (0,6) and Cerulean Cave B1F."
             )
         if map_id == 0xE2:
             if isinstance(position[0], int) and position[0] >= 10:
                 return (
-                    "Authoritative Cerulean Cave 2F route. From (29,1), follow "
-                    "the northeast maze south, then west, south, and west to "
-                    "ladder (19,7), which returns to 1F at (18,9)."
+                    "Authoritative Cerulean Cave 2F route. From (22,6), follow "
+                    "the emulator-verified maze to ladder (29,1), which lands "
+                    "on 1F at (27,1)."
                 )
             return (
                 "Authoritative Cerulean Cave 2F route. From the southwest "
@@ -11492,9 +12093,15 @@ def endgame_route_guidance(game_state: dict[str, Any]) -> Optional[str]:
                     "available. Do not battle Mewtwo; restore a checkpoint with "
                     "the Master Ball."
                 )
+            if position in {(13, 13), (27, 7)}:
+                return (
+                    "Authoritative Cerulean Cave B1F route. This is a verified "
+                    "shoreline: face DOWN, open POKEMON, select BLASTOISE, and "
+                    "use SURF. Resume the trusted coordinate route afterward."
+                )
             return (
                 "Authoritative Mewtwo capture route. Traverse B1F from (3,6) "
-                "through its winding plateaus and required Surf channels to "
+                "with the trusted route through both required Surf channels to "
                 "Mewtwo at (27,13). Stand at (27,14), face UP, and press A. "
                 "In the Mewtwo battle, NEVER ATTACK: open ITEM and use the "
                 "MASTER BALL immediately. Dex 150 ownership must become true."
@@ -13000,6 +13607,10 @@ def trusted_exact_route_guidance(
     game_state: dict[str, Any],
 ) -> Optional[str]:
     """Story/item routes outrank generic puzzle-route replay."""
+    if game_state.get("game_id") == "gold":
+        return gold_route_guidance(game_state)
+    if game_state.get("game_id") not in {None, "red"}:
+        return None
     return (
         item_gate_guidance(game_state)
         or endgame_route_guidance(game_state)
@@ -13010,8 +13621,259 @@ def trusted_exact_route_guidance(
     )
 
 
+def gold_route_guidance(game_state: dict[str, Any]) -> Optional[str]:
+    """Name authoritative early-game Gold waypoints from pret/pokegold."""
+    group = game_state.get("map_group")
+    number = game_state.get("map_number")
+    coordinates = game_state.get("coordinates")
+    position = (
+        (coordinates.get("x"), coordinates.get("y"))
+        if isinstance(coordinates, dict)
+        else (None, None)
+    )
+    party_count = game_state.get("party_count")
+    party = game_state.get("party")
+    lead_needs_center = bool(
+        isinstance(party, list)
+        and party
+        and isinstance(party[0], dict)
+        and isinstance(party[0].get("hp"), int)
+        and isinstance(party[0].get("max_hp"), int)
+        and party[0]["max_hp"] > 0
+        and party[0]["hp"] * 3 < party[0]["max_hp"]
+    )
+    story_events = game_state.get("story_events")
+    story_events = story_events if isinstance(story_events, dict) else {}
+    returning_egg = bool(
+        story_events.get("got_mystery_egg") is True
+        and story_events.get("gave_mystery_egg_to_elm") is not True
+    )
+    egg_returned = story_events.get("gave_mystery_egg_to_elm") is True
+    prefix = (
+        "Authoritative Pokemon Gold route. "
+        f"Current map {group}:{number}, coordinates {position}. "
+    )
+    if (group, number) in {(0x03, 0x01), (0x03, 0x02), (0x03, 0x03)} and lead_needs_center:
+        return prefix + (
+            "CRITICAL: Totodile is below one-third HP and no usable healing "
+            "item is available. Stop opening the Pack. Reverse the nearest "
+            "ladder chain to Sprout Tower 1F, leave through (9,15)/(10,15), "
+            "and heal at Violet Pokemon Center (31,25) before re-entering."
+        )
+    if (group, number) == (0x18, 0x07):
+        return prefix + (
+            "The only downstairs warp is (7,0). Walk onto (7,0); do not "
+            "press A at furniture or search the left side of the room."
+        )
+    if (group, number) == (0x18, 0x06):
+        return prefix + (
+            "Finish Mom's forced Pokegear, weekday, DST, and phone dialogue. "
+            "Then leave through the south door at (6,7) or (7,7)."
+        )
+    if (group, number) == (0x18, 0x04):
+        if party_count == 0 or returning_egg:
+            return prefix + (
+                "Enter Professor Elm's Lab at (6,3). Before receiving a "
+                "starter the west route is blocked; after receiving the "
+                "Mystery Egg this is the required return to Elm."
+            )
+        return prefix + (
+            "With a starter obtained, leave New Bark Town west for Route 29 "
+            "and continue toward Cherrygrove and Mr. Pokemon's house."
+        )
+    if (group, number) == (0x18, 0x05):
+        if party_count == 0:
+            return prefix + (
+                "Finish Elm's forced introduction, then choose TOTODILE: the "
+                "middle Poke Ball is at (7,3). Stand at (7,4), face UP, press "
+                "A, and answer YES."
+            )
+        if returning_egg:
+            return prefix + (
+                "Give the Mystery Egg to Elm and finish every resulting "
+                "dialogue before leaving."
+            )
+        destination = (
+            "Violet City through Routes 29, 30, and 31"
+            if egg_returned
+            else "Mr. Pokemon through Cherrygrove and Route 30"
+        )
+        return prefix + (
+            "Finish required dialogue, leave through (4,11) or (5,11), "
+            f"and continue toward {destination}."
+        )
+    if (group, number) == (0x18, 0x03):
+        direction = "EAST to New Bark and Elm" if returning_egg else "WEST to Cherrygrove"
+        return prefix + f"Traverse Route 29 {direction}; do not enter optional houses."
+    if (group, number) == (0x1A, 0x03):
+        if returning_egg:
+            direction = "EAST onto Route 29 to return the Mystery Egg"
+        elif egg_returned:
+            direction = (
+                "NORTH onto Route 30, then take the Route 31 branch to Violet"
+            )
+        else:
+            direction = "NORTH onto Route 30 toward Mr. Pokemon"
+        return prefix + f"Leave Cherrygrove {direction}."
+    if (group, number) == (0x1A, 0x01):
+        if returning_egg:
+            direction = "SOUTH to Cherrygrove, then EAST to Elm"
+        elif egg_returned:
+            direction = (
+                "NORTH to the open junction, then WEST onto Route 31 toward Violet"
+            )
+        else:
+            direction = "NORTH to Mr. Pokemon's House"
+        return prefix + f"Follow Route 30 {direction}."
+    if (group, number) == (0x1A, 0x0A):
+        return prefix + (
+            "Complete Mr. Pokemon and Professor Oak's dialogue, receive the "
+            "Mystery Egg and Pokedex, then return south to Cherrygrove."
+        )
+    if (group, number) in {(0x1A, 0x02), (0x1A, 0x0B)}:
+        return prefix + (
+            "Continue WEST through Route 31 and its gate into Violet City."
+        )
+    if (group, number) == (0x0A, 0x05):
+        got_flash = story_events.get("got_hm_flash") is True
+        badges = game_state.get("badges")
+        badges = badges if isinstance(badges, list) else []
+        if lead_needs_center:
+            return prefix + (
+                "CRITICAL: heal Totodile at Violet Pokemon Center entrance "
+                "(31,25) before returning to Sprout Tower."
+            )
+        if "Zephyr" in badges:
+            return prefix + (
+                "The Zephyr Badge is complete. Leave Violet SOUTH for Route "
+                "32 and continue toward Union Cave and Azalea."
+            )
+        if not got_flash:
+            return prefix + (
+                "Heal at the Pokemon Center entrance (31,25) if needed, then "
+                "enter Sprout Tower at (23,5), defeat Elder Li on 3F, and "
+                "receive HM05 Flash."
+            )
+        return prefix + (
+            "Sprout Tower is complete. Enter Violet Gym at (18,17), defeat "
+            "Falkner, and receive the Zephyr Badge."
+        )
+    if (group, number) == (0x0A, 0x07):
+        badges = game_state.get("badges")
+        badges = badges if isinstance(badges, list) else []
+        if "Zephyr" in badges:
+            return prefix + (
+                "Falkner is defeated. Leave through (4,15)/(5,15)."
+            )
+        if story_events.get("beat_bird_keeper_rod") is not True:
+            return prefix + (
+                "Bird Keeper Abe is cleared. Route around the LEFT end of the "
+                "railing to (4,6), which enters Bird Keeper Rod's left-facing "
+                "sight line. Defeat Rod before approaching Falkner."
+            )
+        return prefix + (
+            "Follow the center aisle to (5,2), face UP toward Falkner at "
+            "(5,1), press A, and defeat him for the Zephyr Badge."
+        )
+    if (group, number) == (0x0A, 0x01):
+        return prefix + (
+            "Travel SOUTH on Route 32. Heal at the Pokemon Center entrance "
+            "(11,73) if needed, then enter Union Cave at (6,79)."
+        )
+    if (group, number) == (0x03, 0x1D):
+        return prefix + (
+            "Take Union Cave's direct required 1F route from the north entry "
+            "(17,3) to the south exit (17,31). Ignore optional B1F ladders "
+            "(5,19) and (3,33)."
+        )
+    if (group, number) == (0x08, 0x06):
+        return prefix + "Continue WEST on Route 33 into Azalea Town."
+    if (group, number) == (0x08, 0x07):
+        badges = game_state.get("badges")
+        badges = badges if isinstance(badges, list) else []
+        if "Hive" in badges:
+            return prefix + (
+                "The Hive Badge is complete. Leave Azalea WEST for Ilex "
+                "Forest and continue toward Goldenrod."
+            )
+        if story_events.get("cleared_slowpoke_well") is not True:
+            return prefix + (
+                "Visit Kurt's House at (9,5), then enter Slowpoke Well at "
+                "(31,7) and defeat Team Rocket. Do not challenge the Gym yet."
+            )
+        return prefix + (
+            "Slowpoke Well is clear. Heal at (15,9) if needed, then enter "
+            "Azalea Gym at (10,15) and defeat Bugsy for the Hive Badge."
+        )
+    if (group, number) in {(0x03, 0x20), (0x03, 0x21)}:
+        return prefix + (
+            "Clear every required Team Rocket battle in Slowpoke Well and "
+            "defeat Proton; return to Azalea only after "
+            "story_events.cleared_slowpoke_well becomes true."
+        )
+    if (group, number) == (0x08, 0x05):
+        return prefix + (
+            "Complete Azalea Gym's required trainers and spider platforms, "
+            "then defeat Bugsy for the Hive Badge."
+        )
+    if (group, number) == (0x03, 0x01):
+        if (
+            isinstance(position[0], int)
+            and isinstance(position[1], int)
+            and (
+                position[1] == 1
+                or position[0] >= 15
+            )
+        ):
+            if (
+                story_events.get("sprout_1f_parlyz_heal_collected")
+                is not True
+            ):
+                return prefix + (
+                    "The Parlyz Heal item ball at (16,7) blocks the ONLY route "
+                    "west. Stand at (17,7), face LEFT, and press A to collect "
+                    "it; this interaction is required, not optional. Then "
+                    "continue west to ladder (2,6)."
+                )
+            target = "(2,6), which enters 2F's final component"
+        elif (
+            isinstance(position[0], int)
+            and isinstance(position[1], int)
+            and 5 <= position[0] <= 14
+            and position[1] >= 3
+        ):
+            target = "(6,4), which enters 2F's first component"
+        else:
+            target = "(2,6), which enters 2F's final component"
+        return prefix + (
+            f"Sprout Tower's required ladder chain continues at {target}. "
+            "Defeat unavoidable Sages and do not exit through (9,15)/(10,15)."
+        )
+    if (group, number) == (0x03, 0x02):
+        target = (
+            "(10,14), which enters Sprout Tower 3F"
+            if (
+                isinstance(position[0], int)
+                and isinstance(position[1], int)
+                and (position[0] <= 4 or position[1] >= 8)
+            )
+            else "(17,3), which returns to 1F's eastern component"
+        )
+        return prefix + f"Continue the required Sprout Tower route to {target}."
+    if (group, number) == (0x03, 0x03):
+        return prefix + (
+            "Traverse 3F from ladder (10,14), defeat the required Sages, then "
+            "battle Elder Li at (10,2) and receive HM05 Flash."
+        )
+    return None
+
+
 def trusted_story_route_action(game_state: dict[str, Any]) -> Optional[str]:
     """Return one verified cardinal step for fragile completed-story routes."""
+    if game_state.get("game_id") == "gold":
+        return trusted_gold_route_action(game_state)
+    if game_state.get("game_id") not in {None, "red"}:
+        return None
     badges = game_state.get("badges")
     seafoam = game_state.get("seafoam_boulders")
     coordinates = game_state.get("coordinates")
@@ -13024,6 +13886,20 @@ def trusted_story_route_action(game_state: dict[str, Any]) -> Optional[str]:
     position = (coordinates.get("x"), coordinates.get("y"))
     if not all(isinstance(value, int) for value in position):
         return None
+    if (
+        game_state.get("hall_of_fame_completed") is True
+        and game_state.get("mewtwo_caught") is not True
+    ):
+        shore_action = MEWTWO_SHORE_ROUTE_ACTIONS.get(
+            (map_id, position[0], position[1])
+        )
+        if shore_action is not None:
+            return shore_action
+        cave_action = MEWTWO_CAVE_ROUTE_ACTIONS.get(
+            (map_id, position[0], position[1])
+        )
+        if cave_action is not None:
+            return cave_action
     switches_2f = game_state.get("victory_road_2_switches")
     if (
         isinstance(badges, list)
@@ -13307,6 +14183,319 @@ def trusted_story_route_action(game_state: dict[str, Any]) -> Optional[str]:
         (0xA1, 24, 4): "right",
     }
     return verified_steps.get((map_id, position[0], position[1]))
+
+
+def trusted_gold_route_action(game_state: dict[str, Any]) -> Optional[str]:
+    """Return verified early Gold route steps only while their story gate holds."""
+    if game_state.get("screen_text"):
+        return None
+    coordinates = game_state.get("coordinates")
+    story_events = game_state.get("story_events")
+    if not isinstance(coordinates, dict) or not isinstance(story_events, dict):
+        return None
+    position = (coordinates.get("x"), coordinates.get("y"))
+    if not all(isinstance(value, int) for value in position):
+        return None
+    party = game_state.get("party")
+    lead_needs_center = bool(
+        isinstance(party, list)
+        and party
+        and isinstance(party[0], dict)
+        and isinstance(party[0].get("hp"), int)
+        and isinstance(party[0].get("max_hp"), int)
+        and party[0]["max_hp"] > 0
+        and party[0]["hp"] * 3 < party[0]["max_hp"]
+    )
+    returning_egg = bool(
+        story_events.get("got_mystery_egg") is True
+        and story_events.get("gave_mystery_egg_to_elm") is not True
+    )
+    current_map = (
+        game_state.get("map_group"),
+        game_state.get("map_number"),
+    )
+    if lead_needs_center:
+        heal_action = GOLD_SPROUT_HEAL_EXIT_ACTIONS.get(
+            (current_map[0], current_map[1], position[0], position[1])
+        )
+        if heal_action is not None:
+            return heal_action
+        return None
+    if (
+        current_map == (0x03, 0x01)
+        and story_events.get("beat_sage_chow") is True
+    ):
+        chow_action = GOLD_SPROUT_POST_CHOW_ACTIONS.get(position)
+        if chow_action is not None:
+            return chow_action
+    if (
+        current_map == (0x03, 0x02)
+        and story_events.get("beat_sage_chow") is True
+    ):
+        east_action = GOLD_SPROUT_2F_EAST_ACTIONS.get(position)
+        if east_action is not None:
+            return east_action
+    if current_map == (0x03, 0x03):
+        entry_action = GOLD_SPROUT_3F_ENTRY_ACTIONS.get(position)
+        if entry_action is not None:
+            return entry_action
+    if current_map == (0x18, 0x03):
+        actions = (
+            GOLD_ROUTE_29_RETURN_ACTIONS
+            if returning_egg
+            else GOLD_ROUTE_29_ACTIONS
+        )
+        return actions.get(position)
+    if (
+        current_map == (0x1A, 0x01)
+        and story_events.get("gave_mystery_egg_to_elm") is True
+    ):
+        return GOLD_ROUTE_30_ACTIONS.get(position)
+    if (
+        current_map == (0x1A, 0x02)
+        and story_events.get("gave_mystery_egg_to_elm") is True
+    ):
+        return GOLD_ROUTE_31_ACTIONS.get(position)
+    if (
+        current_map == (0x1A, 0x0B)
+        and story_events.get("gave_mystery_egg_to_elm") is True
+    ):
+        return GOLD_ROUTE_31_GATE_ACTIONS.get(position)
+    if (
+        current_map == (0x0A, 0x05)
+        and story_events.get("got_hm_flash") is not True
+    ):
+        return GOLD_VIOLET_TOWER_ACTIONS.get(position)
+    badges = game_state.get("badges")
+    if (
+        current_map == (0x0A, 0x05)
+        and isinstance(badges, list)
+        and badges == ["Zephyr"]
+    ):
+        return GOLD_VIOLET_ROUTE32_ACTIONS.get(position)
+    if (
+        current_map == (0x0A, 0x01)
+        and game_state.get("badges") == ["Zephyr"]
+    ):
+        if position == (10, 81):
+            return "down"
+        if position[1] == 82 and 8 <= position[0] <= 10:
+            return "left"
+        if position == (7, 82) or position == (7, 81):
+            return "up"
+        if position == (7, 80):
+            return "left"
+        if position == (6, 80):
+            return "up"
+    if (
+        current_map == (0x03, 0x1D)
+        and story_events.get("beat_hiker_daniel") is not True
+    ):
+        daniel_action = GOLD_UNION_CAVE_DANIEL_ACTIONS.get(position)
+        if daniel_action is not None:
+            return daniel_action
+    if (
+        current_map == (0x03, 0x1D)
+        and story_events.get("beat_pokemaniac_larry") is not True
+    ):
+        larry_action = GOLD_UNION_CAVE_LARRY_ACTIONS.get(position)
+        if larry_action is not None:
+            return larry_action
+    if current_map == (0x0A, 0x07):
+        if story_events.get("beat_bird_keeper_rod") is not True:
+            if position in {(4, 8), (5, 8), (6, 8), (7, 8)}:
+                return "left"
+            if position in {(3, 8), (3, 7)}:
+                return "up"
+            if position == (3, 6):
+                return "right"
+    return None
+
+
+def trusted_mewtwo_surf_buttons(
+    game_state: dict[str, Any],
+) -> Optional[list[str]]:
+    """Navigate the current UI stage toward Surf at verified shorelines."""
+    coordinates = game_state.get("coordinates")
+    key_items = game_state.get("key_items")
+    party = game_state.get("party")
+    if (
+        game_state.get("hall_of_fame_completed") is not True
+        or game_state.get("mewtwo_caught") is True
+        or game_state.get("surfing") is not False
+        or not isinstance(coordinates, dict)
+        or not isinstance(key_items, dict)
+        or key_items.get("hm_surf") is not True
+        or not isinstance(party, list)
+        or not party
+        or not isinstance(party[0], dict)
+        or party[0].get("nickname") != "BLASTOISE"
+    ):
+        return None
+    position = (
+        game_state.get("map_id"),
+        coordinates.get("x"),
+        coordinates.get("y"),
+    )
+    if position not in MEWTWO_CAVE_SURF_SHORES:
+        return None
+    screen_text = str(game_state.get("screen_text") or "")
+    cursor = game_state.get("menu_cursor_index")
+    if not screen_text:
+        return ["down", "start"]
+    if "POKDEX" in screen_text and "SAVE" in screen_text:
+        if cursor == 0:
+            return ["down"]
+        if isinstance(cursor, int) and cursor > 1:
+            return ["up"]
+        return ["a"] if cursor == 1 else None
+    if "Choose a POKMON" in screen_text and "BLASTOISE" in screen_text:
+        if isinstance(cursor, int) and cursor > 0:
+            return ["up"]
+        return ["a"] if cursor == 0 else None
+    if (
+        "SURF" in screen_text
+        and "STRENGTH" in screen_text
+        and "STATS" in screen_text
+    ):
+        if isinstance(cursor, int) and cursor > 0:
+            return ["up"]
+        return ["a", "a"] if cursor == 0 else None
+    if "used SURF" in screen_text or "got on BLASTOISE" in screen_text:
+        return ["a"]
+    # A stale Pokédex, stats, or item screen can only have come from a prior
+    # interrupted attempt at this exact shoreline; back out one UI level.
+    return ["b"]
+
+
+def trusted_mewtwo_capture_buttons(
+    game_state: dict[str, Any],
+) -> Optional[list[str]]:
+    """Advance only the verified Mewtwo encounter and Master Ball flow."""
+    coordinates = game_state.get("coordinates")
+    key_items = game_state.get("key_items")
+    if (
+        game_state.get("hall_of_fame_completed") is not True
+        or game_state.get("mewtwo_caught") is True
+        or game_state.get("mewtwo_encounter_resolved") is True
+        or game_state.get("map_id") != 0xE3
+        or not isinstance(coordinates, dict)
+        or (coordinates.get("x"), coordinates.get("y")) != (27, 14)
+        or not isinstance(key_items, dict)
+        or key_items.get("master_ball") is not True
+    ):
+        return None
+    screen_text = str(game_state.get("screen_text") or "")
+    if game_state.get("in_battle") is not True:
+        return ["a"] if "Mew!" in screen_text else ["up", "a"]
+    if game_state.get("enemy_species_id") == 0:
+        return ["a"]
+    if game_state.get("enemy_species_id") != 0x83:
+        return None
+    if "FIGHT" in screen_text and "ITEM" in screen_text:
+        return ["down", "a"]
+    item_menu_tokens = (
+        "TOWN MAP",
+        "HELIX FOSSIL",
+        "S.S.TICKET",
+        "BIKE VOUCHER",
+        "MOON STONE",
+        "COIN CASE",
+        "LIFT KEY",
+        "SILPH SCOPE",
+        "POK FLUTE",
+        "CARD KEY",
+        "MASTER BALL",
+    )
+    if any(token in screen_text for token in item_menu_tokens):
+        cursor = game_state.get("menu_cursor_index")
+        target = game_state.get("master_ball_bag_index")
+        if not isinstance(cursor, int) or not isinstance(target, int):
+            return None
+        if cursor < target:
+            return ["down"]
+        if cursor > target:
+            return ["up"]
+        return ["a"]
+    # Battle introductions, throw animations, and capture dialogue all advance
+    # safely with A; the battle command menu is handled above before any A.
+    return ["a"]
+
+
+def trusted_mewtwo_finalize_buttons(
+    game_state: dict[str, Any],
+) -> Optional[list[str]]:
+    """Finish capture dialogue and write the completed run to the in-game save."""
+    coordinates = game_state.get("coordinates")
+    if (
+        game_state.get("mewtwo_caught") is not True
+        or game_state.get("map_id") != 0xE3
+        or not isinstance(coordinates, dict)
+        or (coordinates.get("x"), coordinates.get("y")) != (27, 14)
+    ):
+        return None
+    screen_text = str(game_state.get("screen_text") or "")
+    cursor = game_state.get("menu_cursor_index")
+    if (
+        game_state.get("in_battle") is True
+        or game_state.get("mewtwo_encounter_resolved") is not True
+    ):
+        if (
+            "YES" in screen_text
+            and "NO" in screen_text
+            and "nickname" in screen_text
+        ):
+            return ["down", "a"]
+        return ["a"]
+    if "RED saved" in screen_text:
+        return None
+    if not screen_text:
+        return ["start"]
+    if "YES" in screen_text and "NO" in screen_text:
+        if isinstance(cursor, int) and cursor > 0:
+            return ["up"]
+        return ["a"] if cursor == 0 else None
+    if "POKDEX" in screen_text and "SAVE" in screen_text:
+        if isinstance(cursor, int) and cursor < 4:
+            return ["down"]
+        if isinstance(cursor, int) and cursor > 4:
+            return ["up"]
+        return ["a"] if cursor == 4 else None
+    if "Would you like to" in screen_text or "Now saving" in screen_text:
+        return ["a"]
+    return ["a"]
+
+
+def trusted_cerulean_cave_flee_buttons(
+    game_state: dict[str, Any],
+) -> Optional[list[str]]:
+    """Run from ordinary cave encounters without touching static Mewtwo."""
+    coordinates = game_state.get("coordinates")
+    if (
+        game_state.get("hall_of_fame_completed") is not True
+        or game_state.get("mewtwo_caught") is True
+        or game_state.get("map_id") not in {0xE2, 0xE3, 0xE4}
+        or game_state.get("in_battle") is not True
+        or not isinstance(coordinates, dict)
+        or (
+            game_state.get("map_id") == 0xE3
+            and (coordinates.get("x"), coordinates.get("y")) == (27, 14)
+        )
+    ):
+        return None
+    screen_text = str(game_state.get("screen_text") or "")
+    if "FIGHT" not in screen_text or "RUN" not in screen_text:
+        return ["a"]
+    cursor = game_state.get("menu_cursor_index")
+    if cursor == 0:
+        return ["down", "right", "a"]
+    if cursor == 1:
+        return ["down", "a"]
+    if cursor == 2:
+        return ["right", "a"]
+    if cursor == 3:
+        return ["a"]
+    return None
 
 
 class ClipRecorder:
@@ -13606,6 +14795,34 @@ Make progress deliberately:
 
 Valid buttons are: {", ".join(VALID_BUTTONS)}."""
 
+GOLD_SYSTEM_PROMPT = f"""You are the autonomous player in Copilot Plays Pokemon Gold.
+Your long-term goal is to complete both regions: defeat the Elite Four, earn
+all sixteen badges, unlock Mt. Silver, and defeat Red at the summit.
+Each user message includes the current game state and a PNG screenshot.
+Never use tools. Return only the requested JSON object.
+
+Make progress deliberately:
+- Advance title screens and dialogue with A or Start. Choose CONTINUE after a
+  restart and never choose NEW GAME when a save exists.
+- Prefer Totodile when choosing a starter, but adapt to existing progress.
+- In battle, read the screen before choosing Fight, a move, an item, or Run.
+- In the overworld, use the screenshot and collision grid to avoid loops.
+- Follow required story objectives before optional training or collecting.
+- Remember the campaign order: Johto gyms and Team Rocket, the Pokemon League,
+  the S.S. Aqua and Kanto gyms, Professor Oak's Mt. Silver access, then Red.
+- Do not issue more than {MAX_BUTTONS_PER_DECISION} buttons. In corridors,
+  batch only 2-6 identical directions; use 1-3 inputs near turns, NPCs, doors,
+  menus, warps, ledges, puzzles, or unseen tiles.
+- Set action_mode to precision whenever uncertain or near an interaction.
+- A black or fade screen does not prove a transition. Reobserve before acting.
+- Interact only with NPCs or objects relevant to the current objective.
+- Never repeat an input that produced no visible change without first choosing
+  a materially different action.
+- Set checkpoint true after a badge, major story event, important new
+  location, Elite Four completion, or Red's defeat.
+
+Valid buttons are: {", ".join(VALID_BUTTONS)}."""
+
 
 class CopilotBrain:
     def __init__(
@@ -13615,6 +14832,7 @@ class CopilotBrain:
         timeout_seconds: int = 180,
         reasoning_effort: str = DEFAULT_REASONING_EFFORT,
         max_decisions_per_session: int = MAX_DECISIONS_PER_SESSION,
+        system_prompt: str = GAME_SYSTEM_PROMPT,
     ):
         self.model = model
         self.runtime_dir = runtime_dir
@@ -13626,6 +14844,7 @@ class CopilotBrain:
             )
         self.reasoning_effort = reasoning_effort
         self.max_decisions_per_session = max_decisions_per_session
+        self.system_prompt = system_prompt
         if sys.version_info < (3, 11) or importlib.util.find_spec("copilot") is None:
             raise RuntimeError(
                 "Copilot Plays Pokemon requires Python 3.11+ and github-copilot-sdk"
@@ -13697,7 +14916,10 @@ class CopilotBrain:
         self.session = await self.client.create_session(
             model=self.model,
             reasoning_effort=self.reasoning_effort,
-            system_message={"mode": "replace", "content": GAME_SYSTEM_PROMPT},
+            system_message={
+                "mode": "replace",
+                "content": getattr(self, "system_prompt", GAME_SYSTEM_PROMPT),
+            },
             available_tools=[],
             skip_custom_instructions=True,
             enable_session_store=False,
@@ -15201,6 +16423,17 @@ class PokemonRunner:
             )
         self.run_id = uuid.uuid4().hex[:12]
         self.rom = Path(args.rom).expanduser().resolve()
+        self.game_id = pokemon_game_id(self.rom) or "red"
+        self.memory_reader_class = (
+            PokemonMemoryReader
+            if self.game_id == "red"
+            else PokemonGoldMemoryReader
+        )
+        self.system_prompt = (
+            GAME_SYSTEM_PROMPT
+            if self.game_id == "red"
+            else GOLD_SYSTEM_PROMPT
+        )
         self.runtime_dir = Path(args.runtime_dir).expanduser().resolve()
         self.runtime_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
         os.chmod(self.runtime_dir, 0o700)
@@ -15312,7 +16545,13 @@ class PokemonRunner:
         self.rom_sha256 = self._rom_sha256()
         self.ram_path = (
             self.runtime_dir
-            / f"pokemon-red-{self.rom_sha256[:16]}.ram"
+            / f"pokemon-{self.game_id}-{self.rom_sha256[:16]}.ram"
+        )
+        self.rtc_path = (
+            self.runtime_dir
+            / f"pokemon-gold-{self.rom_sha256[:16]}.rtc"
+            if self.game_id == "gold"
+            else None
         )
         self.status: dict[str, Any] = {
             "running": True,
@@ -15323,6 +16562,7 @@ class PokemonRunner:
             "started_at": utc_now(),
             "updated_at": utc_now(),
             "rom_title": rom_title(self.rom),
+            "game_id": self.game_id,
             "rom_sha256": self.rom_sha256,
             "rom_path": str(self.rom),
             "runtime_dir": str(self.runtime_dir),
@@ -15367,7 +16607,14 @@ class PokemonRunner:
             "observation": "",
             "phase": "other",
             "reason": "",
-            "objective": "Start Pokemon Red and work toward the Hall of Fame",
+            "objective": (
+                "Start Pokemon Red and work toward the Hall of Fame"
+                if self.game_id == "red"
+                else (
+                    "Start Pokemon Gold, defeat the Elite Four, earn all "
+                    "sixteen badges, and defeat Red"
+                )
+            ),
             "last_action": [],
             "last_error": None,
             "game_state": {},
@@ -16132,6 +17379,8 @@ class PokemonRunner:
                 self.runtime_dir,
                 self.args.decision_timeout,
                 self.reasoning_effort,
+                MAX_DECISIONS_PER_SESSION,
+                getattr(self, "system_prompt", GAME_SYSTEM_PROMPT),
             )
             self.brain = brain
             brain.start()
@@ -16375,7 +17624,10 @@ class PokemonRunner:
             if not state_path.exists():
                 pending_path.unlink(missing_ok=True)
             raise
-        game_state = PokemonMemoryReader(self.pyboy.memory).snapshot()
+        reader_class = getattr(
+            self, "memory_reader_class", PokemonMemoryReader
+        )
+        game_state = reader_class(self.pyboy.memory).snapshot()
         manifest = {
             "schema_version": 1,
             "created_at": created_at,
@@ -16663,7 +17915,10 @@ class PokemonRunner:
 
     def _validated_ram_path(self) -> Optional[Path]:
         self._recover_ram_transaction()
-        if not any(path.exists() for path in self._ram_backup_paths()):
+        if (
+            getattr(self, "game_id", "red") == "red"
+            and not any(path.exists() for path in self._ram_backup_paths())
+        ):
             self._adopt_legacy_ram()
         if not self.ram_path.exists():
             return None
@@ -16675,18 +17930,94 @@ class PokemonRunner:
             return None
         return self.ram_path
 
+    def _recover_rtc_transaction(self) -> None:
+        rtc_path = getattr(self, "rtc_path", None)
+        if not isinstance(rtc_path, Path):
+            return
+        manifest = read_json(self.ram_path.with_suffix(".json"))
+        expected = manifest.get("rtc_sha256")
+        temporary = self.runtime_dir / f".{rtc_path.name}.tmp"
+        backup = self.runtime_dir / f".{rtc_path.name}.backup"
+
+        def matches(path: Path) -> bool:
+            try:
+                return bool(expected and path.is_file() and file_sha256(path) == expected)
+            except OSError:
+                return False
+
+        if matches(rtc_path):
+            temporary.unlink(missing_ok=True)
+            backup.unlink(missing_ok=True)
+            return
+        for candidate in (temporary, backup):
+            if matches(candidate):
+                rtc_path.unlink(missing_ok=True)
+                os.replace(candidate, rtc_path)
+                os.chmod(rtc_path, 0o600)
+                temporary.unlink(missing_ok=True)
+                backup.unlink(missing_ok=True)
+                fsync_directory(self.runtime_dir)
+                return
+        if rtc_path.exists() or temporary.exists() or backup.exists():
+            self.status["ram_warning"] = (
+                "Ignored Pokemon Gold RTC data without matching provenance"
+            )
+
+    def _validated_rtc_path(self) -> Optional[Path]:
+        rtc_path = getattr(self, "rtc_path", None)
+        if not isinstance(rtc_path, Path):
+            return None
+        self._recover_rtc_transaction()
+        manifest = read_json(self.ram_path.with_suffix(".json"))
+        expected = manifest.get("rtc_sha256")
+        try:
+            if expected and rtc_path.is_file() and file_sha256(rtc_path) == expected:
+                return rtc_path
+        except OSError:
+            pass
+        return None
+
     def _save_ram_and_stop(self) -> None:
         temporary = self.runtime_dir / f".{self.ram_path.name}.tmp"
+        rtc_path = getattr(self, "rtc_path", None)
+        temporary_rtc = (
+            self.runtime_dir / f".{rtc_path.name}.tmp"
+            if isinstance(rtc_path, Path)
+            else None
+        )
+        backup_rtc = (
+            self.runtime_dir / f".{rtc_path.name}.backup"
+            if isinstance(rtc_path, Path)
+            else None
+        )
         manifest_path = self.ram_path.with_suffix(".json")
         backup_ram, backup_manifest = self._ram_backup_paths()
         pending_path = self._ram_pending_path()
         self._recover_ram_transaction()
+        self._recover_rtc_transaction()
         backed_up = self._ram_pair_valid(self.ram_path, manifest_path)
         backup_started = False
         backup_installed = False
         try:
             with temporary.open("w+b") as ram_output:
-                self.pyboy.stop(save=True, ram_file=ram_output)
+                rtc_output = (
+                    temporary_rtc.open("w+b")
+                    if temporary_rtc is not None
+                    else None
+                )
+                try:
+                    stop_kwargs = {
+                        "save": True,
+                        "ram_file": ram_output,
+                    }
+                    if rtc_output is not None:
+                        stop_kwargs["rtc_file"] = rtc_output
+                    self.pyboy.stop(**stop_kwargs)
+                finally:
+                    if rtc_output is not None:
+                        rtc_output.flush()
+                        os.fsync(rtc_output.fileno())
+                        rtc_output.close()
                 ram_output.flush()
                 os.fsync(ram_output.fileno())
             manifest = {
@@ -16696,15 +18027,27 @@ class PokemonRunner:
                 "sha256": file_sha256(temporary),
                 "bytes": temporary.stat().st_size,
             }
+            if temporary_rtc is not None and temporary_rtc.stat().st_size:
+                manifest["rtc_sha256"] = file_sha256(temporary_rtc)
+                manifest["rtc_bytes"] = temporary_rtc.stat().st_size
             atomic_write_json(pending_path, manifest)
             if backed_up:
                 backup_started = True
                 os.replace(self.ram_path, backup_ram)
                 os.replace(manifest_path, backup_manifest)
+                if (
+                    isinstance(rtc_path, Path)
+                    and isinstance(backup_rtc, Path)
+                    and rtc_path.exists()
+                ):
+                    os.replace(rtc_path, backup_rtc)
                 backup_installed = True
                 fsync_directory(self.runtime_dir)
             os.replace(temporary, self.ram_path)
             os.chmod(self.ram_path, 0o600)
+            if temporary_rtc is not None and isinstance(rtc_path, Path):
+                os.replace(temporary_rtc, rtc_path)
+                os.chmod(rtc_path, 0o600)
             fsync_directory(self.runtime_dir)
             atomic_write_json(manifest_path, manifest)
         except Exception:
@@ -16717,8 +18060,17 @@ class PokemonRunner:
                 manifest_path.unlink(missing_ok=True)
                 os.replace(backup_ram, self.ram_path)
                 os.replace(backup_manifest, manifest_path)
+                if (
+                    isinstance(rtc_path, Path)
+                    and isinstance(backup_rtc, Path)
+                    and backup_rtc.exists()
+                ):
+                    rtc_path.unlink(missing_ok=True)
+                    os.replace(backup_rtc, rtc_path)
                 pending_path.unlink(missing_ok=True)
                 temporary.unlink(missing_ok=True)
+                if temporary_rtc is not None:
+                    temporary_rtc.unlink(missing_ok=True)
                 fsync_directory(self.runtime_dir)
             elif backup_started:
                 try:
@@ -16728,13 +18080,19 @@ class PokemonRunner:
             elif backed_up:
                 pending_path.unlink(missing_ok=True)
                 temporary.unlink(missing_ok=True)
+                if temporary_rtc is not None:
+                    temporary_rtc.unlink(missing_ok=True)
                 fsync_directory(self.runtime_dir)
             elif not pending_path.exists():
                 temporary.unlink(missing_ok=True)
+                if temporary_rtc is not None:
+                    temporary_rtc.unlink(missing_ok=True)
             raise
         else:
             backup_ram.unlink(missing_ok=True)
             backup_manifest.unlink(missing_ok=True)
+            if backup_rtc is not None:
+                backup_rtc.unlink(missing_ok=True)
             pending_path.unlink(missing_ok=True)
             fsync_directory(self.runtime_dir)
 
@@ -17554,6 +18912,26 @@ class PokemonRunner:
             LOGGER.error("Copilot decision error: %s", result["error"])
             return
 
+        current_game_state = self.status.get("game_state")
+        if (
+            isinstance(current_game_state, dict)
+            and (
+                trusted_story_route_action(current_game_state) is not None
+                or trusted_mewtwo_surf_buttons(current_game_state) is not None
+                or trusted_mewtwo_capture_buttons(current_game_state) is not None
+                or trusted_mewtwo_finalize_buttons(current_game_state) is not None
+            )
+        ):
+            self.status["last_discarded_decision"] = {
+                "decision_id": decision_id,
+                "reason": "trusted route became applicable",
+                "timestamp": utc_now(),
+            }
+            self.status["brain_status"] = "idle"
+            self.navigation_memory.cancel_pending()
+            self.last_decision_finished = 0
+            return
+
         decision = result["decision"]
         # The strict one-cardinal contract applies only to settled overworld
         # puzzle decisions. A battle, item pickup, or dialogue that begins
@@ -17749,6 +19127,9 @@ class PokemonRunner:
             "solved_route",
             "frontier_coverage",
             "trusted_story_route",
+            "trusted_mewtwo_capture",
+            "trusted_mewtwo_finalize",
+            "trusted_cerulean_cave_flee",
             "operator",
         }
         if source not in allowed_sources:
@@ -17932,10 +19313,26 @@ class PokemonRunner:
         self, game_state: dict[str, Any]
     ) -> bool:
         """Issue one coordinate-verified story step without changing AI ownership."""
-        if self.status.get("phase") != "overworld":
-            return False
         position = navigation_position(game_state)
         if position is None:
+            return False
+        field_move_buttons = trusted_mewtwo_surf_buttons(game_state)
+        cave_ram_overworld = bool(
+            position[0] in {0xE2, 0xE3, 0xE4}
+            and game_state.get("in_battle") is False
+            and not game_state.get("screen_text")
+        )
+        gold_ram_overworld = bool(
+            game_state.get("game_id") == "gold"
+            and game_state.get("in_battle") is False
+            and not game_state.get("screen_text")
+        )
+        if (
+            self.status.get("phase") != "overworld"
+            and field_move_buttons is None
+            and not cave_ram_overworld
+            and not gold_ram_overworld
+        ):
             return False
         direction = trusted_story_route_action(game_state)
         events = game_state.get("victory_road_3_events")
@@ -17970,9 +19367,9 @@ class PokemonRunner:
                     )
         elif getattr(self, "trusted_story_phase", None) == "vr3_hole":
             self.trusted_story_phase = None
-        if direction is None:
+        if direction is None and field_move_buttons is None:
             return False
-        buttons = [direction]
+        buttons = field_move_buttons or [direction]
         boulder = game_state.get("victory_road_1_boulder")
         route_switch_pending = bool(
             position[0] == 0x6C
@@ -18020,22 +19417,23 @@ class PokemonRunner:
             ):
                 boulder = boulders[3]
                 route_switch_pending = True
-        direction_delta = {
-            "up": (0, -1),
-            "down": (0, 1),
-            "left": (-1, 0),
-            "right": (1, 0),
-        }[direction]
-        if (
-            route_switch_pending
-            and isinstance(boulder, dict)
-            and (
-                position[1] + direction_delta[0],
-                position[2] + direction_delta[1],
-            )
-            == (boulder.get("x"), boulder.get("y"))
-        ):
-            buttons.append(direction)
+        if direction is not None:
+            direction_delta = {
+                "up": (0, -1),
+                "down": (0, 1),
+                "left": (-1, 0),
+                "right": (1, 0),
+            }[direction]
+            if (
+                route_switch_pending
+                and isinstance(boulder, dict)
+                and (
+                    position[1] + direction_delta[0],
+                    position[2] + direction_delta[1],
+                )
+                == (boulder.get("x"), boulder.get("y"))
+            ):
+                buttons.append(direction)
         self.committed_route = None
         self.status["committed_route"] = None
         self.navigation_memory.finish(position)
@@ -18059,6 +19457,50 @@ class PokemonRunner:
         self.status["gameplay_progress_at"] = utc_now()
         self.status["committed_route"] = {
             "source": "trusted_story_route",
+            "remaining": None,
+        }
+        return True
+
+    def _advance_trusted_mewtwo_capture(
+        self, game_state: dict[str, Any]
+    ) -> bool:
+        """Keep the static encounter on the non-attacking Master Ball path."""
+        position = navigation_position(game_state)
+        buttons = trusted_mewtwo_finalize_buttons(game_state)
+        source = "trusted_mewtwo_finalize"
+        if buttons is None:
+            buttons = trusted_mewtwo_capture_buttons(game_state)
+            source = "trusted_mewtwo_capture"
+        if buttons is None:
+            buttons = trusted_cerulean_cave_flee_buttons(game_state)
+            source = "trusted_cerulean_cave_flee"
+        if position is None or buttons is None:
+            return False
+        self.committed_route = None
+        self.status["committed_route"] = None
+        self.navigation_memory.finish(position)
+        self.navigation_memory.begin(
+            list(position),
+            buttons,
+            phase=str(self.status.get("phase") or "other"),
+        )
+        self._record_execution_evidence(
+            source=source,
+            buttons=buttons,
+            game_state=game_state,
+        )
+        self.player.replace(buttons)
+        self.settle_candidate = None
+        self.settle_samples = 0
+        self.position_settled = False
+        self.last_decision_finished = (
+            time.monotonic() + TRUSTED_STORY_SETTLE_SECONDS
+        )
+        self.status["brain_status"] = "route"
+        self.status["last_action"] = buttons
+        self.status["gameplay_progress_at"] = utc_now()
+        self.status["committed_route"] = {
+            "source": source,
             "remaining": None,
         }
         return True
@@ -18222,6 +19664,22 @@ class PokemonRunner:
         if badge_count > self.last_badges:
             self.last_badges = badge_count
             self._rotate_clip(f"Badge milestone: {game_state['badges'][-1]}")
+        if getattr(self, "game_id", "red") == "gold":
+            if (
+                game_state.get("elite_four_completed") is True
+                and not self.status.get("gold_elite_four_completed")
+            ):
+                self.status["gold_elite_four_completed"] = True
+                self._rotate_clip("Pokemon Gold milestone: Elite Four completed")
+            if (
+                game_state.get("red_defeated") is True
+                and not self.status.get("completed")
+            ):
+                self.status["completed"] = True
+                self.status["red_defeated"] = True
+                self._rotate_clip("Pokemon Gold completed: Red defeated")
+                self._set_control_mode("paused")
+            return
         if game_state.get("hall_of_fame") and not self.status["completed"]:
             self.status["completed"] = True
             self._rotate_clip("Pokemon Red completed: Hall of Fame")
@@ -18233,8 +19691,36 @@ class PokemonRunner:
             self.status["mewtwo_caught"] = True
             self._rotate_clip("Postgame milestone: Mewtwo caught")
             self._set_control_mode("paused")
+        if (
+            game_state.get("mewtwo_caught") is True
+            and game_state.get("mewtwo_encounter_resolved") is True
+            and "RED saved" in str(game_state.get("screen_text") or "")
+            and not self.status.get("red_final_save_completed")
+        ):
+            self.status["red_final_save_completed"] = True
+            self._rotate_clip("Final Pokemon Red save persisted")
+            self._set_control_mode("paused")
 
     def _restore_completed_state(self, game_state: dict[str, Any]) -> bool:
+        if getattr(self, "game_id", "red") == "gold":
+            elite_four_completed = (
+                game_state.get("elite_four_completed") is True
+                and isinstance(game_state.get("badges"), list)
+                and len(game_state["badges"]) >= 8
+            )
+            red_defeated = bool(
+                elite_four_completed
+                and len(game_state["badges"]) == len(GOLD_BADGE_NAMES)
+                and game_state.get("red_defeated") is True
+            )
+            if elite_four_completed:
+                self.status["gold_elite_four_completed"] = True
+            if red_defeated:
+                self.status["completed"] = True
+                self.status["red_defeated"] = True
+                if getattr(self, "control_mode", None) != "paused":
+                    self._set_control_mode("paused")
+            return elite_four_completed or red_defeated
         hall_of_fame_map = game_state.get("hall_of_fame") is True
         hall_of_fame = bool(
             hall_of_fame_map
@@ -18448,8 +19934,10 @@ class PokemonRunner:
         (self.runtime_dir / "pid").unlink(missing_ok=True)
 
     def run(self) -> None:
-        if not is_pokemon_red_rom(self.rom):
-            raise StartupConfigurationError(f"Not a Pokemon Red ROM: {self.rom}")
+        if pokemon_game_id(self.rom) is None:
+            raise StartupConfigurationError(
+                f"Not a supported Pokemon ROM: {self.rom}"
+            )
         existing = read_json(self.status_path)
         if (
             process_is_alive(existing.get("pid"))
@@ -18471,8 +19959,12 @@ class PokemonRunner:
 
         window = "SDL2" if self.args.visible else "null"
 
-        def create_emulator(ram_path: Optional[Path]) -> Any:
+        def create_emulator(
+            ram_path: Optional[Path],
+            rtc_path: Optional[Path],
+        ) -> Any:
             ram_input = ram_path.open("rb") if ram_path else None
+            rtc_input = rtc_path.open("rb") if rtc_path else None
             try:
                 with self.rom.open("rb") as rom_input:
                     return PyBoy(
@@ -18482,19 +19974,27 @@ class PokemonRunner:
                         sound_volume=0,
                         sound_emulated=True,
                         ram_file=ram_input,
+                        rtc_file=rtc_input,
                     )
             finally:
                 if ram_input:
                     ram_input.close()
+                if rtc_input:
+                    rtc_input.close()
 
         validated_ram = self._validated_ram_path()
+        validated_rtc = (
+            self._validated_rtc_path()
+            if validated_ram is not None
+            else None
+        )
         try:
-            self.pyboy = create_emulator(validated_ram)
+            self.pyboy = create_emulator(validated_ram, validated_rtc)
         except emulator_errors as ram_error:
             if validated_ram is None:
                 raise
             try:
-                self.pyboy = create_emulator(None)
+                self.pyboy = create_emulator(None, None)
             except emulator_errors as retry_error:
                 raise retry_error from ram_error
             self._quarantine_ram(f"PyBoy rejected cartridge RAM: {ram_error}")
@@ -18508,7 +20008,7 @@ class PokemonRunner:
 
         loaded_state = self._load_latest_state()
         self.status["loaded_state"] = str(loaded_state) if loaded_state else None
-        reader = PokemonMemoryReader(self.pyboy.memory)
+        reader = self.memory_reader_class(self.pyboy.memory)
         initial_state = reader.snapshot()
         self._restore_completed_state(initial_state)
         self.last_badges = len(initial_state.get("badges", []))
@@ -18710,7 +20210,8 @@ class PokemonRunner:
                     # slot one verified cardinal at a time; any surprise
                     # aborts and the same slot requests a fresh decision.
                     if (
-                        not self._advance_trusted_story_route(game_state)
+                        not self._advance_trusted_mewtwo_capture(game_state)
+                        and not self._advance_trusted_story_route(game_state)
                         and not self._advance_committed_route(game_state)
                     ):
                         self._request_decision(

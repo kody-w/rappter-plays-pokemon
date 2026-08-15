@@ -25,6 +25,7 @@ from openrappter.agents.pokemon_agent import (
     VIEWER_HTML,
     VIEWER_JS,
     ActionPlayer,
+    PokemonGoldMemoryReader,
     PokemonMemoryReader,
     PokemonRunner,
     ViewerServer,
@@ -269,6 +270,121 @@ def test_mewtwo_capture_requires_owned_dex_150_bit():
     set_dex_bit(memory, 0xD2F7, 150)
 
     assert reader.snapshot()["mewtwo_caught"] is True
+
+
+def test_surfing_state_reads_walk_bike_surf_memory():
+    memory = bytearray(65536)
+    reader = PokemonMemoryReader(memory)
+
+    assert reader.snapshot()["surfing"] is False
+
+    memory[0xD700] = 2
+
+    assert reader.snapshot()["surfing"] is True
+
+
+def test_mewtwo_battle_and_master_ball_cursor_read_memory():
+    memory = bytearray(65536)
+    memory[0xD057] = 1
+    memory[0xD059] = 0x83
+    memory[0xCC36] = 13
+    memory[0xCC26] = 2
+    memory[0xD31D] = 2
+    memory[0xD31E] = 0x30
+    memory[0xD31F] = 1
+    memory[0xD320] = 0x01
+    memory[0xD321] = 1
+    memory[0xD322] = 0xFF
+
+    snapshot = PokemonMemoryReader(memory).snapshot()
+
+    assert snapshot["in_battle"] is True
+    assert snapshot["enemy_species_id"] == 0x83
+    assert snapshot["menu_cursor_index"] == 15
+    assert snapshot["master_ball_bag_index"] == 1
+
+
+def test_gold_reader_exposes_verified_generation_two_progress():
+    memory = bytearray(65536)
+    memory[0xDA00] = 0x18
+    memory[0xDA01] = 0x04
+    memory[0xDA02] = 5
+    memory[0xDA03] = 6
+    memory[0xDA22] = 1
+    memory[0xDA23] = 158
+    memory[0xDA24] = 0xFF
+    memory[0xDA2A] = 158
+    memory[0xDA2A + 0x1F] = 5
+    memory[0xDA2A + 0x22] = 0
+    memory[0xDA2A + 0x23] = 20
+    memory[0xDA2A + 0x24] = 0
+    memory[0xDA2A + 0x25] = 20
+    memory[0xD57C] = 0xFF
+    memory[0xD57D] = 0xFF
+    memory[0xD5E1] = 0
+    memory[0xD5E2] = 0xFF
+    memory[0xD116] = 1
+    memory[0xD0EF] = 16
+    memory[0xD7B7 + 0x0044 // 8] |= 1 << (0x0044 % 8)
+    memory[0xD7B7 + 0x0762 // 8] |= 1 << (0x0762 % 8)
+    memory[0xD7B7 + 0x001A // 8] |= 1 << (0x001A % 8)
+    memory[0xD7B7 + 0x001E // 8] |= 1 << (0x001E % 8)
+    memory[0xD7B7 + 0x0014 // 8] |= 1 << (0x0014 % 8)
+    memory[0xD7B7 + 0x0647 // 8] |= 1 << (0x0647 % 8)
+    memory[0xD7B7 + 0x0411 // 8] |= 1 << (0x0411 % 8)
+    memory[0xD7B7 + 0x03FB // 8] |= 1 << (0x03FB % 8)
+    memory[0xD7B7 + 0x03FC // 8] |= 1 << (0x03FC % 8)
+    memory[0xD7B7 + 0x002A // 8] |= 1 << (0x002A % 8)
+    memory[0xD7B7 + 0x0533 // 8] |= 1 << (0x0533 % 8)
+    memory[0xD7B7 + 0x04E2 // 8] |= 1 << (0x04E2 % 8)
+
+    snapshot = PokemonGoldMemoryReader(memory).snapshot()
+
+    assert snapshot["map_id"] == 0x1804
+    assert snapshot["location"] == "New Bark Town"
+    assert snapshot["coordinates"] == {"x": 6, "y": 5}
+    assert len(snapshot["badges"]) == 16
+    assert snapshot["party"] == [{
+        "nickname": "",
+        "species_id": 158,
+        "level": 5,
+        "hp": 20,
+        "max_hp": 20,
+    }]
+    assert snapshot["in_battle"] is True
+    assert snapshot["enemy_species_id"] == 16
+    assert snapshot["elite_four_completed"] is True
+    assert snapshot["red_defeated"] is True
+    assert snapshot["ultimate_run_completed"] is True
+    assert snapshot["story_events"] == {
+        "got_hm_flash": True,
+        "got_starter": True,
+        "got_mystery_egg": True,
+        "gave_mystery_egg_to_elm": False,
+        "beat_sage_chow": True,
+        "beat_bird_keeper_rod": True,
+        "beat_bird_keeper_abe": True,
+        "cleared_slowpoke_well": True,
+        "beat_hiker_daniel": True,
+        "beat_pokemaniac_larry": True,
+        "sprout_1f_parlyz_heal_collected": True,
+    }
+
+
+def test_gold_reader_does_not_decode_overworld_tiles_as_text():
+    memory = bytearray(65536)
+    memory[0xDA00] = 0x18
+    memory[0xDA01] = 0x03
+    memory[0xDA02] = 6
+    memory[0xDA03] = 33
+    memory[0xDA22] = 0
+    memory[0xD5E1] = 0
+    memory[0xD5E2] = 0xFF
+    memory[0xD15F] = 0
+    memory[0xD116] = 0
+    memory[0xC4A0 : 0xC4A0 + 360] = bytes([0xF6]) * 360
+
+    assert PokemonGoldMemoryReader(memory).snapshot()["screen_text"] == ""
 
 
 def test_hall_of_fame_completion_event_persists_postgame():
@@ -611,6 +727,31 @@ def test_resume_of_postgame_checkpoint_restores_completion_without_pause():
     }) is True
     assert runner.status["completed"] is True
     assert restored_modes == []
+
+
+def test_gold_restore_rejects_pre_mt_silver_red_visibility_flag():
+    runner = PokemonRunner.__new__(PokemonRunner)
+    runner.game_id = "gold"
+    runner.control_mode = "ai"
+    runner.status = {"completed": False}
+    restored_modes: list[str] = []
+    runner._set_control_mode = restored_modes.append
+
+    assert runner._restore_completed_state({
+        "badges": [],
+        "elite_four_completed": False,
+        "red_defeated": True,
+    }) is False
+    assert runner.status["completed"] is False
+    assert restored_modes == []
+
+    assert runner._restore_completed_state({
+        "badges": [f"badge-{index}" for index in range(16)],
+        "elite_four_completed": True,
+        "red_defeated": True,
+    }) is True
+    assert runner.status["completed"] is True
+    assert restored_modes == ["paused"]
 
 
 def test_dashboard_endpoint_is_authenticated_and_allowlisted(tmp_path):
