@@ -16,6 +16,7 @@ import json
 import socket
 import subprocess
 import threading
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
@@ -168,6 +169,14 @@ def project(
             "key_items": game_state.get("key_items"),
             "pokedex": game_state.get("pokedex"),
             "play_time": game_state.get("play_time"),
+            "hall_of_fame": game_state.get("hall_of_fame") is True,
+            "hall_of_fame_completed": (
+                game_state.get("hall_of_fame_completed") is True
+            ),
+            "mewtwo_caught": game_state.get("mewtwo_caught") is True,
+            "mewtwo_encounter_resolved": (
+                game_state.get("mewtwo_encounter_resolved") is True
+            ),
             "party": party,
             "completed": status.get("completed"),
             "actions_taken": status.get("actions_taken"),
@@ -206,6 +215,134 @@ def metrics(runtime_dir: Path, now: Optional[datetime] = None) -> dict[str, Any]
     if status is None:
         return {"error": error, "generated_at": now.isoformat(), "stale": True}
     return project(status, _encoder_health(runtime_dir, now), now)
+
+
+def attention_event(
+    payload: dict[str, Any],
+    *,
+    stuck_threshold: int = 40,
+) -> Optional[dict[str, Any]]:
+    """Return the first condition that needs an autonomous operator."""
+    run = payload.get("run")
+    run = run if isinstance(run, dict) else {}
+    brain = payload.get("brain")
+    brain = brain if isinstance(brain, dict) else {}
+    infra = payload.get("infra")
+    infra = infra if isinstance(infra, dict) else {}
+    headline = payload.get("headline")
+    headline = headline if isinstance(headline, dict) else {}
+    stuck = payload.get("stuck")
+    stuck = stuck if isinstance(stuck, dict) else {}
+    encoder = infra.get("encoder")
+    encoder = encoder if isinstance(encoder, dict) else {}
+
+    event = None
+    if run.get("mewtwo_caught") is True:
+        event = "mewtwo_caught"
+    elif run.get("hall_of_fame") is True:
+        event = "elite_four_beaten"
+    elif payload.get("error"):
+        event = "status_unavailable"
+    elif (
+        payload.get("stale") is True
+        or payload.get("running") is not True
+        or infra.get("lifecycle") in {"failed", "stopped"}
+    ):
+        event = "player_unhealthy"
+    elif encoder.get("state") != "publishing":
+        event = "encoder_unhealthy"
+    elif brain.get("control_mode") != "ai":
+        event = "control_conflict"
+    elif (
+        headline.get("stuck") is True
+        and isinstance(headline.get("stuck_decision_count"), int)
+        and headline["stuck_decision_count"] >= stuck_threshold
+        and brain.get("phase") != "battle"
+    ):
+        event = "stuck"
+    if event is None:
+        return None
+    return {
+        "event": event,
+        "generated_at": payload.get("generated_at"),
+        "location": headline.get("location"),
+        "stuck_decision_count": headline.get("stuck_decision_count"),
+        "stuck_reasons": stuck.get("stuck_reasons"),
+        "badges": run.get("badges"),
+        "lifecycle": infra.get("lifecycle"),
+        "encoder": encoder.get("state"),
+        "control_mode": brain.get("control_mode"),
+    }
+
+
+def progress_event(
+    payload: dict[str, Any],
+    baseline: dict[str, Any],
+) -> Optional[dict[str, Any]]:
+    """Report durable game milestones reached after a watcher starts."""
+    current = payload.get("run")
+    current = current if isinstance(current, dict) else {}
+    initial = baseline.get("run")
+    initial = initial if isinstance(initial, dict) else {}
+    current_badges = current.get("badges")
+    current_badges = current_badges if isinstance(current_badges, list) else []
+    initial_badges = initial.get("badges")
+    initial_badges = initial_badges if isinstance(initial_badges, list) else []
+    if len(current_badges) > len(initial_badges):
+        return {
+            "event": "badge_earned",
+            "generated_at": payload.get("generated_at"),
+            "location": payload.get("headline", {}).get("location"),
+            "badges": current_badges,
+        }
+    current_items = current.get("key_items")
+    current_items = current_items if isinstance(current_items, dict) else {}
+    initial_items = initial.get("key_items")
+    initial_items = initial_items if isinstance(initial_items, dict) else {}
+    acquired = sorted(
+        name
+        for name, owned in current_items.items()
+        if owned is True and initial_items.get(name) is not True
+    )
+    if acquired:
+        return {
+            "event": "key_item_acquired",
+            "generated_at": payload.get("generated_at"),
+            "location": payload.get("headline", {}).get("location"),
+            "key_items": acquired,
+            "badges": current_badges,
+        }
+    return None
+
+
+def wait_for_attention(
+    runtime_dir: Path,
+    *,
+    stuck_threshold: int = 40,
+    poll_seconds: float = 30,
+    timeout_seconds: float = 0,
+) -> dict[str, Any]:
+    """Block read-only until health, control, progress, or stuck state needs review."""
+    started = time.monotonic()
+    baseline = metrics(runtime_dir)
+    while True:
+        payload = metrics(runtime_dir)
+        event = attention_event(payload, stuck_threshold=stuck_threshold)
+        if event is None:
+            event = progress_event(payload, baseline)
+        if event is not None:
+            return event
+        elapsed = time.monotonic() - started
+        if timeout_seconds > 0 and elapsed >= timeout_seconds:
+            return {
+                "event": "timeout",
+                "generated_at": payload.get("generated_at"),
+                "location": payload.get("headline", {}).get("location"),
+            }
+        delay = max(0.1, poll_seconds)
+        if timeout_seconds > 0:
+            delay = min(delay, max(0.1, timeout_seconds - elapsed))
+        threading.Event().wait(delay)
 
 
 PAGE = """<!doctype html>
@@ -460,14 +597,36 @@ def main(argv: Optional[list[str]] = None) -> int:
         default="127.0.0.1",
         help="bind address; keep loopback and publish with `tailscale serve`",
     )
-    parser.add_argument(
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument(
         "--once",
         action="store_true",
         help="print one metrics document and exit",
     )
+    mode.add_argument(
+        "--wait-for-attention",
+        action="store_true",
+        help="wait read-only for a stuck, unhealthy, manual, or completed run",
+    )
+    parser.add_argument("--stuck-threshold", type=int, default=40)
+    parser.add_argument("--poll-seconds", type=float, default=30)
+    parser.add_argument("--timeout-seconds", type=float, default=0)
     arguments = parser.parse_args(argv)
     if arguments.once:
         print(json.dumps(metrics(arguments.runtime_dir), indent=2))
+        return 0
+    if arguments.wait_for_attention:
+        if arguments.stuck_threshold < 1:
+            parser.error("--stuck-threshold must be positive")
+        if arguments.poll_seconds <= 0 or arguments.timeout_seconds < 0:
+            parser.error("poll and timeout seconds cannot be negative")
+        event = wait_for_attention(
+            arguments.runtime_dir,
+            stuck_threshold=arguments.stuck_threshold,
+            poll_seconds=arguments.poll_seconds,
+            timeout_seconds=arguments.timeout_seconds,
+        )
+        print(json.dumps(event, indent=2), flush=True)
         return 0
     server, _thread = serve(arguments.runtime_dir, arguments.host, arguments.port)
     hostname = socket.gethostname()

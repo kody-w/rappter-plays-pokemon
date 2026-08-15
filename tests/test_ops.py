@@ -81,6 +81,122 @@ def test_projection_drops_fields_that_were_not_reviewed(tmp_path):
     assert "c.mp4" not in flattened
 
 
+def test_attention_event_requires_real_stuck_state():
+    payload = {
+        "generated_at": "2026-08-08T00:00:00+00:00",
+        "running": True,
+        "stale": False,
+        "headline": {
+            "location": "Silph Co. 10F",
+            "stuck": False,
+            "stuck_decision_count": 400,
+        },
+        "stuck": {"stuck_reasons": []},
+        "run": {"badges": ["Boulder"], "completed": False},
+        "brain": {"control_mode": "ai", "phase": "overworld"},
+        "infra": {"lifecycle": "ready", "encoder": {"state": "publishing"}},
+    }
+
+    assert ops.attention_event(payload) is None
+    payload["headline"]["stuck"] = True
+    payload["stuck"]["stuck_reasons"] = ["low_novelty"]
+    assert ops.attention_event(payload)["event"] == "stuck"
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "event"),
+    [
+        ("stale", True, "player_unhealthy"),
+        ("control_mode", "manual", "control_conflict"),
+        ("encoder", "down", "encoder_unhealthy"),
+        ("hall_of_fame", True, "elite_four_beaten"),
+        ("mewtwo_caught", True, "mewtwo_caught"),
+    ],
+)
+def test_attention_event_prioritizes_operator_conditions(field, value, event):
+    payload = {
+        "generated_at": "2026-08-08T00:00:00+00:00",
+        "running": True,
+        "stale": False,
+        "headline": {"location": "Victory Road", "stuck": False},
+        "stuck": {"stuck_reasons": []},
+        "run": {
+            "badges": [],
+            "completed": False,
+            "hall_of_fame": False,
+            "mewtwo_caught": False,
+        },
+        "brain": {"control_mode": "ai", "phase": "overworld"},
+        "infra": {"lifecycle": "ready", "encoder": {"state": "publishing"}},
+    }
+    if field == "control_mode":
+        payload["brain"][field] = value
+    elif field == "encoder":
+        payload["infra"]["encoder"]["state"] = value
+    elif field in {"hall_of_fame", "mewtwo_caught"}:
+        payload["run"][field] = value
+    else:
+        payload[field] = value
+
+    assert ops.attention_event(payload)["event"] == event
+
+
+def test_completed_red_run_can_continue_postgame_without_attention():
+    payload = {
+        "generated_at": "2026-08-08T00:00:00+00:00",
+        "running": True,
+        "stale": False,
+        "headline": {"location": "Pallet Town", "stuck": False},
+        "stuck": {"stuck_reasons": []},
+        "run": {
+            "badges": [],
+            "completed": True,
+            "hall_of_fame": False,
+            "mewtwo_caught": False,
+        },
+        "brain": {"control_mode": "ai", "phase": "overworld"},
+        "infra": {"lifecycle": "ready", "encoder": {"state": "publishing"}},
+    }
+
+    assert ops.attention_event(payload) is None
+
+
+def test_progress_event_reports_badges_and_key_items():
+    baseline = {
+        "headline": {"location": "Saffron City"},
+        "run": {
+            "badges": ["Boulder"],
+            "key_items": {"card_key": True, "master_ball": False},
+        },
+    }
+    badge = {
+        "generated_at": "2026-08-08T00:00:00+00:00",
+        "headline": {"location": "Saffron Gym"},
+        "run": {
+            "badges": ["Boulder", "Marsh"],
+            "key_items": {"card_key": True, "master_ball": False},
+        },
+    }
+    item = {
+        "generated_at": "2026-08-08T00:00:00+00:00",
+        "headline": {"location": "Silph Co. 11F"},
+        "run": {
+            "badges": ["Boulder"],
+            "key_items": {"card_key": True, "master_ball": True},
+        },
+    }
+
+    assert ops.progress_event(badge, baseline)["event"] == "badge_earned"
+    assert ops.progress_event(item, baseline) == {
+        "event": "key_item_acquired",
+        "generated_at": "2026-08-08T00:00:00+00:00",
+        "location": "Silph Co. 11F",
+        "key_items": ["master_ball"],
+        "badges": ["Boulder"],
+    }
+    assert ops.progress_event(baseline, baseline) is None
+
+
 def _serve(tmp_path):
     server, _thread = ops.serve(tmp_path, "127.0.0.1", 0)
     return server, f"http://127.0.0.1:{server.server_address[1]}"

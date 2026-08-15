@@ -47,6 +47,10 @@ def set_bag(memory: bytearray, items: list[tuple[int, int]]) -> None:
     memory[0xD31E + len(items) * 2] = 0xFF
 
 
+def set_event(memory: bytearray, event: int) -> None:
+    memory[0xD747 + event // 8] |= 1 << (event % 8)
+
+
 def test_key_item_state_uses_validated_bag_pairs_and_terminator():
     memory = bytearray(65536)
     set_bag(
@@ -64,6 +68,10 @@ def test_key_item_state_uses_validated_bag_pairs_and_terminator():
         "lift_key": True,
         "card_key": False,
         "master_ball": False,
+        "secret_key": False,
+        "hm_fly": False,
+        "hm_surf": False,
+        "hm_strength": False,
     }
 
     memory[0xD31E + 6] = LIFT_KEY_ITEM_ID
@@ -73,6 +81,10 @@ def test_key_item_state_uses_validated_bag_pairs_and_terminator():
         "lift_key": None,
         "card_key": None,
         "master_ball": None,
+        "secret_key": None,
+        "hm_fly": None,
+        "hm_surf": None,
+        "hm_strength": None,
     }
 
 
@@ -89,6 +101,10 @@ def test_key_item_state_handles_capacity_and_invalid_bags():
         "lift_key": True,
         "card_key": False,
         "master_ball": True,
+        "secret_key": False,
+        "hm_fly": False,
+        "hm_surf": False,
+        "hm_strength": False,
     }
 
     memory[0xD31D] = BAG_ITEM_CAPACITY + 1
@@ -98,6 +114,129 @@ def test_key_item_state_handles_capacity_and_invalid_bags():
         "lift_key": None,
         "card_key": None,
         "master_ball": None,
+        "secret_key": None,
+        "hm_fly": None,
+        "hm_surf": None,
+        "hm_strength": None,
+    }
+
+
+def test_seafoam_boulder_progress_reads_event_pairs():
+    memory = bytearray(65536)
+    reader = PokemonMemoryReader(memory)
+
+    assert reader.seafoam_boulders() == {
+        "one_to_b1f": False,
+        "b1f_to_b2f": False,
+        "b2f_to_b3f": False,
+        "b3f_to_b4f": False,
+    }
+    assert reader.seafoam_boulder_events()["b2f_to_b3f_1"] is False
+
+    for event in (0x50E, 0x50F, 0x9C0, 0x9C1, 0x9C8, 0x9C9, 0x9D0, 0x9D1):
+        set_event(memory, event)
+
+    assert reader.seafoam_boulders() == {
+        "one_to_b1f": True,
+        "b1f_to_b2f": True,
+        "b2f_to_b3f": True,
+        "b3f_to_b4f": True,
+    }
+    assert all(
+        value is True for value in reader.seafoam_boulder_events().values()
+    )
+
+
+def test_mansion_switch_state_reads_shared_event():
+    memory = bytearray(65536)
+    reader = PokemonMemoryReader(memory)
+
+    assert reader.snapshot()["mansion_switch_on"] is False
+
+    set_event(memory, 0x278)
+
+    assert reader.snapshot()["mansion_switch_on"] is True
+
+
+def test_victory_road_switch_state_reads_event():
+    memory = bytearray(65536)
+    reader = PokemonMemoryReader(memory)
+
+    assert reader.snapshot()["victory_road_1_switch_on"] is False
+    assert reader.snapshot()["victory_road_1_boulder"] is None
+    assert reader.snapshot()["strength_active"] is False
+
+    memory[0xD35E] = 0x6C
+    memory[0xC254] = 15 + 4
+    memory[0xC255] = 5 + 4
+
+    assert reader.snapshot()["victory_road_1_boulder"] == {"x": 5, "y": 15}
+
+    memory[0xD728] |= 0x01
+
+    assert reader.snapshot()["strength_active"] is True
+
+    set_event(memory, 0x917)
+
+    assert reader.snapshot()["victory_road_1_switch_on"] is True
+
+
+def test_victory_road_2_switches_and_boulders_read_memory():
+    memory = bytearray(65536)
+    memory[0xD35E] = 0xC2
+    for index, (x, y) in zip(
+        (11, 12, 13),
+        ((4, 14), (5, 5), (23, 16)),
+        strict=True,
+    ):
+        memory[0xC200 + 16 * index + 4] = y + 4
+        memory[0xC200 + 16 * index + 5] = x + 4
+    reader = PokemonMemoryReader(memory)
+
+    assert reader.snapshot()["victory_road_2_boulders"] == [
+        {"x": 4, "y": 14},
+        {"x": 5, "y": 5},
+        {"x": 23, "y": 16},
+    ]
+    assert reader.snapshot()["victory_road_2_switches"] == {
+        "one": False,
+        "two": False,
+    }
+
+    set_event(memory, 0x538)
+
+    assert reader.snapshot()["victory_road_2_switches"]["one"] is True
+
+
+def test_victory_road_3_events_read_memory():
+    memory = bytearray(65536)
+    memory[0xD35E] = 0xC6
+    for index, (x, y) in zip(
+        (7, 8, 9, 10),
+        ((22, 3), (13, 12), (24, 10), (22, 15)),
+        strict=True,
+    ):
+        memory[0xC200 + 16 * index + 4] = y + 4
+        memory[0xC200 + 16 * index + 5] = x + 4
+    reader = PokemonMemoryReader(memory)
+
+    assert reader.snapshot()["victory_road_3_events"] == {
+        "switch": False,
+        "hole_boulder": False,
+    }
+    assert reader.snapshot()["victory_road_3_boulders"] == [
+        {"x": 22, "y": 3},
+        {"x": 13, "y": 12},
+        {"x": 24, "y": 10},
+        {"x": 22, "y": 15},
+    ]
+
+    set_event(memory, 0x660)
+    set_event(memory, 0x666)
+
+    assert reader.snapshot()["victory_road_3_events"] == {
+        "switch": True,
+        "hole_boulder": True,
     }
 
 
@@ -113,6 +252,36 @@ def test_pokedex_counts_ignore_padding_and_include_dex_151():
     snapshot = PokemonMemoryReader(memory).snapshot()
 
     assert snapshot["pokedex"] == {"caught": 2, "seen": 3, "total": 151}
+
+
+def test_mewtwo_capture_requires_owned_dex_150_bit():
+    memory = bytearray(65536)
+    reader = PokemonMemoryReader(memory)
+
+    assert reader.snapshot()["mewtwo_caught"] is False
+    assert reader.snapshot()["mewtwo_encounter_resolved"] is False
+
+    set_event(memory, 0x8C1)
+
+    assert reader.snapshot()["mewtwo_caught"] is False
+    assert reader.snapshot()["mewtwo_encounter_resolved"] is True
+
+    set_dex_bit(memory, 0xD2F7, 150)
+
+    assert reader.snapshot()["mewtwo_caught"] is True
+
+
+def test_hall_of_fame_completion_event_persists_postgame():
+    memory = bytearray(65536)
+    reader = PokemonMemoryReader(memory)
+
+    assert reader.snapshot()["hall_of_fame"] is False
+    assert reader.snapshot()["hall_of_fame_completed"] is False
+
+    set_event(memory, 0x000)
+
+    assert reader.snapshot()["hall_of_fame"] is False
+    assert reader.snapshot()["hall_of_fame_completed"] is True
 
 
 @pytest.mark.parametrize(
@@ -416,6 +585,32 @@ def test_resume_of_completed_checkpoint_restores_paused_completion(tmp_path):
     assert runner._load_latest_state() == state
     assert runner.status["completed"] is True
     assert restored_modes == ["paused"]
+
+
+def test_resume_of_mewtwo_checkpoint_restores_paused_postgame(tmp_path):
+    runner = PokemonRunner.__new__(PokemonRunner)
+    runner.status = {"completed": False, "mewtwo_caught": False}
+    restored_modes: list[str] = []
+    runner._set_control_mode = restored_modes.append
+
+    assert runner._restore_completed_state({"mewtwo_caught": True}) is True
+    assert runner.status["completed"] is True
+    assert runner.status["mewtwo_caught"] is True
+    assert restored_modes == ["paused"]
+
+
+def test_resume_of_postgame_checkpoint_restores_completion_without_pause():
+    runner = PokemonRunner.__new__(PokemonRunner)
+    runner.status = {"completed": False, "mewtwo_caught": False}
+    restored_modes: list[str] = []
+    runner._set_control_mode = restored_modes.append
+
+    assert runner._restore_completed_state({
+        "hall_of_fame": False,
+        "hall_of_fame_completed": True,
+    }) is True
+    assert runner.status["completed"] is True
+    assert restored_modes == []
 
 
 def test_dashboard_endpoint_is_authenticated_and_allowlisted(tmp_path):

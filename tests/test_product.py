@@ -294,6 +294,44 @@ def test_cli_config_and_agent_dispatch(monkeypatch, tmp_path):
     assert captured["reasoning_effort"] == "medium"
 
 
+def test_cli_replays_supervisor_desired_config(monkeypatch, tmp_path):
+    rom = tmp_path / "Pokemon Red.gb"
+    desired = tmp_path / "desired.json"
+    desired.write_text(
+        json.dumps(
+            {
+                "running": False,
+                "instance_id": "old-instance",
+                "config": {
+                    "rom": str(rom),
+                    "runtime_dir": str(tmp_path / "runtime"),
+                    "model": "gpt-5.6-sol",
+                    "reasoning_effort": "high",
+                    "livestream": True,
+                    "open_viewer": False,
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    captured: dict[str, object] = {}
+
+    def perform(self, **kwargs):
+        del self
+        captured.update(kwargs)
+        return '{"status":"success","message":"mocked"}'
+
+    monkeypatch.setattr(PokemonAgent, "perform", perform)
+
+    exit_code, _result = cli.run(["start", "--config", str(desired)])
+
+    assert exit_code == 0
+    assert captured["rom_path"] == str(rom)
+    assert captured["reasoning_effort"] == "high"
+    assert captured["livestream"] is True
+    assert captured["open_viewer"] is False
+
+
 def test_launchers_preserve_rom_paths_as_single_arguments():
     launch = (ROOT / "launch.sh").read_text()
     bootstrap = (ROOT / "bootstrap.sh").read_text()
@@ -304,6 +342,7 @@ def test_launchers_preserve_rom_paths_as_single_arguments():
     assert 'rappter_plays_pokemon.story "$@"' in story
     assert 'rappter_plays_pokemon.youtube_chat "$@"' in chat
     assert '"${LAUNCH_ARGS[@]}"' in bootstrap
+    assert '"$@" --port "$PORT"' in (ROOT / "ops.sh").read_text()
     assert 'if [[ "$ACTION" == "start" ]]' in launch
     assert launch.index('if [[ "$ACTION" == "start" ]]') < launch.index(
         "rappter_plays_pokemon.install_agent"

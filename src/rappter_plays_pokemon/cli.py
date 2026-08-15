@@ -37,6 +37,10 @@ def load_config(path: Path | None) -> dict[str, Any]:
         raise RuntimeError(f"Cannot read config {path}: {error}") from error
     if not isinstance(value, dict):
         raise RuntimeError("Config must contain one JSON object")
+    if isinstance(value.get("config"), dict) and "running" in value:
+        value = dict(value["config"])
+        if "rom_path" not in value and "rom" in value:
+            value["rom_path"] = value["rom"]
     return value
 
 

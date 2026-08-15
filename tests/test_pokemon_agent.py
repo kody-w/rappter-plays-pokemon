@@ -29,6 +29,7 @@ from openrappter.agents.pokemon_agent import (
     celadon_route_guidance,
     collision_allows_direction,
     discover_pokemon_red_rom,
+    endgame_route_guidance,
     ensure_copilot_runtime,
     file_sha256,
     is_cloud_placeholder,
@@ -54,6 +55,7 @@ from openrappter.agents.pokemon_agent import (
     silph_co_route_guidance,
     supervisor_main,
     terminate_isolated_process_group,
+    trusted_story_route_action,
     wait_for_stopping_supervisor,
     wait_for_supervised_child,
 )
@@ -751,6 +753,20 @@ SILPH_9F_WARPS = [
     {"x": 17, "y": 15, "destination_map": 0xD2,
      "destination_name": "Silph Co. 5F"},
 ]
+SILPH_7F_WARPS = [
+    {"x": 16, "y": 0, "destination_map": 0xD5,
+     "destination_name": "Silph Co. 8F"},
+    {"x": 22, "y": 0, "destination_map": 0xD3,
+     "destination_name": "Silph Co. 6F"},
+    {"x": 18, "y": 0, "destination_map": 0xEC,
+     "destination_name": "Silph Co. Elevator"},
+    {"x": 5, "y": 7, "destination_map": 0xEB,
+     "destination_name": "Silph Co. 11F"},
+    {"x": 5, "y": 3, "destination_map": 0xD0,
+     "destination_name": "Silph Co. 3F"},
+    {"x": 21, "y": 15, "destination_map": 0xD2,
+     "destination_name": "Silph Co. 5F"},
+]
 
 
 def silph_state(map_id, warps=None, x=28, y=5, **key_items):
@@ -799,14 +815,50 @@ def test_silph_guidance_switches_to_giovanni_once_the_card_key_is_owned():
     guidance = silph_co_route_guidance(
         silph_state(0xE9, SILPH_9F_WARPS, card_key=True)
     )
-    top = silph_co_route_guidance(
-        silph_state(0xEB, [], card_key=True)
+    entry = silph_co_route_guidance(
+        silph_state(
+            0xD0,
+            [{"x": 11, "y": 11, "destination_map": 0xD4,
+              "destination_name": "Silph Co. 7F"}],
+            card_key=True,
+        )
+    )
+    east_seventh = silph_co_route_guidance(
+        silph_state(0xD4, SILPH_7F_WARPS, x=16, y=3, card_key=True)
+    )
+    west_seventh = silph_co_route_guidance(
+        silph_state(0xD4, SILPH_7F_WARPS, x=5, y=3, card_key=True)
+    )
+    east = silph_co_route_guidance(
+        silph_state(0xEB, [], x=13, y=0, card_key=True)
+    )
+    west = silph_co_route_guidance(
+        silph_state(0xEB, [], x=3, y=2, card_key=True)
     )
 
-    assert "11F" in guidance
+    assert "choose 3F" in guidance
     assert "(21,16)" not in guidance
-    assert "Giovanni at (6,9)" in top
-    assert "master_ball" in top
+    assert "stand at (18,8)" in entry
+    assert "face LEFT" in entry
+    assert "press A once" in entry
+    assert "only A opens it" in entry
+    assert "pad (11,11)" in entry
+    assert "WRONG EAST" in east_seventh
+    assert "choose 3F" in east_seventh
+    assert "(18,8)" in east_seventh
+    assert "CORRECT WEST" in west_seventh
+    assert "pad at (5,7)" in west_seventh
+    assert "SEALED EAST" in east
+    assert "already defeated" in east
+    assert "3F (11,11)" in east
+    assert "Rocket at (3,16)" in west
+    assert "Giovanni at (6,9)" in west
+    assert "never walk south to check again" in west
+    assert "from (5,6)" in west
+    assert "UP once to (5,5)" in west
+    assert "RIGHT once to (6,5)" in west
+    assert "face RIGHT" in west
+    assert "master_ball" in west
 
 
 def test_silph_guidance_sends_you_out_once_the_building_is_cleared():
@@ -829,6 +881,44 @@ def test_silph_guidance_sends_you_out_once_the_building_is_cleared():
     spent["badges"] = ["Boulder", "Marsh"]
     assert "COMPLETE" in silph_co_route_guidance(spent)
 
+    top = silph_state(
+        0xEB,
+        [
+            {"x": 5, "y": 5, "destination_map": 0xFF},
+            {"x": 3, "y": 2, "destination_map": 0xD4},
+        ],
+        x=6,
+        y=5,
+        card_key=True,
+        master_ball=True,
+    )
+    top_guidance = silph_co_route_guidance(top)
+    assert "Do NOT use (5,5)" in top_guidance
+    assert "LAST_MAP sentinel" in top_guidance
+    assert "11F pad (3,2)" in top_guidance
+    assert "7F pad (5,3)" in top_guidance
+
+    lift = silph_state(
+        0xEC,
+        [],
+        card_key=True,
+        master_ball=True,
+    )
+    assert "choose 1F" in silph_co_route_guidance(lift)
+
+    seventh = silph_state(
+        0xD4,
+        SILPH_7F_WARPS,
+        x=5,
+        y=3,
+        card_key=True,
+        master_ball=True,
+    )
+    seventh_guidance = silph_co_route_guidance(seventh)
+    assert "LEFT to (4,3)" in seventh_guidance
+    assert "RIGHT back onto (5,3)" in seventh_guidance
+    assert "Never press DOWN" in seventh_guidance
+
 
 def test_silph_guidance_never_claims_ownership_it_cannot_read():
     state = silph_state(0xD2, SILPH_5F_WARPS)
@@ -845,6 +935,1051 @@ def test_silph_guidance_is_silent_outside_the_building():
     assert silph_co_route_guidance(silph_state(0x92, [])) is None
     # The elevator is a separate map and must still be handled.
     assert "panel at (3,0)" in silph_co_route_guidance(silph_state(0xEC, []))
+
+
+def endgame_state(map_id, badges, **key_items):
+    return {
+        "map_id": map_id,
+        "badges": badges,
+        "key_items": {"secret_key": False, **key_items},
+    }
+
+
+def test_endgame_guidance_routes_six_badges_to_cinnabar():
+    badges = ["Boulder", "Cascade", "Thunder", "Rainbow", "Soul", "Marsh"]
+
+    celadon = endgame_route_guidance(endgame_state(0x06, badges))
+    fuchsia = endgame_route_guidance(endgame_state(0x07, badges))
+    cinnabar = endgame_route_guidance(endgame_state(0x08, badges))
+    mansion = endgame_route_guidance(endgame_state(0xD8, badges))
+    mansion_off = endgame_route_guidance({
+        **endgame_state(0xD8, badges),
+        "mansion_switch_on": False,
+    })
+    mansion_north_on = endgame_route_guidance({
+        **endgame_state(0xD8, badges),
+        "mansion_switch_on": True,
+        "coordinates": {"x": 13, "y": 6},
+    })
+    mansion_south_on = endgame_route_guidance({
+        **endgame_state(0xD8, badges),
+        "mansion_switch_on": True,
+        "coordinates": {"x": 17, "y": 25},
+    })
+    mansion_1f = endgame_route_guidance(endgame_state(0xA5, badges))
+    mansion_2f = endgame_route_guidance(endgame_state(0xD6, badges))
+    mansion_3f = endgame_route_guidance(endgame_state(0xD7, badges))
+    unlocked = endgame_route_guidance(
+        endgame_state(0x08, badges, secret_key=True)
+    )
+    pallet_with_key = endgame_route_guidance(
+        endgame_state(0x00, badges, secret_key=True, hm_fly=True)
+    )
+
+    assert "Fly is OPTIONAL" in celadon
+    assert "Route 7" in celadon
+    assert "SURF" in fuchsia
+    assert "Mansion at (6,3)" in cinnabar
+    assert "B1F at (5,13)" in cinnabar
+    assert "southern switch at (18,25)" in mansion
+    assert "northern switch at (20,3)" in mansion
+    assert "SECRET KEY ball at (5,13)" in mansion
+    assert "switch is OFF" in mansion_off
+    assert "Do NOT return south" in mansion_off
+    assert "balls at (10,2) and (19,25) are items" in mansion_off
+    assert "northern statue has turned" in mansion_north_on
+    assert "Do NOT touch another statue" in mansion_north_on
+    assert "southern switch at (18,25)" in mansion_south_on
+    assert "face UP" in mansion_south_on
+    assert "do not press the southern statue twice" in mansion_south_on
+    assert "1F staircase at (5,10)" in mansion_1f
+    assert "B1F stairs at (21,23)" in mansion_1f
+    assert "2F staircase at (6,1)" in mansion_2f
+    assert "Do NOT use (7,10)" in mansion_2f
+    assert "LEFT drop at (16,14) or (17,14)" in mansion_3f
+    assert "rightmost drop at (19,14)" in mansion_3f
+    assert "Gym at (18,3)" in unlocked
+    assert "choose CINNABAR ISLAND" in pallet_with_key
+    assert "depleted Surf" in pallet_with_key
+
+
+def test_endgame_guidance_covers_seafoam_boulder_chains():
+    badges = ["Boulder", "Cascade", "Thunder", "Rainbow", "Soul", "Marsh"]
+    items = {"hm_surf": True, "hm_strength": True}
+
+    first = endgame_route_guidance(
+        {
+            **endgame_state(0xC0, badges, **items),
+            "coordinates": {"x": 4, "y": 17},
+        }
+    )
+    west = endgame_route_guidance(
+        {
+            **endgame_state(0xC0, badges, **items),
+            "coordinates": {"x": 26, "y": 17},
+        }
+    )
+    basement = endgame_route_guidance(
+        endgame_state(0xA1, badges, **items)
+    )
+    bottom = endgame_route_guidance(
+        endgame_state(0xA2, badges, **items)
+    )
+    route20_west = endgame_route_guidance(
+        {
+            **endgame_state(0x1F, badges, **items),
+            "coordinates": {"x": 40, "y": 15},
+        }
+    )
+    route20_pocket = endgame_route_guidance(
+        {
+            **endgame_state(0x1F, badges, **items),
+            "coordinates": {"x": 46, "y": 9},
+        }
+    )
+
+    assert "boulders at (18,10) and (26,7)" in first
+    assert "holes at (17,6) and (24,6)" in first
+    assert "do NOT step down or leave" in first
+    assert "CINNABAR doors at (26,17)/(27,17)" in west
+    assert "native boulders at (5,14) and (3,15)" in basement
+    assert "holes at (6,16) and (3,16)" in basement
+    assert "Ignore Articuno" in bottom
+    assert "EAST ladder at (25,4)" in bottom
+    assert "CINNABAR doors at (26,17)/(27,17)" in bottom
+    assert "Do not return to Seafoam" in route20_west
+    assert "Seafoam cave is MANDATORY" in route20_pocket
+    assert "(48,6)" in route20_pocket
+    assert "Do NOT target the (58,9) door" in route20_pocket
+
+
+def test_endgame_guidance_blocks_seafoam_without_strength():
+    badges = ["Boulder", "Cascade", "Thunder", "Rainbow", "Soul", "Marsh"]
+    guidance = endgame_route_guidance(
+        endgame_state(0xC0, badges, hm_surf=True, hm_strength=False)
+    )
+
+    assert "HM04 STRENGTH is not owned" in guidance
+
+
+def test_endgame_guidance_ascends_after_seafoam_puzzle_complete():
+    badges = ["Boulder", "Cascade", "Thunder", "Rainbow", "Soul", "Marsh"]
+    state = endgame_state(
+        0xA0,
+        badges,
+        hm_surf=True,
+        hm_strength=True,
+    )
+    state["seafoam_boulders"] = {
+        "one_to_b1f": True,
+        "b1f_to_b2f": True,
+        "b2f_to_b3f": True,
+        "b3f_to_b4f": True,
+    }
+    state["coordinates"] = {"x": 25, "y": 14}
+
+    b2_east = endgame_route_guidance(
+        {**state, "coordinates": {"x": 25, "y": 11}}
+    )
+    b2_west = endgame_route_guidance(
+        {**state, "coordinates": {"x": 5, "y": 13}}
+    )
+    b3_east = endgame_route_guidance({
+        **state,
+        "map_id": 0xA1,
+        "coordinates": {"x": 23, "y": 12},
+    })
+    b3_west = endgame_route_guidance({
+        **state,
+        "map_id": 0xA1,
+        "coordinates": {"x": 8, "y": 6},
+    })
+    b4 = endgame_route_guidance({
+        **state,
+        "map_id": 0xA2,
+        "coordinates": {"x": 25, "y": 4},
+    })
+    b1_east = endgame_route_guidance({
+        **state,
+        "map_id": 0x9F,
+        "coordinates": {"x": 25, "y": 3},
+    })
+    b1_west = endgame_route_guidance({
+        **state,
+        "map_id": 0x9F,
+        "coordinates": {"x": 4, "y": 2},
+    })
+    one_west = endgame_route_guidance({
+        **state,
+        "map_id": 0xC0,
+        "coordinates": {"x": 7, "y": 5},
+    })
+    one_east = endgame_route_guidance({
+        **state,
+        "map_id": 0xC0,
+        "coordinates": {"x": 26, "y": 17},
+    })
+    route20_middle = endgame_route_guidance({
+        **state,
+        "map_id": 0x1F,
+        "coordinates": {"x": 58, "y": 11},
+    })
+    route20_west_exit = endgame_route_guidance({
+        **state,
+        "map_id": 0x1F,
+        "coordinates": {"x": 48, "y": 6},
+    })
+    route16 = endgame_route_guidance({
+        **state,
+        "map_id": 0x1B,
+        "coordinates": {"x": 12, "y": 12},
+    })
+    fly_house = endgame_route_guidance({
+        **state,
+        "map_id": 0xBC,
+        "coordinates": {"x": 3, "y": 5},
+    })
+    fuchsia_detour = endgame_route_guidance({
+        **state,
+        "map_id": 0x07,
+    })
+    vermilion_detour = endgame_route_guidance({
+        **state,
+        "map_id": 0x05,
+    })
+    route13_detour = endgame_route_guidance({
+        **state,
+        "map_id": 0x18,
+    })
+    route8_detour = endgame_route_guidance({
+        **state,
+        "map_id": 0x13,
+    })
+    route16_gate = endgame_route_guidance({
+        **state,
+        "map_id": 0xBA,
+    })
+    fly_ready = endgame_route_guidance({
+        **state,
+        "map_id": 0x1B,
+        "key_items": {
+            **state["key_items"],
+            "hm_fly": True,
+        },
+    })
+
+    assert "PUZZLE IS COMPLETE" in b2_east
+    assert "follow this exit chain" in b2_east
+    assert "press DOWN three times" in b2_east
+    assert "B2F ladder (25,14)" in b2_east
+    assert "Do not use (25,3)" in b2_east
+    assert "west ladder at (5,3)" in b2_west
+    assert "Reach (23,9), face DOWN" in b3_east
+    assert "LEFT x4, UP x2, LEFT x4" in b3_east
+    assert "B2F's west side at (5,13)" in b3_east
+    assert "west ladder at (5,12)" in b3_west
+    assert "B4F east ladder (25,4)" in b4
+    assert "B3F Surf crossing" in b4
+    assert "lower-right 1F stair landing" in b1_east
+    assert "press UP x4" in b1_east
+    assert "RIGHT x2" in b1_east
+    assert "B1F ladder (25,11)" in b1_east
+    assert "west ladder at (7,5)" in b1_west
+    assert "western 1F component" in one_west
+    assert "doors (4,17)/(5,17)" in one_west
+    assert "lower-right stair at (23,15)" in one_east
+    assert "UP x4, RIGHT x2" in one_east
+    assert "Surf west" in one_east
+    assert "Authoritative Pallet bypass" in route20_middle
+    assert "Travel EAST across Route 20" in route20_middle
+    assert "do not enter Seafoam again" in route20_west_exit
+    assert "Fly House entrance at (7,5)" in route16
+    assert "brunette girl at (2,3)" in fly_house
+    assert "receive HM02 FLY" in fly_house
+    assert "Fuchsia EAST onto Route 15" in fuchsia_detour
+    assert "no-Bicycle route" in fuchsia_detour
+    assert "Do not detour for the Bicycle Voucher" in vermilion_detour
+    assert "Vermilion NORTH onto Route 6" in vermilion_detour
+    assert "verified Route 13 fence path" in route13_detour
+    assert "(14,4), (24,4), (24,6)" in route13_detour
+    assert "(50,6), and (51,6)" in route13_detour
+    assert "Route 8 directly into Saffron" in route8_detour
+    assert "skip Underground Path" in route8_detour
+    assert "WEST exits at (0,2)/(0,3)" in route16_gate
+    assert "Fly House side" in route16_gate
+    assert "Teach HM02 FLY to DODUO" in fly_ready
+    assert "choose PALLET TOWN" in fly_ready
+    assert trusted_story_route_action({
+        **state,
+        "map_id": 0xC0,
+        "coordinates": {"x": 24, "y": 15},
+    }) == "left"
+    assert trusted_story_route_action({
+        **state,
+        "map_id": 0x9F,
+        "coordinates": {"x": 23, "y": 15},
+    }) == "up"
+    assert trusted_story_route_action({
+        **state,
+        "map_id": 0x9F,
+        "coordinates": {"x": 25, "y": 11},
+    }) == "left"
+    assert trusted_story_route_action({
+        **state,
+        "map_id": 0xA0,
+        "coordinates": {"x": 25, "y": 13},
+    }) == "down"
+    assert trusted_story_route_action({
+        **state,
+        "map_id": 0xA1,
+        "coordinates": {"x": 22, "y": 3},
+    }) == "down"
+    assert trusted_story_route_action({
+        **state,
+        "map_id": 0xA1,
+        "coordinates": {"x": 24, "y": 4},
+    }) == "right"
+    assert trusted_story_route_action({
+        **state,
+        "map_id": 0xA1,
+        "coordinates": {"x": 25, "y": 6},
+    }) == "left"
+    assert trusted_story_route_action({
+        **state,
+        "map_id": 0xA1,
+        "coordinates": {"x": 25, "y": 7},
+    }) == "left"
+    assert trusted_story_route_action({
+        **state,
+        "map_id": 0xA1,
+        "coordinates": {"x": 23, "y": 10},
+    }) == "left"
+    assert trusted_story_route_action({
+        **state,
+        "map_id": 0xA1,
+        "coordinates": {"x": 19, "y": 10},
+    }) == "up"
+    assert trusted_story_route_action({
+        **state,
+        "map_id": 0xA1,
+        "coordinates": {"x": 6, "y": 12},
+    }) == "left"
+    assert trusted_story_route_action({
+        **state,
+        "screen_text": "Wild encounter",
+    }) is None
+
+
+def test_endgame_guidance_enforces_seafoam_stage_order():
+    badges = ["Boulder", "Cascade", "Thunder", "Rainbow", "Soul", "Marsh"]
+    state = endgame_state(
+        0xA0,
+        badges,
+        hm_surf=True,
+        hm_strength=True,
+    )
+    state["seafoam_boulders"] = {
+        "one_to_b1f": False,
+        "b1f_to_b2f": False,
+        "b2f_to_b3f": False,
+        "b3f_to_b4f": False,
+    }
+
+    guidance = endgame_route_guidance(state)
+
+    assert "first 1F boulder pair is INCOMPLETE" in guidance
+    assert "Use an ESCAPE ROPE" in guidance
+    assert "select DIGLETT and use DIG" in guidance
+    assert "Route 20 door (48,5)" in guidance
+    assert "holes at (19,6)" not in guidance
+
+
+def test_endgame_guidance_uses_b1f_holes_for_separate_b2f_chambers():
+    badges = ["Boulder", "Cascade", "Thunder", "Rainbow", "Soul", "Marsh"]
+    state = endgame_state(
+        0x9F,
+        badges,
+        hm_surf=True,
+        hm_strength=True,
+    )
+    state["seafoam_boulders"] = {
+        "one_to_b1f": True,
+        "b1f_to_b2f": True,
+        "b2f_to_b3f": False,
+        "b3f_to_b4f": False,
+    }
+    state["seafoam_boulder_events"] = {
+        "b2f_to_b3f_1": False,
+        "b2f_to_b3f_2": False,
+    }
+
+    guidance = endgame_route_guidance(state)
+
+    assert "B1F (12,6)" in guidance
+    assert "NORTH to (12,2)" in guidance
+    assert "SOUTH to (17,6)" in guidance
+    assert "RIGHT into completed hole (18,6)" in guidance
+    assert "RIGHT into B2F hole (19,6)" in guidance
+
+    state["seafoam_boulder_events"]["b2f_to_b3f_1"] = True
+    guidance = endgame_route_guidance(state)
+    assert "first B2F boulder is COMPLETE" in guidance
+    assert "ladder (7,5)" in guidance
+    assert "east ladder at (25,3)" in guidance
+    assert "hole (23,6)" in guidance
+
+
+def test_endgame_guidance_routes_to_final_b3f_boulder_stage():
+    badges = ["Boulder", "Cascade", "Thunder", "Rainbow", "Soul", "Marsh"]
+    progress = {
+        "one_to_b1f": True,
+        "b1f_to_b2f": True,
+        "b2f_to_b3f": True,
+        "b3f_to_b4f": False,
+    }
+    items = {"hm_surf": True, "hm_strength": True}
+
+    b1 = endgame_state(0x9F, badges, **items)
+    b1["seafoam_boulders"] = progress
+    b1_east = endgame_state(0x9F, badges, **items)
+    b1_east["seafoam_boulders"] = progress
+    b1_east["coordinates"] = {"x": 22, "y": 11}
+    b2 = endgame_state(0xA0, badges, **items)
+    b2["seafoam_boulders"] = progress
+    b2_east = endgame_state(0xA0, badges, **items)
+    b2_east["seafoam_boulders"] = progress
+    b2_east["coordinates"] = {"x": 26, "y": 10}
+    b3 = endgame_state(0xA1, badges, **items)
+    b3["seafoam_boulders"] = progress
+    b3_after_first = endgame_state(0xA1, badges, **items)
+    b3_after_first["seafoam_boulders"] = progress
+    b3_after_first["seafoam_boulder_events"] = {
+        "b3f_to_b4f_1": True,
+        "b3f_to_b4f_2": False,
+    }
+    b4 = endgame_state(0xA2, badges, **items)
+    b4["seafoam_boulders"] = progress
+
+    assert "western B1F landing (7,5)" in endgame_route_guidance(b1)
+    assert "(5,14), (9,14), (9,8)" in endgame_route_guidance(b1)
+    assert "completed hole (18,6)" in endgame_route_guidance(b1)
+    assert "disconnected east chamber" in endgame_route_guidance(b1_east)
+    assert "DIGLETT's DIG inside" in endgame_route_guidance(b1_east)
+    assert "B2F (19,7)" in endgame_route_guidance(b2)
+    assert "Press UP once" in endgame_route_guidance(b2)
+    assert "Never use hole (22,6)" in endgame_route_guidance(b2)
+    assert "disconnected east platform" in endgame_route_guidance(b2_east)
+    assert "ladder (25,11) to B1F" in endgame_route_guidance(b2_east)
+    assert "current is STOPPED" in endgame_route_guidance(b3)
+    assert "(16,17), (8,17), (8,15)" in endgame_route_guidance(b3)
+    assert "LEFT six separate times" in endgame_route_guidance(b3)
+    assert "Hole (3,16) is complete" in endgame_route_guidance(b3_after_first)
+    assert "UP x4" in endgame_route_guidance(b3_after_first)
+    assert "blocker at (8,14)" in endgame_route_guidance(b3_after_first)
+    assert "LEFT x4" in endgame_route_guidance(b3_after_first)
+    assert "DOWN x2" in endgame_route_guidance(b3_after_first)
+    assert "east ladder at (25,4)" in endgame_route_guidance(b4)
+
+
+def test_endgame_guidance_recovers_stage_four_from_route20():
+    badges = ["Boulder", "Cascade", "Thunder", "Rainbow", "Soul", "Marsh"]
+    state = endgame_state(
+        0x1F,
+        badges,
+        hm_surf=True,
+        hm_strength=True,
+    )
+    state["seafoam_boulders"] = {
+        "one_to_b1f": True,
+        "b1f_to_b2f": True,
+        "b2f_to_b3f": True,
+        "b3f_to_b4f": False,
+    }
+
+    guidance = endgame_route_guidance(state)
+
+    assert "Do not use Fly" in guidance
+    assert "(62,5)" in guidance
+    assert "(55,5)" in guidance
+    assert "(48,6)" in guidance
+    assert "door (48,5)" in guidance
+    assert "1F ladder (7,5)" in guidance
+    assert "B1F hole (18,6)" in guidance
+    assert "B2F hole (19,6)" in guidance
+
+
+def test_endgame_guidance_digs_out_of_route20_middle_basin():
+    badges = ["Boulder", "Cascade", "Thunder", "Rainbow", "Soul", "Marsh"]
+    state = endgame_state(
+        0x1F,
+        badges,
+        hm_surf=True,
+        hm_strength=True,
+    )
+    state["coordinates"] = {"x": 56, "y": 10}
+    state["seafoam_boulders"] = {
+        "one_to_b1f": True,
+        "b1f_to_b2f": True,
+        "b2f_to_b3f": True,
+        "b3f_to_b4f": False,
+    }
+
+    guidance = endgame_route_guidance(state)
+
+    assert "middle basin" in guidance
+    assert "DIG is rejected outdoors" in guidance
+    assert "east Seafoam door at (58,9)" in guidance
+    assert "use DIG from INSIDE" in guidance
+    assert "three boulder stages are saved" in guidance
+    assert "(48,5) door" in guidance
+
+
+def test_endgame_guidance_routes_volcano_to_earth_badge():
+    badges = [
+        "Boulder", "Cascade", "Thunder", "Rainbow",
+        "Soul", "Marsh", "Volcano",
+    ]
+
+    assert "SURFING NORTH" in endgame_route_guidance(
+        endgame_state(0x08, badges, secret_key=True)
+    )
+    assert "choose VIRIDIAN CITY" in endgame_route_guidance(
+        endgame_state(
+            0x08,
+            badges,
+            secret_key=True,
+            hm_fly=True,
+        )
+    )
+    assert "Leave Cinnabar Gym" in endgame_route_guidance(
+        endgame_state(0xA6, badges, secret_key=True, hm_fly=True)
+    )
+    assert "Gym at (32,7)" in endgame_route_guidance(
+        endgame_state(0x01, badges, secret_key=True)
+    )
+    assert "Giovanni at (2,1)" in endgame_route_guidance(
+        endgame_state(0x2D, badges, secret_key=True)
+    )
+    assert trusted_story_route_action({
+        **endgame_state(0x2D, badges, secret_key=True),
+        "coordinates": {"x": 15, "y": 7},
+    }) == "left"
+    assert trusted_story_route_action({
+        **endgame_state(0x2D, badges, secret_key=True),
+        "coordinates": {"x": 18, "y": 11},
+    }) == "right"
+    assert trusted_story_route_action({
+        **endgame_state(0x2D, badges, secret_key=True),
+        "coordinates": {"x": 4, "y": 1},
+    }) == "left"
+
+
+def test_endgame_guidance_routes_eight_badges_to_hall_of_fame():
+    badges = list(pokemon_module.BADGE_NAMES)
+    low_party = [{"nickname": "BLASTOISE", "hp": 44, "max_hp": 230}]
+
+    route22 = endgame_route_guidance(
+        endgame_state(0x21, badges, secret_key=True)
+    )
+    assert "League gate" in route22
+    assert "(8,5)" in route22
+    assert "ledge-safe path" in route22
+    assert "(33,14), (33,8), (31,8)" in route22
+    assert "(5,11), (5,9), (11,9)" in route22
+    assert "FLY to VIRIDIAN CITY" in endgame_route_guidance({
+        **endgame_state(
+            0x21,
+            badges,
+            secret_key=True,
+            hm_fly=True,
+        ),
+        "party": low_party,
+    })
+    assert "Heal the party" in endgame_route_guidance({
+        **endgame_state(0x01, badges, secret_key=True),
+        "party": low_party,
+    })
+    assert "Victory Road" in endgame_route_guidance(
+        endgame_state(0xC2, badges, secret_key=True)
+    )
+    upper_route23 = endgame_route_guidance({
+        **endgame_state(0x22, badges, secret_key=True),
+        "coordinates": {"x": 14, "y": 32},
+    })
+    assert "Victory Road is complete" in upper_route23
+    assert "(18,32), (18,20), (14,20)" in upper_route23
+    assert "continue NORTH into Indigo Plateau" in upper_route23
+    victory_road_closed = endgame_route_guidance({
+        **endgame_state(0x6C, badges, secret_key=True),
+        "victory_road_1_switch_on": False,
+        "strength_active": True,
+    })
+    victory_road_strength_reset = endgame_route_guidance({
+        **endgame_state(0x6C, badges, secret_key=True),
+        "victory_road_1_switch_on": False,
+        "strength_active": False,
+    })
+    victory_road_open = endgame_route_guidance({
+        **endgame_state(0x6C, badges, secret_key=True),
+        "victory_road_1_switch_on": True,
+    })
+    victory_road_deadlocked = endgame_route_guidance({
+        **endgame_state(0x6C, badges, secret_key=True),
+        "victory_road_1_switch_on": False,
+        "victory_road_1_boulder": {"x": 5, "y": 14},
+    })
+    victory_road_ladder_recovery = endgame_route_guidance({
+        **endgame_state(0x6C, badges, secret_key=True),
+        "victory_road_1_switch_on": False,
+        "strength_active": True,
+        "coordinates": {"x": 1, "y": 1},
+    })
+    victory_road_far_side = endgame_route_guidance({
+        **endgame_state(0x6C, badges, secret_key=True),
+        "victory_road_1_switch_on": False,
+        "strength_active": True,
+        "coordinates": {"x": 7, "y": 8},
+    })
+    assert "switch event is FALSE" in victory_road_closed
+    assert "switch (17,13)" in victory_road_closed
+    assert "STRENGTH reset" in victory_road_strength_reset
+    assert "strength_active is true" in victory_road_strength_reset
+    assert "dead-end at (5,14)" in victory_road_deadlocked
+    assert "south exit at (8,17)/(9,17)" in victory_road_deadlocked
+    assert "far side at the (1,1) 2F ladder" in victory_road_ladder_recovery
+    assert "RIGHT off (1,1), then LEFT" in victory_road_ladder_recovery
+    assert "already inside the northwest passage" in victory_road_far_side
+    assert "trusted far-side route" in victory_road_far_side
+    assert trusted_story_route_action({
+        **endgame_state(0x6C, badges, secret_key=True),
+        "victory_road_1_switch_on": False,
+        "strength_active": True,
+        "coordinates": {"x": 7, "y": 8},
+    }) == "left"
+    assert trusted_story_route_action({
+        **endgame_state(0x6C, badges, secret_key=True),
+        "victory_road_1_switch_on": False,
+        "strength_active": True,
+        "coordinates": {"x": 1, "y": 1},
+    }) == "right"
+    assert trusted_story_route_action({
+        **endgame_state(0x6C, badges, secret_key=True),
+        "victory_road_1_switch_on": False,
+        "strength_active": True,
+        "victory_road_1_boulder": {"x": 5, "y": 15},
+        "coordinates": {"x": 14, "y": 13},
+    }) == "down"
+    assert trusted_story_route_action({
+        **endgame_state(0x6C, badges, secret_key=True),
+        "victory_road_1_switch_on": False,
+        "strength_active": True,
+        "victory_road_1_boulder": {"x": 5, "y": 16},
+        "coordinates": {"x": 4, "y": 16},
+    }) == "right"
+    assert trusted_story_route_action({
+        **endgame_state(0x6C, badges, secret_key=True),
+        "victory_road_1_switch_on": False,
+        "strength_active": True,
+        "victory_road_1_boulder": {"x": 17, "y": 12},
+        "coordinates": {"x": 17, "y": 11},
+    }) == "down"
+    assert "northwest passage is open" in victory_road_open
+    assert "(11,14), (9,14), (9,16)" in victory_road_open
+    assert "(7,8), (3,8), (3,5)" in victory_road_open
+    assert "2F ladder at (1,1)" in victory_road_open
+    victory_road_2_closed = endgame_route_guidance({
+        **endgame_state(0xC2, badges, secret_key=True),
+        "victory_road_2_switches": {"one": False, "two": False},
+        "victory_road_2_boulders": [
+            {"x": 4, "y": 14},
+            {"x": 5, "y": 5},
+            {"x": 23, "y": 16},
+        ],
+        "strength_active": True,
+    })
+    victory_road_far_side = endgame_route_guidance({
+        **endgame_state(0xC2, badges, secret_key=True),
+        "victory_road_2_switches": {"one": False, "two": False},
+        "coordinates": {"x": 28, "y": 7},
+    })
+    victory_road_2_open = endgame_route_guidance({
+        **endgame_state(0xC2, badges, secret_key=True),
+        "victory_road_2_switches": {"one": True, "two": False},
+        "strength_active": True,
+    })
+    assert "Ignore the optional boulders" in victory_road_2_closed
+    assert "route start at (7,14)" in victory_road_2_closed
+    assert "already beside the exterior exit" in victory_road_far_side
+    assert "EAST through (29,7)/(29,8)" in victory_road_far_side
+    assert trusted_story_route_action({
+        **endgame_state(0xC2, badges, secret_key=True),
+        "victory_road_2_switches": {"one": False, "two": False},
+        "coordinates": {"x": 28, "y": 7},
+    }) == "right"
+    assert "Switch one is ON" in victory_road_2_open
+    assert "(28,16), (28,11), (23,11)" in victory_road_2_open
+    assert trusted_story_route_action({
+        **endgame_state(0xC2, badges, secret_key=True),
+        "victory_road_2_switches": {"one": True, "two": False},
+        "strength_active": True,
+        "coordinates": {"x": 3, "y": 16},
+    }) == "up"
+    assert trusted_story_route_action({
+        **endgame_state(0xC2, badges, secret_key=True),
+        "victory_road_2_switches": {"one": True, "two": False},
+        "strength_active": True,
+        "coordinates": {"x": 15, "y": 16},
+    }) == "right"
+    assert trusted_story_route_action({
+        **endgame_state(0xC2, badges, secret_key=True),
+        "victory_road_2_switches": {"one": True, "two": False},
+        "strength_active": True,
+        "coordinates": {"x": 23, "y": 8},
+    }) == "up"
+    assert trusted_story_route_action({
+        **endgame_state(0xC2, badges, secret_key=True),
+        "victory_road_2_switches": {"one": True, "two": False},
+        "strength_active": True,
+        "coordinates": {"x": 23, "y": 7},
+    }) == "left"
+    assert trusted_story_route_action({
+        **endgame_state(0xC2, badges, secret_key=True),
+        "victory_road_2_switches": {"one": True, "two": False},
+        "strength_active": True,
+        "coordinates": {"x": 22, "y": 7},
+    }) == "right"
+    assert trusted_story_route_action({
+        **endgame_state(0xC2, badges, secret_key=True),
+        "victory_road_2_switches": {"one": False, "two": False},
+        "victory_road_2_boulders": [{"x": 4, "y": 14}],
+        "strength_active": True,
+        "coordinates": {"x": 7, "y": 14},
+    }) == "left"
+    assert trusted_story_route_action({
+        **endgame_state(0xC2, badges, secret_key=True),
+        "victory_road_2_switches": {"one": False, "two": False},
+        "victory_road_2_boulders": [{"x": 2, "y": 16}],
+        "strength_active": True,
+        "coordinates": {"x": 3, "y": 16},
+    }) == "left"
+    victory_road_final_inactive = endgame_route_guidance({
+        **endgame_state(0xC2, badges, secret_key=True),
+        "victory_road_2_switches": {"one": True, "two": False},
+        "victory_road_3_events": {
+            "switch": True,
+            "hole_boulder": True,
+        },
+        "strength_active": False,
+    })
+    victory_road_final = endgame_route_guidance({
+        **endgame_state(0xC2, badges, secret_key=True),
+        "victory_road_2_switches": {"one": True, "two": False},
+        "victory_road_3_events": {
+            "switch": True,
+            "hole_boulder": True,
+        },
+        "strength_active": True,
+    })
+    victory_road_exit = endgame_route_guidance({
+        **endgame_state(0xC2, badges, secret_key=True),
+        "victory_road_2_switches": {"one": True, "two": True},
+        "strength_active": True,
+    })
+    assert "Activate BLASTOISE's STRENGTH" in victory_road_final_inactive
+    assert "DOWN x5 and LEFT x4" in victory_road_final
+    assert "switch (9,16)" in victory_road_final
+    assert "Both 2F switches are ON" in victory_road_exit
+    assert "(25,14)" in victory_road_exit
+    assert "(26,8)" in victory_road_exit
+    assert "final exit at (29,7)/(29,8)" in victory_road_exit
+    victory_road_3_exit = endgame_route_guidance({
+        **endgame_state(0xC6, badges, secret_key=True),
+        "victory_road_2_switches": {"one": True, "two": True},
+        "victory_road_3_events": {
+            "switch": True,
+            "hole_boulder": True,
+        },
+    })
+    assert "reach warp (26,8)" in victory_road_3_exit
+    assert "walk EAST through exit" in victory_road_3_exit
+    assert trusted_story_route_action({
+        **endgame_state(0xC6, badges, secret_key=True),
+        "victory_road_2_switches": {"one": True, "two": True},
+        "coordinates": {"x": 22, "y": 7},
+    }) == "right"
+    assert trusted_story_route_action({
+        **endgame_state(0xC2, badges, secret_key=True),
+        "victory_road_2_switches": {"one": True, "two": True},
+        "coordinates": {"x": 23, "y": 7},
+    }) == "down"
+    assert trusted_story_route_action({
+        **endgame_state(0xC2, badges, secret_key=True),
+        "victory_road_2_switches": {"one": True, "two": True},
+        "coordinates": {"x": 24, "y": 14},
+    }) == "right"
+    assert trusted_story_route_action({
+        **endgame_state(0xC6, badges, secret_key=True),
+        "victory_road_2_switches": {"one": True, "two": True},
+        "coordinates": {"x": 27, "y": 8},
+    }) == "left"
+    assert trusted_story_route_action({
+        **endgame_state(0xC2, badges, secret_key=True),
+        "victory_road_2_switches": {"one": True, "two": True},
+        "coordinates": {"x": 28, "y": 8},
+    }) == "right"
+    assert trusted_story_route_action({
+        **endgame_state(0xC2, badges, secret_key=True),
+        "victory_road_2_switches": {"one": True, "two": False},
+        "victory_road_2_boulders": [
+            {"x": 1, "y": 16},
+            {"x": 5, "y": 5},
+            {"x": 23, "y": 16},
+        ],
+        "victory_road_3_events": {
+            "switch": True,
+            "hole_boulder": True,
+        },
+        "strength_active": True,
+        "coordinates": {"x": 28, "y": 11},
+    }) == "down"
+    assert trusted_story_route_action({
+        **endgame_state(0xC2, badges, secret_key=True),
+        "victory_road_2_switches": {"one": True, "two": False},
+        "victory_road_2_boulders": [
+            {"x": 1, "y": 16},
+            {"x": 5, "y": 5},
+            {"x": 23, "y": 16},
+        ],
+        "victory_road_3_events": {
+            "switch": True,
+            "hole_boulder": True,
+        },
+        "strength_active": True,
+        "coordinates": {"x": 24, "y": 16},
+    }) == "left"
+    victory_road_3_dead_end = endgame_route_guidance({
+        **endgame_state(0xC6, badges, secret_key=True),
+        "victory_road_3_events": {
+            "switch": False,
+            "hole_boulder": False,
+        },
+        "victory_road_3_boulders": [
+            {"x": 22, "y": 3},
+            {"x": 13, "y": 12},
+            {"x": 24, "y": 10},
+            {"x": 22, "y": 15},
+        ],
+        "coordinates": {"x": 7, "y": 2},
+    })
+    victory_road_3_switch = endgame_route_guidance({
+        **endgame_state(0xC6, badges, secret_key=True),
+        "victory_road_3_events": {
+            "switch": True,
+            "hole_boulder": False,
+        },
+    })
+    victory_road_3_strength_reset = endgame_route_guidance({
+        **endgame_state(0xC6, badges, secret_key=True),
+        "victory_road_3_events": {
+            "switch": False,
+            "hole_boulder": False,
+        },
+        "strength_active": False,
+        "coordinates": {"x": 23, "y": 7},
+    })
+    assert "dead-end (2,0) 3F pocket" in victory_road_3_dead_end
+    assert "Use DIGLETT's DIG" in victory_road_3_dead_end
+    assert "boulder four at (22,15)" in victory_road_3_switch
+    assert "hole (23,15)" in victory_road_3_switch
+    assert "DOWN, LEFT x3, DOWN x2" in victory_road_3_switch
+    assert "Activate BLASTOISE's STRENGTH" in victory_road_3_strength_reset
+    assert "UP x4, LEFT x4" in victory_road_3_strength_reset
+    victory_road_3_moved = endgame_route_guidance({
+        **endgame_state(0xC6, badges, secret_key=True),
+        "victory_road_3_events": {
+            "switch": False,
+            "hole_boulder": False,
+        },
+        "victory_road_3_boulders": [{"x": 8, "y": 3}],
+        "coordinates": {"x": 7, "y": 2},
+    })
+    assert "LEFT x27" in victory_road_3_moved
+    assert "never Dig after boulder one moves" in victory_road_3_moved
+    assert trusted_story_route_action({
+        **endgame_state(0xC6, badges, secret_key=True),
+        "victory_road_3_events": {
+            "switch": False,
+            "hole_boulder": False,
+        },
+        "victory_road_3_boulders": [{"x": 20, "y": 3}],
+        "strength_active": True,
+        "coordinates": {"x": 21, "y": 3},
+    }) == "down"
+    assert trusted_story_route_action({
+        **endgame_state(0xC6, badges, secret_key=True),
+        "victory_road_3_events": {
+            "switch": False,
+            "hole_boulder": False,
+        },
+        "victory_road_3_boulders": [{"x": 22, "y": 3}],
+        "strength_active": True,
+        "coordinates": {"x": 23, "y": 7},
+    }) == "up"
+    assert trusted_story_route_action({
+        **endgame_state(0xC6, badges, secret_key=True),
+        "victory_road_3_events": {
+            "switch": False,
+            "hole_boulder": False,
+        },
+        "victory_road_3_boulders": [{"x": 22, "y": 3}],
+        "strength_active": True,
+        "coordinates": {"x": 23, "y": 3},
+    }) == "left"
+    assert trusted_story_route_action({
+        **endgame_state(0xC6, badges, secret_key=True),
+        "victory_road_3_events": {
+            "switch": False,
+            "hole_boulder": False,
+        },
+        "victory_road_3_boulders": [{"x": 2, "y": 5}],
+        "strength_active": True,
+        "coordinates": {"x": 1, "y": 5},
+    }) == "right"
+    assert trusted_story_route_action({
+        **endgame_state(0xC6, badges, secret_key=True),
+        "victory_road_3_events": {
+            "switch": True,
+            "hole_boulder": False,
+        },
+        "victory_road_3_boulders": [
+            {"x": 3, "y": 5},
+            {"x": 13, "y": 12},
+            {"x": 24, "y": 10},
+            {"x": 22, "y": 15},
+        ],
+        "strength_active": True,
+        "coordinates": {"x": 20, "y": 10},
+    }) == "up"
+    assert trusted_story_route_action({
+        **endgame_state(0xC6, badges, secret_key=True),
+        "victory_road_3_events": {
+            "switch": True,
+            "hole_boulder": False,
+        },
+        "victory_road_3_boulders": [
+            {"x": 3, "y": 5},
+            {"x": 13, "y": 12},
+            {"x": 24, "y": 10},
+            {"x": 22, "y": 15},
+        ],
+        "strength_active": True,
+        "coordinates": {"x": 23, "y": 7},
+    }) is None
+    assert trusted_story_route_action({
+        **endgame_state(0xC6, badges, secret_key=True),
+        "victory_road_3_events": {
+            "switch": True,
+            "hole_boulder": False,
+        },
+        "victory_road_3_boulders": [
+            {"x": 3, "y": 5},
+            {"x": 13, "y": 12},
+            {"x": 24, "y": 10},
+            {"x": 22, "y": 15},
+        ],
+        "strength_active": True,
+        "coordinates": {"x": 21, "y": 15},
+    }) == "right"
+    assert "Lorelei" in endgame_route_guidance(
+        endgame_state(0xAE, badges, secret_key=True)
+    )
+    assert "Hall of Fame" in endgame_route_guidance(
+        endgame_state(0x78, badges, secret_key=True)
+    )
+    assert endgame_route_guidance(
+        endgame_state(0x06, ["Boulder"], secret_key=False)
+    ) is None
+
+
+def test_postgame_guidance_routes_to_master_ball_mewtwo_capture():
+    completed = {
+        **endgame_state(
+            0x76,
+            [],
+            hm_fly=True,
+            hm_surf=True,
+            master_ball=True,
+        ),
+        "completed": True,
+        "hall_of_fame": True,
+        "mewtwo_caught": False,
+        "mewtwo_encounter_resolved": False,
+    }
+
+    assert "choose CONTINUE" in endgame_route_guidance(completed)
+    assert "Do not choose NEW GAME" in endgame_route_guidance(completed)
+    assert "cave entrance warp at (4,11)" in endgame_route_guidance({
+        **completed,
+        "map_id": 0x03,
+        "hall_of_fame": False,
+    })
+    route24 = endgame_route_guidance({
+        **completed,
+        "map_id": 0x23,
+        "hall_of_fame": False,
+    })
+    assert "Cross Nugget Bridge" in route24
+    assert "travel SOUTH" in route24
+    assert "water west of Nugget Bridge" in endgame_route_guidance({
+        **completed,
+        "map_id": 0x24,
+        "hall_of_fame": False,
+    })
+    assert "ladder (27,1)" in endgame_route_guidance({
+        **completed,
+        "map_id": 0xE4,
+        "hall_of_fame": False,
+        "coordinates": {"x": 24, "y": 17},
+    })
+    assert "ladder (19,7)" in endgame_route_guidance({
+        **completed,
+        "map_id": 0xE2,
+        "hall_of_fame": False,
+        "coordinates": {"x": 29, "y": 1},
+    })
+    assert "ladder (3,11)" in endgame_route_guidance({
+        **completed,
+        "map_id": 0xE4,
+        "hall_of_fame": False,
+        "coordinates": {"x": 18, "y": 9},
+    })
+    assert "ladder (1,3)" in endgame_route_guidance({
+        **completed,
+        "map_id": 0xE2,
+        "hall_of_fame": False,
+        "coordinates": {"x": 3, "y": 11},
+    })
+    mewtwo = endgame_route_guidance({
+        **completed,
+        "map_id": 0xE3,
+        "hall_of_fame": False,
+        "coordinates": {"x": 27, "y": 14},
+    })
+    assert "Mewtwo at (27,13)" in mewtwo
+    assert "MASTER BALL immediately" in mewtwo
+    assert "NEVER ATTACK" in mewtwo
+    assert "Dex 150 ownership" in mewtwo
+    assert "static Mewtwo encounter is resolved" in endgame_route_guidance({
+        **completed,
+        "hall_of_fame": False,
+        "mewtwo_encounter_resolved": True,
+    })
+    assert "MEWTWO is caught" in endgame_route_guidance({
+        **completed,
+        "hall_of_fame": False,
+        "mewtwo_caught": True,
+        "mewtwo_encounter_resolved": True,
+    })
 
 
 def test_collision_warp_tile_stays_probeable_after_a_wall_bump(tmp_path):
@@ -1102,11 +2237,11 @@ def test_wall_bump_plus_hub_revisits_do_not_arm_puzzle_mode(tmp_path):
     assert assessment["episode"] is None
 
 
-def _activated_memory(tmp_path):
+def _activated_memory(tmp_path, map_id=0xC9):
     memory = NavigationMemory(tmp_path / "navigation-memory.json")
     now = datetime.now(timezone.utc)
-    a = (0xC9, 15, 11)
-    b = (0xC9, 15, 13)
+    a = (map_id, 15, 11)
+    b = (map_id, 15, 13)
     memory.begin(a, ["down"], phase="overworld")
     memory.finish(b, now=now)
     memory.begin(b, ["up"], phase="overworld")
@@ -2487,6 +3622,112 @@ def test_puzzle_decision_state_carries_neighborhood_directive_and_counters(
     assert research_calls and research_calls[0]["frontier"]
 
 
+def test_exact_route_guidance_suppresses_conflicting_frontier(tmp_path):
+    memory, now, b = _activated_memory(tmp_path, map_id=0xEA)
+    a = (0xEA, 15, 11)
+    warps = [
+        {"x": 10, "y": 0, "destination_map": 0xEB},
+        {"x": 12, "y": 0, "destination_map": 0xEC},
+    ]
+    # A newly observed warp signature intentionally resets an old episode.
+    # Establish it first, then reproduce the loop the route override must relax.
+    memory.observe_warps(0xEA, warps)
+    memory.begin(a, ["down"], phase="overworld")
+    memory.finish(b, now=now)
+    memory.begin(b, ["up"], phase="overworld")
+    memory.finish(a, now=now)
+    memory.begin(a, ["down"], phase="overworld")
+    memory.finish(b, now=now)
+    runner = PokemonRunner.__new__(PokemonRunner)
+    runner.screens_dir = tmp_path
+    runner.run_id = "test"
+    runner.decision_sequence = 0
+    runner.control_generation = 0
+    runner.control_mode = "ai"
+    runner.emulator_pause_requested = False
+    runner.status = {"phase": "overworld", "model_calls": 0}
+    runner.navigation_memory = memory
+    runner.decision_positions = deque(maxlen=6)
+    runner.stuck_decision_count = 2
+    runner.puzzle_feedback = None
+    runner.navigation_mode = "puzzle"
+    runner.stuck_web_research_enabled = False
+    runner.total_decisions = 7
+    runner.last_edge_count = 0
+    runner.steps_since_new_edge = 3
+    runner.edge_count_history = deque(
+        maxlen=pokemon_module.EDGE_LEARNING_WINDOW_DECISIONS + 1
+    )
+    runner.history = []
+    runner.pending_decision_id = None
+    runner.decision_pending = False
+    runner.brain_requests = queue.Queue()
+    runner._maybe_start_web_research = lambda **kwargs: None
+    runner._crowd_route_advisory = lambda **kwargs: None
+    image = SimpleNamespace(
+        save=lambda path, format=None: Path(path).write_bytes(b"png")
+    )
+    game_state = silph_state(
+        0xEA,
+        warps,
+        x=b[1],
+        y=b[2],
+        card_key=True,
+    )
+
+    collision = "\n".join(
+        "....P....." if index == 4 else ".........." for index in range(9)
+    )
+    runner._request_decision(image, game_state, collision)
+
+    request = runner.brain_requests.get_nowait()
+    state = request["game_state"]
+    assert "choose 3F" in state["route_guidance"]
+    assert "frontier_directive" not in state
+    assert "navigation_mode" not in state
+    assert request["navigation_mode"] == "normal"
+    # The deterministic stuck episode remains available after the story
+    # interaction if it does not actually make progress.
+    assert runner.navigation_mode == "puzzle"
+
+
+def test_exact_route_guidance_cancels_route_before_replay(tmp_path):
+    runner = PokemonRunner.__new__(PokemonRunner)
+    runner.committed_route = {
+        "steps": [
+            {
+                "origin": [0xC0, 4, 17],
+                "direction": "down",
+                "destination": [0x1F, 48, 6],
+            }
+        ],
+        "index": 0,
+        "generation": 0,
+        "source": "solved_route",
+    }
+    runner.status = {"committed_route": {"source": "solved_route"}}
+    runner.navigation_memory = NavigationMemory(
+        tmp_path / "navigation-memory.json"
+    )
+    game_state = {
+        "map_id": 0xC0,
+        "coordinates": {"x": 4, "y": 17},
+        "screen_text": "",
+        "badges": [
+            "Boulder", "Cascade", "Thunder", "Rainbow", "Soul", "Marsh"
+        ],
+        "key_items": {
+            "hm_surf": True,
+            "hm_strength": True,
+            "secret_key": False,
+        },
+    }
+
+    assert runner._advance_committed_route(game_state) is False
+    assert runner.committed_route is None
+    assert runner.status["committed_route"] is None
+
+
 def test_prompt_stamps_step_counters_with_time_blindness_line():
     prompt = CopilotBrain._prompt(
         {
@@ -3842,6 +5083,56 @@ def test_supervisor_restarts_failed_child_then_stops_cleanly(monkeypatch, tmp_pa
     assert json.loads((tmp_path / "supervisor.json").read_text())["running"] is False
 
 
+def test_supervisor_circuit_cools_down_then_retries(monkeypatch, tmp_path):
+    exit_codes = iter([1] * 11 + [0])
+    children = []
+
+    class FakeChild:
+        def __init__(self, command, **kwargs):
+            del command, kwargs
+            self.pid = 2000 + len(children)
+            self.returncode = None
+            children.append(self)
+
+        def wait(self, timeout=None):
+            del timeout
+            if self.returncode is None:
+                self.returncode = next(exit_codes)
+            return self.returncode
+
+        def poll(self):
+            return self.returncode
+
+        def terminate(self):
+            self.returncode = 0
+
+        def kill(self):
+            self.returncode = -9
+
+    monkeypatch.setattr(pokemon_module.subprocess, "Popen", FakeChild)
+    monkeypatch.setattr(pokemon_module.time, "sleep", lambda seconds: None)
+    monkeypatch.setattr(pokemon_module.signal, "signal", lambda *args: None)
+    monkeypatch.setattr(
+        pokemon_module,
+        "SUPERVISOR_RESTART_COOLDOWN_SECONDS",
+        0,
+    )
+    args = build_parser().parse_args(
+        [
+            "supervise",
+            "--rom",
+            str(tmp_path / "Pokemon Red.gb"),
+            "--runtime-dir",
+            str(tmp_path),
+            "--instance-id",
+            "circuit-test",
+        ]
+    )
+
+    assert supervisor_main(args) == 0
+    assert len(children) == 12
+
+
 def test_supervisor_does_not_retry_nonretryable_startup_failure(
     monkeypatch,
     tmp_path,
@@ -4087,13 +5378,42 @@ def test_supervisor_escalates_hung_child_on_stop():
     assert child.terminated is True
 
 
-def test_stop_control_sets_supervisor_owned_desired_state(tmp_path):
+def test_running_stop_waits_for_child_to_consume_control(tmp_path):
     (tmp_path / "desired.json").write_text(json.dumps({"running": True}))
 
     pokemon_module.append_control(tmp_path, {"action": "stop"})
 
-    assert json.loads((tmp_path / "desired.json").read_text())["running"] is False
+    assert json.loads((tmp_path / "desired.json").read_text())["running"] is True
     assert json.loads((tmp_path / "control.jsonl").read_text())["action"] == "stop"
+
+
+def test_new_supervisor_cursor_skips_historical_stop(tmp_path):
+    control = tmp_path / "control.jsonl"
+    control.write_text(
+        '{"action":"checkpoint"}\n{"action":"stop"}\n',
+        encoding="utf-8",
+    )
+    (tmp_path / pokemon_module.CONTROL_CURSOR_NAME).write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "offset": len('{"action":"checkpoint"}\n'),
+                "file_id": list(
+                    (control.stat().st_dev, control.stat().st_ino)
+                ),
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    pokemon_module.initialize_control_cursor_at_eof(tmp_path)
+
+    cursor = json.loads(
+        (tmp_path / pokemon_module.CONTROL_CURSOR_NAME).read_text()
+    )
+    assert cursor["offset"] == control.stat().st_size
+    assert cursor["file_id"] == [control.stat().st_dev, control.stat().st_ino]
 
 
 def test_agent_can_stop_supervisor_between_child_retries(tmp_path):

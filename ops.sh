@@ -9,6 +9,7 @@
 #   ./ops.sh                 # serve on loopback and publish over the tailnet
 #   ./ops.sh --no-publish    # loopback only
 #   ./ops.sh --once          # print one metrics document and exit
+#   ./ops.sh --wait-for-attention --timeout-seconds 1800
 #   ./ops.sh --unpublish     # withdraw the tailnet route
 set -euo pipefail
 
@@ -37,8 +38,8 @@ if [[ "${1:-}" == "--unpublish" ]]; then
   exit 0
 fi
 
-if [[ "${1:-}" == "--once" ]]; then
-  exec "$VENV/bin/python" -m rappter_plays_pokemon.ops --once --port "$PORT"
+if [[ "${1:-}" == "--once" || "${1:-}" == "--wait-for-attention" ]]; then
+  exec "$VENV/bin/python" -m rappter_plays_pokemon.ops "$@" --port "$PORT"
 fi
 
 PUBLISH=1

@@ -158,6 +158,7 @@ MAX_DECISIONS_PER_SESSION = 24
 REASONING_EFFORTS = ("low", "medium", "high", "max")
 DEFAULT_REASONING_EFFORT = "medium"
 DECISION_COOLDOWN_SECONDS = 0.25
+TRUSTED_STORY_SETTLE_SECONDS = 2.0
 COPILOT_START_TIMEOUT_SECONDS = 90
 COPILOT_STOP_TIMEOUT_SECONDS = 15
 COPILOT_THREAD_SHUTDOWN_TIMEOUT_SECONDS = COPILOT_STOP_TIMEOUT_SECONDS * 3 + 5
@@ -173,6 +174,9 @@ STATUS_HEARTBEAT_FRESH_SECONDS = 15
 SUPERVISOR_HEARTBEAT_TIMEOUT_SECONDS = 45
 SUPERVISOR_STARTUP_TIMEOUT_SECONDS = 180
 SUPERVISOR_STALE_HEARTBEAT_EXIT = 75
+SUPERVISOR_RESTART_WINDOW_SECONDS = 600
+SUPERVISOR_RESTART_LIMIT = 10
+SUPERVISOR_RESTART_COOLDOWN_SECONDS = 300
 RESTART_REQUEST_NAME = "restart-request.json"
 YOUTUBE_CHAT_ADVISORY_NAME = "youtube-chat-advisory.json"
 NAVIGATION_MEMORY_NAME = "navigation-memory.json"
@@ -248,6 +252,7 @@ PAUSE_KINDS = {"automation", "operator_hold"}
 CARDINAL_BUTTONS = ("up", "down", "left", "right")
 W_NUM_BAG_ITEMS = 0xD31D
 W_BAG_ITEMS = 0xD31E
+W_EVENT_FLAGS = 0xD747
 BAG_ITEM_CAPACITY = 20
 # Fixed gain mapping the Game Boy APU's small integer mix onto int16 after DC
 # removal. Measured over 10s of play: DC +24.0, peak deviation 24 counts, so
@@ -261,6 +266,360 @@ POKE_FLUTE_ITEM_ID = 0x49
 LIFT_KEY_ITEM_ID = 0x4A
 CARD_KEY_ITEM_ID = 0x30
 MASTER_BALL_ITEM_ID = 0x01
+HALL_OF_FAME_COMPLETED_EVENT = 0x000
+MEWTWO_DEX_NUMBER = 150
+MEWTWO_EVENT = 0x8C1
+SECRET_KEY_ITEM_ID = 0x2B
+HM_FLY_ITEM_ID = 0xC5
+HM_SURF_ITEM_ID = 0xC6
+HM_STRENGTH_ITEM_ID = 0xC7
+SEAFOAM_BOULDER_EVENT_PAIRS = {
+    "one_to_b1f": (0x50E, 0x50F),
+    "b1f_to_b2f": (0x9C0, 0x9C1),
+    "b2f_to_b3f": (0x9C8, 0x9C9),
+    "b3f_to_b4f": (0x9D0, 0x9D1),
+}
+MANSION_SWITCH_EVENT = 0x278
+VICTORY_ROAD_1_SWITCH_EVENT = 0x917
+VICTORY_ROAD_1_ROUTE_ACTIONS = {
+    (14, 13, 5, 15): "down",
+    (14, 14, 5, 15): "left",
+    (13, 14, 5, 15): "left",
+    (12, 14, 5, 15): "left",
+    (11, 14, 5, 15): "left",
+    (10, 14, 5, 15): "left",
+    (9, 14, 5, 15): "down",
+    (9, 15, 5, 15): "down",
+    (9, 16, 5, 15): "left",
+    (8, 16, 5, 15): "left",
+    (7, 16, 5, 15): "left",
+    (6, 16, 5, 15): "left",
+    (5, 16, 5, 15): "left",
+    (4, 16, 5, 15): "up",
+    (4, 15, 5, 15): "up",
+    (4, 14, 5, 15): "right",
+    (5, 14, 5, 15): "down",
+    (5, 14, 5, 16): "down",
+    (5, 15, 5, 16): "left",
+    (4, 15, 5, 16): "down",
+    (4, 16, 5, 16): "right",
+    (4, 16, 6, 16): "right",
+    (5, 16, 6, 16): "right",
+    (5, 16, 7, 16): "right",
+    (6, 16, 7, 16): "right",
+    (6, 16, 8, 16): "right",
+    (7, 16, 8, 16): "right",
+    (7, 16, 9, 16): "down",
+    (7, 17, 9, 16): "right",
+    (8, 17, 9, 16): "right",
+    (9, 17, 9, 16): "up",
+    (9, 17, 9, 15): "up",
+    (9, 16, 9, 15): "up",
+    (9, 16, 9, 14): "up",
+    (9, 15, 9, 14): "left",
+    (8, 15, 9, 14): "up",
+    (8, 14, 9, 14): "right",
+    (8, 14, 10, 14): "right",
+    (9, 14, 10, 14): "right",
+    (9, 14, 11, 14): "right",
+    (10, 14, 11, 14): "right",
+    (10, 14, 12, 14): "right",
+    (11, 14, 12, 14): "right",
+    (11, 14, 13, 14): "right",
+    (12, 14, 13, 14): "right",
+    (12, 14, 14, 14): "right",
+    (13, 14, 14, 14): "right",
+    (13, 14, 15, 14): "right",
+    (14, 14, 15, 14): "right",
+    (14, 14, 16, 14): "down",
+    (14, 15, 16, 14): "right",
+    (15, 15, 16, 14): "right",
+    (16, 15, 16, 14): "up",
+    (16, 15, 16, 13): "up",
+    (16, 14, 16, 13): "up",
+    (16, 14, 16, 12): "left",
+    (15, 14, 16, 12): "left",
+    (14, 14, 16, 12): "up",
+    (14, 13, 16, 12): "up",
+    (14, 12, 16, 12): "right",
+    (15, 12, 16, 12): "right",
+    (15, 12, 17, 12): "up",
+    (15, 11, 17, 12): "right",
+    (16, 11, 17, 12): "right",
+    (17, 11, 17, 12): "down",
+}
+VICTORY_ROAD_1_FAR_SIDE_ACTIONS = {
+    (7, 8): "left",
+    (6, 8): "left",
+    (5, 8): "left",
+    (4, 8): "left",
+    (3, 8): "up",
+    (3, 7): "up",
+    (3, 6): "up",
+    (3, 5): "left",
+    (2, 5): "up",
+    (2, 4): "up",
+    (2, 3): "up",
+    (2, 2): "up",
+    (2, 1): "left",
+}
+VICTORY_ROAD_2_SWITCH_1_EVENT = 0x538
+VICTORY_ROAD_2_SWITCH_2_EVENT = 0x53F
+VICTORY_ROAD_2_ROUTE_ACTIONS = {
+    (7, 14, 4, 14): "left",
+    (6, 14, 4, 14): "left",
+    (5, 14, 4, 14): "left",
+    (5, 14, 3, 14): "up",
+    (5, 13, 3, 14): "left",
+    (4, 13, 3, 14): "left",
+    (3, 13, 3, 14): "down",
+    (3, 13, 3, 15): "down",
+    (3, 14, 3, 15): "down",
+    (3, 14, 3, 16): "down",
+    (3, 15, 3, 16): "right",
+    (4, 15, 3, 16): "down",
+    (4, 16, 3, 16): "left",
+    (4, 16, 2, 16): "left",
+    (3, 16, 2, 16): "left",
+}
+VICTORY_ROAD_2_OPEN_ACTIONS = {
+    (3, 16): "up",
+    (3, 15): "up",
+    (3, 14): "up",
+    (3, 13): "up",
+    (3, 12): "up",
+    (3, 11): "right",
+    (4, 11): "right",
+    (5, 11): "up",
+    (5, 10): "up",
+    (5, 9): "up",
+    (5, 8): "right",
+    (6, 8): "right",
+    (7, 8): "right",
+    (8, 8): "right",
+    (9, 8): "right",
+    (10, 8): "right",
+    (11, 8): "right",
+    (12, 8): "right",
+    (13, 8): "down",
+    (13, 9): "down",
+    (13, 10): "down",
+    (13, 11): "down",
+    (13, 12): "down",
+    (13, 13): "down",
+    (13, 14): "right",
+    (14, 14): "right",
+    (15, 14): "down",
+    (15, 15): "down",
+    (15, 16): "right",
+    (16, 16): "right",
+    (17, 16): "right",
+    (18, 16): "right",
+    (19, 16): "right",
+    (20, 16): "right",
+    (21, 16): "right",
+    (22, 16): "right",
+    (23, 16): "right",
+    (24, 16): "right",
+    (25, 16): "right",
+    (26, 16): "right",
+    (27, 16): "right",
+    (28, 16): "up",
+    (28, 15): "up",
+    (28, 14): "up",
+    (28, 13): "up",
+    (28, 12): "up",
+    (28, 11): "left",
+    (27, 11): "left",
+    (26, 11): "left",
+    (25, 11): "left",
+    (24, 11): "left",
+    (23, 11): "up",
+    (23, 10): "up",
+    (23, 9): "up",
+    (23, 8): "up",
+}
+VICTORY_ROAD_3_SWITCH_1_EVENT = 0x660
+VICTORY_ROAD_3_HOLE_BOULDER_EVENT = 0x666
+VICTORY_ROAD_3_ROUTE_ACTIONS = {
+    (23, 7, 22, 3): "up",
+    (23, 6, 22, 3): "up",
+    (23, 5, 22, 3): "up",
+    (23, 4, 22, 3): "up",
+    (23, 3, 22, 3): "left",
+    (23, 3, 21, 3): "left",
+    (22, 3, 21, 3): "left",
+    (22, 3, 20, 3): "left",
+    (21, 3, 20, 3): "down",
+    (21, 4, 20, 3): "left",
+    (20, 4, 20, 3): "up",
+    (20, 4, 20, 2): "up",
+    (20, 3, 20, 2): "up",
+    (20, 3, 20, 1): "up",
+    (20, 2, 20, 1): "right",
+    (21, 2, 20, 1): "up",
+    (21, 1, 20, 1): "left",
+    (21, 1, 19, 1): "left",
+    (20, 1, 19, 1): "left",
+    (20, 1, 18, 1): "left",
+    (19, 1, 18, 1): "left",
+    (19, 1, 17, 1): "left",
+    (18, 1, 17, 1): "left",
+    (18, 1, 16, 1): "left",
+    (17, 1, 16, 1): "left",
+    (17, 1, 15, 1): "left",
+    (16, 1, 15, 1): "left",
+    (16, 1, 14, 1): "left",
+    (15, 1, 14, 1): "left",
+    (15, 1, 13, 1): "left",
+    (14, 1, 13, 1): "left",
+    (14, 1, 12, 1): "left",
+    (13, 1, 12, 1): "left",
+    (13, 1, 11, 1): "left",
+    (12, 1, 11, 1): "left",
+    (12, 1, 10, 1): "left",
+    (11, 1, 10, 1): "left",
+    (11, 1, 9, 1): "left",
+    (10, 1, 9, 1): "left",
+    (10, 1, 8, 1): "left",
+    (9, 1, 8, 1): "left",
+    (9, 1, 7, 1): "left",
+    (8, 1, 7, 1): "left",
+    (8, 1, 6, 1): "up",
+    (8, 0, 6, 1): "left",
+    (7, 0, 6, 1): "left",
+    (6, 0, 6, 1): "down",
+    (6, 0, 6, 2): "down",
+    (6, 1, 6, 2): "right",
+    (7, 1, 6, 2): "down",
+    (7, 2, 6, 2): "left",
+    (7, 2, 5, 2): "left",
+    (6, 2, 5, 2): "left",
+    (6, 2, 4, 2): "left",
+    (5, 2, 4, 2): "left",
+    (5, 2, 3, 2): "left",
+    (4, 2, 3, 2): "left",
+    (4, 2, 2, 2): "left",
+    (3, 2, 2, 2): "up",
+    (3, 1, 2, 2): "left",
+    (2, 1, 2, 2): "down",
+    (2, 1, 2, 3): "down",
+    (2, 2, 2, 3): "down",
+    (2, 2, 2, 4): "down",
+    (2, 3, 2, 4): "down",
+    (2, 3, 2, 5): "down",
+    (2, 4, 2, 5): "left",
+    (1, 4, 2, 5): "down",
+    (1, 5, 2, 5): "right",
+}
+VICTORY_ROAD_3_HOLE_ACTIONS = {
+    (20, 10, 22, 15): "up",
+    (20, 9, 22, 15): "up",
+    (20, 8, 22, 15): "up",
+    (20, 7, 22, 15): "up",
+    (20, 6, 22, 15): "left",
+    (19, 6, 22, 15): "left",
+    (18, 6, 22, 15): "left",
+    (17, 6, 22, 15): "up",
+    (17, 5, 22, 15): "up",
+    (17, 4, 22, 15): "left",
+    (16, 4, 22, 15): "left",
+    (15, 4, 22, 15): "left",
+    (14, 4, 22, 15): "left",
+    (13, 4, 22, 15): "left",
+    (12, 4, 22, 15): "left",
+    (11, 4, 22, 15): "left",
+    (10, 4, 22, 15): "down",
+    (10, 5, 22, 15): "down",
+    (10, 6, 22, 15): "down",
+    (10, 7, 22, 15): "down",
+    (10, 8, 22, 15): "down",
+    (10, 9, 22, 15): "down",
+    (10, 10, 22, 15): "left",
+    (9, 10, 22, 15): "left",
+    (8, 10, 22, 15): "left",
+    (7, 10, 22, 15): "left",
+    (6, 10, 22, 15): "left",
+    (5, 10, 22, 15): "up",
+    (5, 9, 22, 15): "up",
+    (5, 8, 22, 15): "left",
+    (4, 8, 22, 15): "left",
+    (3, 8, 22, 15): "left",
+    (2, 8, 22, 15): "left",
+    (1, 8, 22, 15): "down",
+    (1, 9, 22, 15): "down",
+    (1, 10, 22, 15): "down",
+    (1, 11, 22, 15): "down",
+    (1, 12, 22, 15): "down",
+    (1, 13, 22, 15): "down",
+    (1, 14, 22, 15): "down",
+    (1, 15, 22, 15): "right",
+    (2, 15, 22, 15): "down",
+    (2, 16, 22, 15): "right",
+    (3, 16, 22, 15): "right",
+    (4, 16, 22, 15): "right",
+    (5, 16, 22, 15): "right",
+    (6, 16, 22, 15): "right",
+    (7, 16, 22, 15): "right",
+    (8, 16, 22, 15): "right",
+    (9, 16, 22, 15): "right",
+    (10, 16, 22, 15): "right",
+    (11, 16, 22, 15): "right",
+    (12, 16, 22, 15): "right",
+    (13, 16, 22, 15): "right",
+    (14, 16, 22, 15): "up",
+    (14, 15, 22, 15): "right",
+    (15, 15, 22, 15): "right",
+    (16, 15, 22, 15): "right",
+    (17, 15, 22, 15): "right",
+    (18, 15, 22, 15): "right",
+    (19, 15, 22, 15): "right",
+    (20, 15, 22, 15): "right",
+    (21, 15, 22, 15): "right",
+}
+VICTORY_ROAD_EXIT_ACTIONS = {
+    (0xC6, 22, 7): "right",
+    (0xC2, 23, 7): "down",
+    (0xC2, 23, 8): "down",
+    (0xC2, 23, 9): "down",
+    (0xC2, 23, 10): "down",
+    (0xC2, 23, 11): "right",
+    (0xC2, 24, 11): "right",
+    (0xC2, 25, 11): "right",
+    (0xC2, 26, 11): "right",
+    (0xC2, 27, 11): "right",
+    (0xC2, 28, 11): "down",
+    (0xC2, 28, 12): "down",
+    (0xC2, 28, 13): "down",
+    (0xC2, 28, 14): "down",
+    (0xC2, 28, 15): "down",
+    (0xC2, 28, 16): "down",
+    (0xC2, 28, 17): "left",
+    (0xC2, 27, 17): "left",
+    (0xC2, 26, 17): "left",
+    (0xC2, 25, 17): "left",
+    (0xC2, 24, 17): "left",
+    (0xC2, 23, 17): "left",
+    (0xC2, 22, 17): "up",
+    (0xC2, 22, 16): "left",
+    (0xC2, 21, 16): "up",
+    (0xC2, 21, 15): "up",
+    (0xC2, 21, 14): "right",
+    (0xC2, 22, 14): "right",
+    (0xC2, 23, 14): "right",
+    (0xC2, 24, 14): "right",
+    (0xC6, 27, 15): "up",
+    (0xC6, 27, 14): "up",
+    (0xC6, 27, 13): "up",
+    (0xC6, 27, 12): "up",
+    (0xC6, 27, 11): "up",
+    (0xC6, 27, 10): "up",
+    (0xC6, 27, 9): "up",
+    (0xC6, 27, 8): "left",
+    (0xC2, 27, 7): "down",
+    (0xC2, 27, 8): "right",
+    (0xC2, 28, 8): "right",
+}
 # Bag contents worth surfacing to the model. Each entry either opens a dungeon
 # that no sequence of movements can open, or proves one is finished; ownership
 # the model cannot see is ownership it will not act on.
@@ -270,6 +629,10 @@ TRACKED_KEY_ITEMS: dict[str, int] = {
     "lift_key": LIFT_KEY_ITEM_ID,
     "card_key": CARD_KEY_ITEM_ID,
     "master_ball": MASTER_BALL_ITEM_ID,
+    "secret_key": SECRET_KEY_ITEM_ID,
+    "hm_fly": HM_FLY_ITEM_ID,
+    "hm_surf": HM_SURF_ITEM_ID,
+    "hm_strength": HM_STRENGTH_ITEM_ID,
 }
 YOUTUBE_VIDEO_ID_RE = re.compile(r"^[A-Za-z0-9_-]{11}$")
 CHAT_ADVISORY_STALE_SECONDS = 90
@@ -3795,6 +4158,10 @@ MAP_NAMES = {
     0x9A: "Fuchsia Pokemon Center",
     0x9C: "Safari Zone Entrance",
     0x9D: "Fuchsia Gym",
+    0x9F: "Seafoam Islands B1F",
+    0xA0: "Seafoam Islands B2F",
+    0xA1: "Seafoam Islands B3F",
+    0xA2: "Seafoam Islands B4F",
     0xA5: "Pokemon Mansion 1F",
     0xA6: "Cinnabar Gym",
     0xAB: "Cinnabar Pokemon Center",
@@ -3802,6 +4169,9 @@ MAP_NAMES = {
     0xB2: "Saffron Gym",
     0xB5: "Silph Co. 1F",
     0xB6: "Saffron Pokemon Center",
+    0xBA: "Route 16 Gate 1F",
+    0xBB: "Route 16 Gate 2F",
+    0xBC: "Route 16 Fly House",
     0xC0: "Seafoam Islands 1F",
     0xC2: "Victory Road 2F",
     0xC5: "Diglett's Cave",
@@ -3817,10 +4187,16 @@ MAP_NAMES = {
     0xD3: "Silph Co. 6F",
     0xD4: "Silph Co. 7F",
     0xD5: "Silph Co. 8F",
+    0xD6: "Pokemon Mansion 2F",
+    0xD7: "Pokemon Mansion 3F",
+    0xD8: "Pokemon Mansion B1F",
     0xD9: "Safari Zone East",
     0xDA: "Safari Zone North",
     0xDB: "Safari Zone West",
     0xDC: "Safari Zone Center",
+    0xE2: "Cerulean Cave 2F",
+    0xE3: "Cerulean Cave B1F",
+    0xE4: "Cerulean Cave 1F",
     0xE8: "Rock Tunnel B1F",
     0xE9: "Silph Co. 9F",
     0xEA: "Silph Co. 10F",
@@ -9156,12 +9532,27 @@ def append_control(runtime_dir: Path, command: dict[str, Any]) -> None:
     runtime_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
     os.chmod(runtime_dir, 0o700)
     command = {**command, "timestamp": utc_now()}
-    if command.get("action") == "stop":
-        set_desired_running(runtime_dir, False)
     control_path = runtime_dir / "control.jsonl"
     descriptor = os.open(control_path, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
     with os.fdopen(descriptor, "a", encoding="utf-8") as handle:
         handle.write(json.dumps(command, separators=(",", ":")) + "\n")
+
+
+def initialize_control_cursor_at_eof(runtime_dir: Path) -> None:
+    """A new supervisor session never replays commands from an older run."""
+    control_path = runtime_dir / "control.jsonl"
+    control_path.touch(mode=0o600, exist_ok=True)
+    os.chmod(control_path, 0o600)
+    identity = control_path.stat()
+    atomic_write_json(
+        runtime_dir / CONTROL_CURSOR_NAME,
+        {
+            "schema_version": 1,
+            "offset": identity.st_size,
+            "file_id": [identity.st_dev, identity.st_ino],
+            "updated_at": utc_now(),
+        },
+    )
 
 
 def list_clips(runtime_dir: Path) -> list[dict[str, Any]]:
@@ -10509,6 +10900,15 @@ class PokemonMemoryReader:
             if bitfield[index // 8] & (1 << (index % 8))
         )
 
+    def _bitfield_flag(
+        self, start: int, dex_number: int
+    ) -> Optional[bool]:
+        if not 1 <= dex_number <= 151:
+            raise ValueError("dex number must be 1-151")
+        index = dex_number - 1
+        value = self._read_optional(start + index // 8)
+        return None if value is None else bool(value & (1 << (index % 8)))
+
     def pokedex_counts(self) -> dict[str, Optional[int]]:
         return {
             "caught": self._bitfield_count(0xD2F7),
@@ -10539,6 +10939,74 @@ class PokemonMemoryReader:
             name: item_id in item_ids
             for name, item_id in TRACKED_KEY_ITEMS.items()
         }
+
+    def _event_flag(self, event: int) -> Optional[bool]:
+        byte = self._read_optional(W_EVENT_FLAGS + event // 8)
+        return None if byte is None else bool(byte & (1 << (event % 8)))
+
+    def seafoam_boulders(self) -> dict[str, Optional[bool]]:
+        output: dict[str, Optional[bool]] = {}
+        for stage, pair in SEAFOAM_BOULDER_EVENT_PAIRS.items():
+            values = [self._event_flag(event) for event in pair]
+            output[stage] = (
+                None if any(value is None for value in values) else all(values)
+            )
+        return output
+
+    def seafoam_boulder_events(self) -> dict[str, Optional[bool]]:
+        return {
+            f"{stage}_{index}": self._event_flag(event)
+            for stage, pair in SEAFOAM_BOULDER_EVENT_PAIRS.items()
+            for index, event in enumerate(pair, start=1)
+        }
+
+    def victory_road_1_boulder(self) -> Optional[dict[str, int]]:
+        if self._read_optional(0xD35E) != 0x6C:
+            return None
+        raw_y = self._read_optional(0xC254)
+        raw_x = self._read_optional(0xC255)
+        if (
+            raw_x is None
+            or raw_y is None
+            or not 4 <= raw_x <= 33
+            or not 4 <= raw_y <= 21
+        ):
+            return None
+        return {"x": raw_x - 4, "y": raw_y - 4}
+
+    def victory_road_2_boulders(self) -> Optional[list[dict[str, int]]]:
+        if self._read_optional(0xD35E) != 0xC2:
+            return None
+        output = []
+        for index in (11, 12, 13):
+            raw_y = self._read_optional(0xC200 + 16 * index + 4)
+            raw_x = self._read_optional(0xC200 + 16 * index + 5)
+            if (
+                raw_x is None
+                or raw_y is None
+                or not 4 <= raw_x <= 33
+                or not 4 <= raw_y <= 21
+            ):
+                return None
+            output.append({"x": raw_x - 4, "y": raw_y - 4})
+        return output
+
+    def victory_road_3_boulders(self) -> Optional[list[dict[str, int]]]:
+        if self._read_optional(0xD35E) != 0xC6:
+            return None
+        output = []
+        for index in (7, 8, 9, 10):
+            raw_y = self._read_optional(0xC200 + 16 * index + 4)
+            raw_x = self._read_optional(0xC200 + 16 * index + 5)
+            if (
+                raw_x is None
+                or raw_y is None
+                or not 4 <= raw_x <= 33
+                or not 4 <= raw_y <= 21
+            ):
+                return None
+            output.append({"x": raw_x - 4, "y": raw_y - 4})
+        return output
 
     def play_time(self) -> Optional[dict[str, Any]]:
         values = [
@@ -10728,8 +11196,36 @@ class PokemonMemoryReader:
             "key_items": self.key_items(),
             "warps": self.warps(),
             "play_time": self.play_time(),
+            "seafoam_boulders": self.seafoam_boulders(),
+            "seafoam_boulder_events": self.seafoam_boulder_events(),
+            "mansion_switch_on": self._event_flag(MANSION_SWITCH_EVENT),
+            "victory_road_1_switch_on": self._event_flag(
+                VICTORY_ROAD_1_SWITCH_EVENT
+            ),
+            "victory_road_1_boulder": self.victory_road_1_boulder(),
+            "victory_road_2_switches": {
+                "one": self._event_flag(VICTORY_ROAD_2_SWITCH_1_EVENT),
+                "two": self._event_flag(VICTORY_ROAD_2_SWITCH_2_EVENT),
+            },
+            "victory_road_2_boulders": self.victory_road_2_boulders(),
+            "victory_road_3_events": {
+                "switch": self._event_flag(VICTORY_ROAD_3_SWITCH_1_EVENT),
+                "hole_boulder": self._event_flag(
+                    VICTORY_ROAD_3_HOLE_BOULDER_EVENT
+                ),
+            },
+            "victory_road_3_boulders": self.victory_road_3_boulders(),
+            "strength_active": bool(self._read(0xD728) & 0x01),
+            "mewtwo_caught": self._bitfield_flag(
+                0xD2F7, MEWTWO_DEX_NUMBER
+            ),
+            "mewtwo_encounter_resolved": self._event_flag(MEWTWO_EVENT),
             "screen_text": self._screen_text(),
             "hall_of_fame": map_id == 0x76 if map_id is not None else False,
+            "hall_of_fame_completed": bool(
+                map_id == 0x76
+                or self._event_flag(HALL_OF_FAME_COMPLETED_EVENT) is True
+            ),
         }
 
 
@@ -10839,6 +11335,1070 @@ def celadon_route_guidance(game_state: dict[str, Any]) -> Optional[str]:
         return (
             "Authoritative Celadon Gym objective: reach Erika at (4,3), "
             "defeat her, and obtain the Rainbow Badge."
+        )
+    return None
+
+
+POKEMON_MANSION_MAP_IDS = frozenset({0xA5, 0xD6, 0xD7, 0xD8})
+SEAFOAM_MAP_IDS = frozenset({0x9F, 0xA0, 0xA1, 0xA2, 0xC0})
+VICTORY_ROAD_MAP_IDS = frozenset({0x6C, 0xC2, 0xC6})
+
+
+def endgame_route_guidance(game_state: dict[str, Any]) -> Optional[str]:
+    """Keep the six-badge run on the required Cinnabar-to-League sequence."""
+    badges = game_state.get("badges")
+    postgame_completed = bool(
+        game_state.get("completed") is True
+        or game_state.get("hall_of_fame") is True
+        or game_state.get("hall_of_fame_completed") is True
+    )
+    if (
+        not postgame_completed
+        and (not isinstance(badges, list) or "Marsh" not in badges)
+    ):
+        return None
+    badges = badges if isinstance(badges, list) else []
+    map_id = game_state.get("map_id")
+    coordinates = game_state.get("coordinates")
+    position = (
+        (coordinates.get("x"), coordinates.get("y"))
+        if isinstance(coordinates, dict)
+        else (None, None)
+    )
+    key_items = game_state.get("key_items")
+    key_items = key_items if isinstance(key_items, dict) else {}
+    secret_key = key_items.get("secret_key")
+    hm_fly = key_items.get("hm_fly")
+    hm_surf = key_items.get("hm_surf")
+    hm_strength = key_items.get("hm_strength")
+    seafoam_boulders = game_state.get("seafoam_boulders")
+    seafoam_boulders = (
+        seafoam_boulders if isinstance(seafoam_boulders, dict) else {}
+    )
+    seafoam_boulder_events = game_state.get("seafoam_boulder_events")
+    seafoam_boulder_events = (
+        seafoam_boulder_events
+        if isinstance(seafoam_boulder_events, dict)
+        else {}
+    )
+    mansion_switch_on = game_state.get("mansion_switch_on")
+    victory_road_1_switch_on = game_state.get(
+        "victory_road_1_switch_on"
+    )
+    victory_road_1_boulder = game_state.get("victory_road_1_boulder")
+    victory_road_2_switches = game_state.get("victory_road_2_switches")
+    victory_road_3_events = game_state.get("victory_road_3_events")
+    victory_road_3_boulders = game_state.get("victory_road_3_boulders")
+    strength_active = game_state.get("strength_active")
+    party = game_state.get("party")
+    lead_needs_heal = False
+    if isinstance(party, list) and party and isinstance(party[0], dict):
+        lead_hp = party[0].get("hp")
+        lead_max_hp = party[0].get("max_hp")
+        lead_needs_heal = bool(
+            isinstance(lead_hp, int)
+            and isinstance(lead_max_hp, int)
+            and lead_max_hp > 0
+            and lead_hp * 2 < lead_max_hp
+        )
+
+    if postgame_completed:
+        mewtwo_caught = game_state.get("mewtwo_caught")
+        mewtwo_resolved = game_state.get("mewtwo_encounter_resolved")
+        master_ball = key_items.get("master_ball")
+        if mewtwo_caught is True:
+            return (
+                "Authoritative postgame objective COMPLETE. MEWTWO is caught; "
+                "preserve this state and do not release or trade it."
+            )
+        if mewtwo_resolved is True:
+            return (
+                "CRITICAL: the static Mewtwo encounter is resolved but Dex 150 "
+                "is not owned. Do not save further progress; restore the latest "
+                "pre-Mewtwo checkpoint."
+            )
+        if map_id == 0x76:
+            return (
+                "Authoritative postgame route. Finish the Hall of Fame ceremony "
+                "and credits. At the title screen press START, choose CONTINUE, "
+                "and load the completed save. Do not choose NEW GAME."
+            )
+        if map_id == 0x03:
+            return (
+                "Authoritative Mewtwo route. In Cerulean City reach the cave "
+                "entrance warp at (4,11), using SURF around the northwest water "
+                "if required, and enter Cerulean Cave."
+            )
+        if map_id == 0x23:
+            return (
+                "Authoritative Mewtwo route. Cross Nugget Bridge north on "
+                "Route 24, move west to the water channel, activate SURF, and "
+                "travel SOUTH along the water west of the bridge into "
+                "Cerulean City's northwest basin. Enter Cerulean Cave at "
+                "(4,11)."
+            )
+        if map_id == 0x24:
+            return (
+                "Authoritative Mewtwo route. Return WEST from Route 25 to the "
+                "top of Route 24, then Surf SOUTH down the water west of Nugget "
+                "Bridge into Cerulean and enter the cave at (4,11)."
+            )
+        if map_id == 0xE4:
+            if (
+                isinstance(position[0], int)
+                and isinstance(position[1], int)
+                and position[0] >= 20
+                and position[1] >= 12
+            ):
+                return (
+                    "Authoritative Cerulean Cave route. From the 1F entrance "
+                    "(24,17), follow the dry plateau to ladder (27,1), which "
+                    "enters 2F at (29,1). Ignore optional items."
+                )
+            if (
+                isinstance(position[0], int)
+                and isinstance(position[1], int)
+                and position[0] >= 12
+                and position[1] >= 7
+            ):
+                return (
+                    "Authoritative Cerulean Cave route. This is the 1F landing "
+                    "at (18,9). Descend to the lake, SURF southwest to the "
+                    "central/southern plateau, and reach ladder (3,11). Do not "
+                    "use the misleading northeast ladder (23,7)."
+                )
+            return (
+                "Authoritative Cerulean Cave route. From the southwest 1F "
+                "landing near (1,3), follow the short dry corridor to (0,6), "
+                "which descends to Cerulean Cave B1F."
+            )
+        if map_id == 0xE2:
+            if isinstance(position[0], int) and position[0] >= 10:
+                return (
+                    "Authoritative Cerulean Cave 2F route. From (29,1), follow "
+                    "the northeast maze south, then west, south, and west to "
+                    "ladder (19,7), which returns to 1F at (18,9)."
+                )
+            return (
+                "Authoritative Cerulean Cave 2F route. From the southwest "
+                "landing (3,11), take maze turns EAST, SOUTH, WEST, continue "
+                "WEST past the optional Ultra Ball spur, then NORTH to ladder "
+                "(1,3), returning to 1F."
+            )
+        if map_id == 0xE3:
+            if master_ball is not True:
+                return (
+                    "CRITICAL: Mewtwo is not caught and the Master Ball is not "
+                    "available. Do not battle Mewtwo; restore a checkpoint with "
+                    "the Master Ball."
+                )
+            return (
+                "Authoritative Mewtwo capture route. Traverse B1F from (3,6) "
+                "through its winding plateaus and required Surf channels to "
+                "Mewtwo at (27,13). Stand at (27,14), face UP, and press A. "
+                "In the Mewtwo battle, NEVER ATTACK: open ITEM and use the "
+                "MASTER BALL immediately. Dex 150 ownership must become true."
+            )
+        if hm_fly is True:
+            return (
+                "Authoritative postgame route. Get outdoors if necessary, then "
+                "select DODUO's FLY field move and choose CERULEAN CITY. From "
+                "Cerulean, enter Cerulean Cave at (4,11) and catch Mewtwo with "
+                "the Master Ball."
+            )
+        return (
+            "Authoritative postgame route. Travel to Cerulean City, enter "
+            "Cerulean Cave at (4,11), and catch Mewtwo with the Master Ball."
+        )
+
+    if "Volcano" not in badges:
+        stage_four_pending = bool(
+            seafoam_boulders.get("one_to_b1f") is True
+            and seafoam_boulders.get("b1f_to_b2f") is True
+            and seafoam_boulders.get("b2f_to_b3f") is True
+            and seafoam_boulders.get("b3f_to_b4f") is False
+        )
+        seafoam_puzzle_complete = all(
+            seafoam_boulders.get(stage) is True
+            for stage in SEAFOAM_BOULDER_EVENT_PAIRS
+        )
+        if (
+            secret_key is True
+            and hm_fly is True
+            and map_id in {0x00, 0x20}
+        ):
+            return (
+                "Authoritative badge-7 route. SECRET KEY is owned and Cinnabar "
+                "has been visited. Select DODUO's FLY field move, choose "
+                "CINNABAR ISLAND, then enter the Gym at (18,3). Do not use "
+                "BLASTOISE's depleted Surf."
+            )
+        fly_detour_maps = {
+            0x1F,
+            0x1E,
+            0x07,
+            0x1D,
+            0x1C,
+            0x1B,
+            0x1A,
+            0x19,
+            0x18,
+            0x17,
+            0x16,
+            0x05,
+            0x11,
+            0x0A,
+            0x13,
+            0x12,
+            0x06,
+            0xBA,
+            0xBB,
+            0xBC,
+        }
+        if (
+            seafoam_puzzle_complete
+            and hm_fly is not True
+            and map_id in fly_detour_maps
+        ):
+            fly_detour = {
+                0x1F: (
+                    "Travel EAST across Route 20 into Route 19; do not enter "
+                    "Seafoam again."
+                ),
+                0x1E: "Travel NORTH on Route 19 into Fuchsia City.",
+                0x07: (
+                    "The Cycling Road gate is blocked without a Bicycle. Leave "
+                    "Fuchsia EAST onto Route 15 for the no-Bicycle route to "
+                    "Celadon and HM02."
+                ),
+                0x1D: (
+                    "Return EAST through Route 18 to Fuchsia; do not attempt "
+                    "the Bicycle-locked Cycling Road."
+                ),
+                0x1C: "Continue NORTH through Route 17 if already on it.",
+                0x1A: "Travel EAST across Route 15 into Route 14.",
+                0x19: "Travel NORTH through Route 14 into Route 13.",
+                0x18: (
+                    "Use the verified Route 13 fence path. Reach (14,6), then "
+                    "follow waypoints (14,4), (24,4), (24,6), (17,6), "
+                    "(17,8), (26,8), (26,10), (34,10), (34,11), (50,11), "
+                    "(50,6), and (51,6); continue NORTH into Route 12."
+                ),
+                0x17: "Travel NORTH on Route 12, then WEST onto Route 11.",
+                0x16: "Travel WEST across Route 11 into Vermilion City.",
+                0x05: (
+                    "Do not detour for the Bicycle Voucher. Leave Vermilion "
+                    "NORTH onto Route 6."
+                ),
+                0x11: "Travel NORTH on Route 6 into Saffron City.",
+                0x13: (
+                    "Travel WEST through Route 8 directly into Saffron City; "
+                    "the guards are already unlocked, so skip Underground Path."
+                ),
+                0x0A: "Leave Saffron WEST onto Route 7.",
+                0x12: "Travel WEST through Route 7 into Celadon City.",
+                0x06: "Leave Celadon WEST onto Route 16.",
+                0xBA: (
+                    "Use the upper corridor's WEST exits at (0,2)/(0,3) to "
+                    "reach Route 16's secluded Fly House side."
+                ),
+                0xBB: "Return downstairs to Route 16 Gate 1F.",
+                0x1B: (
+                    "Reach the Route 16 Fly House entrance at (7,5), using "
+                    "Cut if the secluded northern path is blocked."
+                ),
+                0xBC: (
+                    "Talk to the brunette girl at (2,3) and receive HM02 FLY. "
+                    "Free one bag slot first if she says there is no room."
+                ),
+            }
+            return (
+                "Authoritative Pallet bypass. Route 20's central basin cannot "
+                "reach Cinnabar's x<44 basin, so obtain Fly and use Route 21. "
+                + fly_detour[map_id]
+            )
+        if (
+            seafoam_puzzle_complete
+            and hm_fly is True
+            and map_id in fly_detour_maps
+        ):
+            return (
+                "Authoritative Pallet bypass. Teach HM02 FLY to DODUO if it "
+                "does not already know Fly, then select DODUO's FLY field "
+                "move and choose PALLET TOWN. From Pallet, Surf south on "
+                "Route 21 to Cinnabar."
+            )
+        if seafoam_puzzle_complete and map_id == 0x1F:
+            if (
+                isinstance(position[0], int)
+                and position[0] >= 52
+            ):
+                return (
+                    "Authoritative completed-Seafoam crossing. RED is still "
+                    "east of the final rock wall. Reach (58,10) and press UP "
+                    "into cave door (58,9). Inside, cross 1F east-to-west and "
+                    "leave only through doors (4,17)/(5,17); never exit again "
+                    "through (26,17)/(27,17)."
+                )
+            if (
+                isinstance(position[0], int)
+                and 44 <= position[0] < 52
+            ):
+                return (
+                    "Authoritative completed-Seafoam crossing. RED exited the "
+                    "correct west cave door at (48,5). Continue WEST into the "
+                    "x<44 water basin, use SURF, and travel west to Cinnabar."
+                )
+        if stage_four_pending and map_id == 0x1F:
+            if (
+                isinstance(position[0], int)
+                and 44 <= position[0] < 62
+            ):
+                return (
+                    "Authoritative Seafoam stage-four recovery. RED is trapped "
+                    "in Route 20's middle basin between the rock walls; neither "
+                    "cave door can reach B1F's western hole region from here. "
+                    "DIG is rejected outdoors. Enter the reachable east Seafoam "
+                    "door at (58,9) first, then select DIGLETT and use DIG from "
+                    "INSIDE the cave. Retrace through Fuchsia/Route 19; the "
+                    "first three boulder stages are saved, and on return use "
+                    "the reachable (48,5) door."
+                )
+            return (
+                "Authoritative Seafoam stage-four recovery. Do not use Fly or "
+                "travel away. From the east-side water reach (62,5), move WEST "
+                "along the upper ledge to (55,5), DOWN to (55,6), then WEST "
+                "to (48,6) and press UP into Route 20 cave door (48,5). Enter "
+                "1F at (4,17), use 1F ladder (7,5) to B1F, fall through B1F "
+                "hole (18,6), then through B2F hole (19,6) to B3F's western "
+                "native-boulder region."
+            )
+        if stage_four_pending and map_id == 0xC0:
+            if isinstance(position[0], int) and position[0] < 15:
+                return (
+                    "Authoritative Seafoam stage-four recovery. Stay inside "
+                    "the Fuchsia-side 1F region and use ladder (7,5) to B1F; "
+                    "then fall through B1F hole (18,6) and B2F hole (19,6)."
+                )
+            return (
+                "Authoritative Seafoam stage-four recovery. This east 1F "
+                "chamber cannot reach the required B1F hole. Exit through "
+                "(26,17)/(27,17) into Route 20's middle basin, re-enter the "
+                "reachable east door at (58,9), and use DIGLETT's DIG from "
+                "inside. Retrace through Fuchsia to Route 20 door (48,5), "
+                "re-enter at (4,17), and use ladder (7,5)."
+            )
+        city_route = {
+            0x06: (
+                "Fly is OPTIONAL and Route 16 is a distraction. Leave Celadon "
+                "EAST to Route 7 and Saffron, then travel south to Vermilion."
+            ),
+            0x12: "Continue EAST through Route 7 into Saffron City.",
+            0x0A: "Leave Saffron SOUTH through Route 6 to Vermilion City.",
+            0x11: "Continue SOUTH on Route 6 into Vermilion City.",
+            0x05: "Leave Vermilion EAST onto Route 11.",
+            0x16: "Continue EAST across Route 11 to Route 12.",
+            0x17: "Travel SOUTH down Route 12 toward Route 13.",
+            0x18: "Follow Route 13 WEST toward Route 14 and Route 15.",
+            0x19: "Continue SOUTH on Route 14 to Route 15.",
+            0x1A: "Travel WEST across Route 15 into Fuchsia City.",
+            0x1B: (
+                "Do not search for Fly. Return EAST to Celadon, then take the "
+                "Saffron/Vermilion/Routes 11-15 path to Fuchsia."
+            ),
+            0x1C: "Continue SOUTH on Cycling Road toward Route 18 and Fuchsia.",
+            0x1D: "Continue EAST through Route 18 into Fuchsia City.",
+            0x07: (
+                "Heal in Fuchsia if needed, then leave SOUTH onto Route 19. "
+                "Use BLASTOISE's SURF at the water; Fly is not required."
+            ),
+            0x1E: "Use SURF and continue SOUTH on Route 19 toward Route 20.",
+            0x00: (
+                "Use BLASTOISE's SURF and travel SOUTH from Pallet on Route 21 "
+                "to Cinnabar Island."
+            ),
+            0x20: "Use SURF and continue SOUTH on Route 21 to Cinnabar Island.",
+        }
+        if map_id in city_route:
+            return "Authoritative badge-7 route. " + city_route[map_id]
+        if map_id == 0x1F:
+            if isinstance(position[0], int) and position[0] < 44:
+                return (
+                    "Authoritative badge-7 route. RED is in Route 20's Cinnabar "
+                    "basin now; use SURF and continue WEST to Cinnabar Island. "
+                    "Do not return to Seafoam."
+                )
+            return (
+                "Authoritative badge-7 route. Seafoam cave is MANDATORY; the "
+                "external rock walls cannot be bypassed. From the Fuchsia-side "
+                "water, reach (62,5), move WEST along the upper ledge to "
+                "(55,5), DOWN to (55,6), then WEST to (48,6) and press UP into "
+                "the only reachable cave door at (48,5). Do NOT target the "
+                "(58,9) door from this basin. Inside, complete the Strength "
+                "boulder/current stages and exit the opposite half."
+            )
+        if map_id in SEAFOAM_MAP_IDS:
+            if hm_strength is False:
+                return (
+                    "Seafoam transit is blocked because HM04 STRENGTH is not "
+                    "owned. Leave and obtain HM04 before attempting this cave."
+                )
+            if hm_surf is False:
+                return (
+                    "Seafoam transit is blocked because HM03 SURF is not owned. "
+                    "Leave and obtain HM03 before attempting this cave."
+                )
+            puzzle_complete = seafoam_puzzle_complete
+            if puzzle_complete:
+                if map_id == 0xA2:
+                    exit_route = (
+                        "Return through B4F east ladder (25,4) to B3F, then "
+                        "use the verified B3F Surf crossing from (23,9)."
+                    )
+                elif map_id == 0xA1:
+                    if (
+                        isinstance(position[0], int)
+                        and position[0] < 15
+                    ):
+                        exit_route = (
+                            "This is B3F's west side after the B4F Surf "
+                            "crossing. Take the west ladder at (5,12) to B2F "
+                            "(5,13). Do not return to B4F."
+                        )
+                    else:
+                        exit_route = (
+                            "This is B3F's east side. Reach (23,9), face DOWN, "
+                            "and activate BLASTOISE's SURF. The water begins "
+                            "at (23,10). Then follow LEFT x4, UP x2, LEFT x4, "
+                            "UP x2, LEFT x3, DOWN x4, LEFT x6, DOWN x2, LEFT. "
+                            "The final LEFT enters B2F's west side at (5,13)."
+                        )
+                elif map_id == 0xA0:
+                    if (
+                        isinstance(position[0], int)
+                        and position[0] < 12
+                    ):
+                        exit_route = (
+                            "This is B2F's west side after the B4F crossing. "
+                            "Take the west ladder at (5,3) to B1F (4,2)."
+                        )
+                    else:
+                        exit_route = (
+                            "This is B2F's east descent. From the (25,11) "
+                            "landing, press DOWN three times; the third DOWN "
+                            "takes B2F ladder (25,14) to B3F's east side. Do "
+                            "not use (25,3), which is a sealed pocket."
+                        )
+                elif map_id == 0x9F:
+                    if (
+                        isinstance(position[0], int)
+                        and position[0] < 12
+                    ):
+                        exit_route = (
+                            "This is B1F's west side after the B4F crossing. "
+                            "Take the west ladder at (7,5) to 1F (7,5)."
+                        )
+                    else:
+                        exit_route = (
+                            "This is B1F's east descent. From the lower-right "
+                            "1F stair landing at B1F (23,15), press UP x4, "
+                            "then RIGHT x2. The second RIGHT takes B1F ladder "
+                            "(25,11) to B2F."
+                        )
+                else:
+                    if (
+                        isinstance(position[0], int)
+                        and position[0] >= 20
+                    ):
+                        exit_route = (
+                            "Do NOT leave through east doors (26,17)/(27,17). "
+                            "Take the reachable lower-right stair at (23,15) "
+                            "to B1F. Then follow UP x4, RIGHT x2 to B2F and "
+                            "descend the x=25 ladder chain to B4F to Surf west."
+                        )
+                    else:
+                        exit_route = (
+                            "Stay in the western 1F component and leave only "
+                            "through doors (4,17)/(5,17). Do not cross back "
+                            "toward the east doors."
+                        )
+                return (
+                    "Authoritative Seafoam transit. BOULDER/CURRENT PUZZLE IS "
+                    "COMPLETE. Ignore every boulder and follow this exit chain. "
+                    + exit_route
+                )
+            progress_known = all(
+                isinstance(seafoam_boulders.get(stage), bool)
+                for stage in SEAFOAM_BOULDER_EVENT_PAIRS
+            )
+            if progress_known:
+                stages = (
+                    ("one_to_b1f", 0xC0, "Seafoam Islands 1F"),
+                    ("b1f_to_b2f", 0x9F, "Seafoam Islands B1F"),
+                    ("b2f_to_b3f", 0xA0, "Seafoam Islands B2F"),
+                    ("b3f_to_b4f", 0xA1, "Seafoam Islands B3F"),
+                )
+                required = next(
+                    (
+                        (stage, target_map, target_name)
+                        for stage, target_map, target_name in stages
+                        if seafoam_boulders.get(stage) is not True
+                    ),
+                    None,
+                )
+                if (
+                    required is not None
+                    and required[0] == "b2f_to_b3f"
+                ):
+                    first_b2 = seafoam_boulder_events.get("b2f_to_b3f_1")
+                    second_b2 = seafoam_boulder_events.get("b2f_to_b3f_2")
+                    if first_b2 is not True and map_id == 0x9F:
+                        return (
+                            "Authoritative Seafoam transit. Reach B1F (12,6), "
+                            "go NORTH to (12,2), EAST to (17,2), SOUTH to "
+                            "(17,6), then step RIGHT into completed hole (18,6). "
+                            "It drops RED into the left B2F chamber beside the "
+                            "first stage-three boulder. Push that boulder RIGHT "
+                            "into B2F hole (19,6), then return to B1F."
+                        )
+                    if first_b2 is True and second_b2 is not True:
+                        if map_id == 0x9F:
+                            return (
+                                "Authoritative Seafoam transit. The first B2F "
+                                "boulder is COMPLETE; do not use hole (18,6) "
+                                "again. Return to 1F through B1F ladder (7,5), "
+                                "cross 1F to its east ladder at (25,3), descend "
+                                "to B1F's east region, then fall through completed "
+                                "hole (23,6) into the separate right B2F chamber."
+                            )
+                        if map_id == 0xC0:
+                            return (
+                                "Authoritative Seafoam transit. Cross 1F to the "
+                                "east ladder at (25,3), descend to B1F's east "
+                                "region, then fall through B1F hole (23,6)."
+                            )
+                        if map_id == 0xA0:
+                            return (
+                                "Authoritative Seafoam transit. Stage-three "
+                                "boulder one is complete. If the boulder at "
+                                "(23,6) is present, stand at (24,6) and push it "
+                                "LEFT into hole (22,6). If it is absent, this is "
+                                "the wrong B2F chamber: return to B1F and use "
+                                "the 1F (25,3) -> B1F hole (23,6) route."
+                            )
+                    if map_id == 0x9F:
+                        return (
+                            "Authoritative Seafoam transit. Do NOT use a B1F "
+                            "ladder: those land in sealed B2F pockets. Fall through "
+                            "the completed boulder holes at (18,6) and (23,6); each "
+                            "hole reaches one separate B2F boulder chamber. In each "
+                            "chamber use STRENGTH to push its boulder into the B2F "
+                            "holes at (19,6) and (22,6), return to B1F, then use the "
+                            "other hole. Both must fall before stage four."
+                        )
+                if required is not None and required[0] == "b3f_to_b4f":
+                    if map_id == 0x9F:
+                        if (
+                            isinstance(position[0], int)
+                            and position[0] >= 19
+                        ):
+                            return (
+                                "Authoritative Seafoam stage-four recovery. This "
+                                "is B1F's disconnected east chamber; hole (18,6) "
+                                "is unreachable here. Take B1F ladder (25,3) to "
+                                "1F, leave through east doors (26,17)/(27,17), "
+                                "enter Route 20 door (58,9), and use DIGLETT's "
+                                "DIG inside. Retrace to the Fuchsia-side door "
+                                "(48,5) and descend through 1F ladder (7,5)."
+                            )
+                        return (
+                            "Authoritative Seafoam stage-four exact route. From "
+                            "the western B1F landing (7,5), immediately move DOWN "
+                            "and never step back onto (7,5). Follow these exact "
+                            "waypoints: (7,6), (6,6), (6,8), (5,8), (5,14), "
+                            "(9,14), (9,8), (11,8), (11,2), (17,2), (17,6), "
+                            "then RIGHT onto completed hole (18,6). Wait for the "
+                            "fall to B2F; do not use any ladder."
+                        )
+                    if map_id == 0xA0:
+                        if (
+                            isinstance(position[0], int)
+                            and isinstance(position[1], int)
+                            and position[0] >= 24
+                            and position[1] >= 9
+                        ):
+                            return (
+                                "Authoritative Seafoam stage-four recovery. This "
+                                "is B2F's disconnected east platform; hole (19,6) "
+                                "is unreachable. Take ladder (25,11) to B1F, then "
+                                "B1F ladder (25,3) to 1F. Leave through east doors "
+                                "(26,17)/(27,17), enter Route 20 door (58,9), use "
+                                "DIGLETT's DIG inside, and retrace from Fuchsia."
+                            )
+                        return (
+                            "Authoritative Seafoam stage-four exact route. The "
+                            "western B1F hole lands at B2F (19,7). Press UP once "
+                            "onto completed hole (19,6), then wait for the fall "
+                            "to B3F. Never use hole (22,6)."
+                        )
+                    if map_id == 0xA2:
+                        return (
+                            "Authoritative Seafoam transit. Stage four is "
+                            "INCOMPLETE. Return to B3F through the east ladder "
+                            "at (25,4); do not explore B4F yet."
+                        )
+                    if map_id == 0xA1:
+                        first_b3 = seafoam_boulder_events.get(
+                            "b3f_to_b4f_1"
+                        )
+                        second_b3 = seafoam_boulder_events.get(
+                            "b3f_to_b4f_2"
+                        )
+                        if first_b3 is not True:
+                            return (
+                                "Authoritative Seafoam stage-four exact route. "
+                                "Both B2 boulders are down, so B3F's current is "
+                                "STOPPED; do not wait for forced movement and do "
+                                "not push the blockers at (18,6)/(19,6). From the "
+                                "(18,7) landing follow exact waypoints (18,8), "
+                                "(15,8), (15,6), (12,6), (12,14), (16,14), "
+                                "(16,17), (8,17), (8,15), (6,15), then UP to "
+                                "(6,14). Activate BLASTOISE's STRENGTH. Press "
+                                "LEFT six separate times to move the boulder from "
+                                "(5,14) to (2,14) and place RED at (3,14). Press "
+                                "DOWN twice to drop the boulder at (3,15) into "
+                                "hole (3,16)."
+                            )
+                        if second_b3 is not True:
+                            return (
+                                "Authoritative Seafoam final-boulder exact route. "
+                                "Hole (3,16) is complete. Ensure STRENGTH remains "
+                                "active and reach (3,15), then execute: UP, RIGHT "
+                                "x2, DOWN, RIGHT x4 to (9,15); UP x4 to move the "
+                                "blocker at (9,14) to (9,12); LEFT to (8,13); "
+                                "DOWN x2 to move the blocker at (8,14) to (8,15); "
+                                "RIGHT, DOWN to (9,15); LEFT x4 to move that "
+                                "blocker to (6,15); DOWN x2, LEFT x3, UP x3, "
+                                "RIGHT to stand at (6,14); finally DOWN x2 to "
+                                "drop it into hole (6,16). These inputs were "
+                                "replayed against the emulator and set both flags."
+                            )
+                        return (
+                            "Authoritative Seafoam transit. Both final boulder "
+                            "flags are set; wait for the completed-puzzle ascent "
+                            "guidance and do not move another boulder."
+                        )
+                if required is not None and map_id != required[1]:
+                    if required[0] == "one_to_b1f":
+                        return (
+                            "Authoritative Seafoam transit. The first 1F "
+                            "boulder pair is INCOMPLETE, and the lower chambers "
+                            "cannot climb back to that side. Use an ESCAPE ROPE "
+                            "now; if none is in the bag, select DIGLETT and use "
+                            "DIG to leave the cave. Re-enter Seafoam through "
+                            "Route 20 door (48,5), stay inside, and finish both "
+                            "1F boulders before descending again."
+                        )
+                    return (
+                        "Authoritative Seafoam transit. Puzzle stages must be "
+                        f"completed in order; {required[0]} is still INCOMPLETE. "
+                        f"Ignore this floor's boulders and use ladders to return "
+                        f"to {required[2]} (map 0x{required[1]:02X}), then finish "
+                        "that stage before descending again."
+                    )
+            seafoam = {
+                0xC0: (
+                    "Seafoam Islands 1F. Doors (4,17)/(5,17) are the FUCHSIA "
+                    "entrance: if RED is at x<15, do NOT step down or leave. "
+                    "Stay inside and use STRENGTH to push the two boulders at "
+                    "(18,10) and (26,7) into the holes at (17,6) and (24,6), "
+                    "then follow their fall route downward. After the currents "
+                    "are solved and RED returns on the opposite x>=20 half, "
+                    "leave only through the CINNABAR doors at (26,17)/(27,17)."
+                ),
+                0x9F: (
+                    "Seafoam B1F. Continue the two fallen boulders into the "
+                    "next holes at (18,6) and (23,6), then descend to B2F. "
+                    "Both boulders must continue down; do not explore for items."
+                ),
+                0xA0: (
+                    "Seafoam B2F. Continue the two fallen boulders into the "
+                    "holes at (19,6) and (22,6), then descend to B3F. This "
+                    "first boulder chain stops B3F's forced current."
+                ),
+                0xA1: (
+                    "Seafoam B3F has the second required pair. After the first "
+                    "chain has stopped the upper current, use STRENGTH on the "
+                    "native boulders at (5,14) and (3,15), pushing them into "
+                    "the holes at (6,16) and (3,16). Descend to B4F only after "
+                    "both have fallen; that pair stops B4F's current."
+                ),
+                0xA2: (
+                    "Seafoam B4F. The two fallen boulders should now be in the "
+                    "water at (4,15)/(5,15), stopping the current. Ignore "
+                    "Articuno. Use the EAST ladder at (25,4) to return to B3F, "
+                    "then keep ascending through the east-side ladders until "
+                    "RED reaches the opposite x>=20 half of 1F. Exit only "
+                    "through the CINNABAR doors at (26,17)/(27,17)."
+                ),
+            }
+            return "Authoritative Seafoam transit. " + seafoam[map_id]
+        if map_id == 0x08:
+            if secret_key is True:
+                return (
+                    "Authoritative badge-7 route. SECRET KEY is owned. Enter "
+                    "Cinnabar Gym at (18,3), clear its quiz/trainer rooms, "
+                    "defeat Blaine, and obtain the Volcano Badge."
+                )
+            return (
+                "Authoritative badge-7 route. The Gym is locked until the "
+                "SECRET KEY is collected. Enter Pokemon Mansion at (6,3); "
+                "the Secret Key item ball is on B1F at (5,13). Do not enter "
+                "the Gym at (18,3) until key_items.secret_key is true."
+            )
+        if map_id in POKEMON_MANSION_MAP_IDS:
+            if secret_key is True:
+                return (
+                    "Authoritative badge-7 route. SECRET KEY is owned; leave "
+                    "Pokemon Mansion with DIG or an Escape Rope, return to "
+                    "Cinnabar Island, enter the Gym at (18,3), and defeat Blaine."
+                )
+            if map_id == 0xD8:
+                if mansion_switch_on is False:
+                    return (
+                        "Authoritative Pokemon Mansion B1F route. The shared "
+                        "switch is OFF, proving the southern statue is complete. "
+                        "Do NOT return south. Reach the northern statue near "
+                        "(20,3), face UP, and turn it ON. Then enter the western "
+                        "item room and collect the SECRET KEY ball at (5,13). "
+                        "The balls at (10,2) and (19,25) are items, not statues."
+                    )
+                if (
+                    mansion_switch_on is True
+                    and isinstance(position[1], int)
+                    and position[1] <= 14
+                ):
+                    return (
+                        "Authoritative Pokemon Mansion B1F route. The northern "
+                        "statue has turned the shared switch ON. Do NOT touch "
+                        "another statue. Enter the western item room and collect "
+                        "the SECRET KEY ball at (5,13)."
+                    )
+                if mansion_switch_on is True:
+                    return (
+                        "Authoritative Pokemon Mansion B1F route. The shared "
+                        "switch is ON. Reach the southern switch at (18,25), "
+                        "face UP, and turn it OFF. Then "
+                        "route north; do not press the southern statue twice."
+                    )
+                return (
+                    "Authoritative Pokemon Mansion B1F route. First turn the "
+                    "southern switch at (18,25), facing UP, OFF. Then turn the "
+                    "northern switch at (20,3), facing UP, ON, and collect the "
+                    "SECRET KEY ball at (5,13)."
+                )
+            mansion_route = {
+                0xA5: (
+                    "Use the northwest 1F staircase at (5,10) to 2F. After the "
+                    "correct 3F left drop lands in the isolated section at "
+                    "(16,14), go southeast to the B1F stairs at (21,23)."
+                ),
+                0xD6: (
+                    "Use the north/top-left 2F staircase at (6,1) to 3F. Do "
+                    "NOT use (7,10); it reaches the wrong 3F dead end."
+                ),
+                0xD7: (
+                    "Set the statue so the southern balcony passage is OPEN, "
+                    "then use the LEFT drop at (16,14) or (17,14). Never use "
+                    "the rightmost drop at (19,14), which lands on 2F."
+                ),
+            }
+            return (
+                "Authoritative Pokemon Mansion exact route. "
+                + mansion_route[map_id]
+            )
+        if map_id == 0xA6:
+            if secret_key is not True:
+                return (
+                    "The Cinnabar Gym route is locked: leave and collect the "
+                    "SECRET KEY from Pokemon Mansion B1F at (5,13)."
+                )
+            return (
+                "Authoritative Cinnabar Gym objective: progress through the "
+                "quiz doors or defeat their trainers, reach Blaine, win, and "
+                "obtain the Volcano Badge."
+            )
+        return None
+
+    if "Earth" not in badges:
+        if map_id == 0xA6:
+            return (
+                "Authoritative badge-8 route. Leave Cinnabar Gym through its "
+                "south exit, then use DODUO's Fly outside."
+            )
+        if hm_fly is True and map_id in {0x08, 0xAB}:
+            return (
+                "Authoritative badge-8 route. Select DODUO's FLY field move "
+                "and choose VIRIDIAN CITY, then enter the reopened Viridian "
+                "Gym at (32,7) and defeat Giovanni for the Earth Badge."
+            )
+        earth_route = {
+            0x08: (
+                "Leave Cinnabar by SURFING NORTH on Route 21 toward Pallet Town."
+            ),
+            0x20: "Continue NORTH on Route 21 to Pallet Town.",
+            0x00: "Leave Pallet NORTH onto Route 1 toward Viridian City.",
+            0x0C: "Continue NORTH on Route 1 into Viridian City.",
+            0x01: (
+                "Enter the reopened Viridian Gym at (32,7) and defeat Giovanni "
+                "for the Earth Badge."
+            ),
+            0x2D: (
+                "Authoritative Viridian Gym exact route. Reach (15,7), then "
+                "execute LEFT x2, DOWN x4, RIGHT, DOWN, RIGHT x4, UP, RIGHT, "
+                "UP x6, LEFT, DOWN, LEFT x3, DOWN x2, LEFT x3, UP x3, LEFT. "
+                "This lands at (3,1), immediately east of Giovanni at (2,1). "
+                "Face LEFT, interact, defeat him, and obtain the Earth Badge."
+            ),
+        }
+        if map_id in earth_route:
+            return "Authoritative badge-8 route. " + earth_route[map_id]
+        return None
+
+    if (
+        lead_needs_heal
+        and hm_fly is True
+        and map_id == 0x21
+    ):
+        return (
+            "Authoritative Pokemon League preparation. BLASTOISE is below "
+            "half HP. Use DODUO's FLY to VIRIDIAN CITY now, heal at the "
+            "Pokemon Center, then return west to Route 22. The rival battle "
+            "is already complete."
+        )
+    if lead_needs_heal and map_id == 0x01:
+        return (
+            "Authoritative Pokemon League preparation. Heal the party at "
+            "Viridian Pokemon Center before leaving west for Route 22."
+        )
+    if (
+        map_id == 0x22
+        and isinstance(position[1], int)
+        and position[1] <= 32
+    ):
+        return (
+            "Authoritative Pokemon League route. Victory Road is complete. "
+            "Use the verified upper Route 23 waypoints (14,32), (18,32), "
+            "(18,20), (14,20), (14,10), (13,10), (13,6), and (10,6), then "
+            "continue NORTH into Indigo Plateau. Do not return south to the cave."
+        )
+    league_route = {
+        0x01: "Leave Viridian WEST onto Route 22 toward the Pokemon League.",
+        0x21: (
+            "Use the verified Route 22 ledge-safe path. Reach (15,14), then "
+            "follow waypoints (33,14), (33,8), (31,8), (31,5), (21,5), "
+            "(21,11), (5,11), (5,9), (11,9), (11,5), and (8,5). Press UP "
+            "from (8,5) to enter the League gate."
+        ),
+        0xC1: "Pass north through the Route 22 League gate onto Route 23.",
+        0x22: (
+            "Continue NORTH through every badge checkpoint on Route 23. Enter "
+            "Victory Road at (4,31) or (14,31)."
+        ),
+        0x09: "Enter the Indigo Plateau lobby at (9,5) or (10,5).",
+        0xAE: (
+            "Heal with the nurse at (7,5), buy any needed recovery items, then "
+            "enter Lorelei's room through the north door at (8,0)."
+        ),
+        0xF5: "Defeat Lorelei, then continue through the north door to Bruno.",
+        0xF6: "Defeat Bruno, then continue through the north door to Agatha.",
+        0xF7: "Defeat Agatha, then continue through the north door to Lance.",
+        0x71: "Defeat Lance, then continue to the Champion's room.",
+        0x78: "Defeat BLUE, then advance into the Hall of Fame.",
+    }
+    if map_id in league_route:
+        return "Authoritative Pokemon League route. " + league_route[map_id]
+    if map_id == 0x6C:
+        if victory_road_1_switch_on is False:
+            if (
+                isinstance(position[0], int)
+                and isinstance(position[1], int)
+                and (position[0], position[1])
+                in VICTORY_ROAD_1_FAR_SIDE_ACTIONS
+            ):
+                return (
+                    "Authoritative Victory Road recovery. RED is already inside "
+                    "the northwest passage even though the switch reset. Follow "
+                    "the trusted far-side route to ladder (1,1); do not return "
+                    "to the boulder."
+                )
+            if (
+                isinstance(position[0], int)
+                and isinstance(position[1], int)
+                and position[0] <= 2
+                and position[1] <= 2
+            ):
+                return (
+                    "Authoritative Victory Road recovery. RED is already on "
+                    "the far side at the (1,1) 2F ladder even though the 1F "
+                    "switch reset. Step RIGHT off (1,1), then LEFT back onto "
+                    "it to return to 2F. Do not re-solve the boulder."
+                )
+            if victory_road_1_boulder == {"x": 5, "y": 14}:
+                return (
+                    "Authoritative Victory Road 1F reset. The required boulder "
+                    "was pushed north into the dead-end at (5,14). Leave through "
+                    "the south exit at (8,17)/(9,17), then immediately re-enter "
+                    "Victory Road to reset it to (5,15). Do not try another "
+                    "north push."
+                )
+            if strength_active is False:
+                return (
+                    "Authoritative Victory Road 1F switch route. STRENGTH reset "
+                    "when the floor was exited. Activate BLASTOISE's STRENGTH "
+                    "once, finish its dialogue, and do not push until "
+                    "strength_active is true."
+                )
+            return (
+                "Authoritative Victory Road 1F switch route. The switch event "
+                "is FALSE, so the northwest passage is still closed. Keep "
+                "STRENGTH active and use the trusted boulder route. With a reset "
+                "boulder at (5,15), reach its canonical route start at (14,13); "
+                "the harness will move it around the walls to switch (17,13). "
+                "Do not improvise pushes or reactivate Strength while the "
+                "trusted route is moving."
+            )
+        if victory_road_1_switch_on is True:
+            return (
+                "Authoritative Victory Road 1F route. The boulder switch is "
+                "ON and the northwest passage is open. Use verified waypoints "
+                "(11,14), (9,14), (9,16), (5,16), (5,12), (11,12), (11,6), "
+                "(7,6), (7,8), (3,8), (3,5), and (2,1), then press LEFT into "
+                "the northwest 2F ladder at (1,1). Ignore all boulders."
+            )
+    if map_id == 0xC2 and isinstance(victory_road_2_switches, dict):
+        if (
+            isinstance(position[0], int)
+            and isinstance(position[1], int)
+            and position[0] >= 27
+            and position[1] <= 8
+        ):
+            return (
+                "Authoritative Victory Road far-side recovery. RED is already "
+                "beside the exterior exit; ignore reset switch events and walk "
+                "EAST through (29,7)/(29,8). Do not return west into the cave."
+            )
+        if victory_road_2_switches.get("two") is True:
+            return (
+                "Authoritative Victory Road exit route. Both 2F switches are "
+                "ON. Reach 2F ladder (25,14) to 3F (27,15), then take 3F warp "
+                "(26,8) to 2F (27,7). Walk EAST through the final exit at "
+                "(29,7)/(29,8). Do not return to (23,7) or (1,1)."
+            )
+        if (
+            victory_road_2_switches.get("one") is True
+            and victory_road_2_switches.get("two") is False
+            and isinstance(victory_road_3_events, dict)
+            and victory_road_3_events.get("hole_boulder") is True
+        ):
+            if strength_active is False:
+                return (
+                    "Authoritative Victory Road final-switch route. Activate "
+                    "BLASTOISE's STRENGTH once before moving the dropped boulder."
+                )
+            return (
+                "Authoritative Victory Road final-switch route. From (28,11), "
+                "go DOWN x5 and LEFT x4 to stand east of the dropped boulder at "
+                "(23,16). The trusted route then pushes it WEST along row 16 "
+                "onto switch (9,16). Do not use another warp until switch two "
+                "is ON."
+            )
+        if victory_road_2_switches.get("one") is False:
+            if strength_active is False:
+                return (
+                    "Authoritative Victory Road 2F switch route. Activate "
+                    "BLASTOISE's STRENGTH once and finish the dialogue before "
+                    "moving any boulder."
+                )
+            return (
+                "Authoritative Victory Road 2F switch route. Ignore the "
+                "optional boulders at (5,3) and (23,16). Use boulder one, which "
+                "starts at (4,14). Reach the trusted route start at (7,14); "
+                "the harness will move it onto switch (1,16). Do not improvise "
+                "another boulder route."
+            )
+        if victory_road_2_switches.get("one") is True:
+            return (
+                "Authoritative Victory Road 2F route. Switch one is ON. From "
+                "(3,16), follow verified waypoints (3,11), (5,11), (5,8), "
+                "(13,8), (13,14), (15,14), (15,16), (28,16), (28,11), "
+                "(23,11), and (23,7). If standing on (23,7), step LEFT to "
+                "(22,7), then RIGHT back onto (23,7) to enter Victory Road 3F. "
+                "Never bump the wall to the right."
+            )
+    if map_id == 0xC6 and isinstance(victory_road_3_events, dict):
+        if (
+            isinstance(victory_road_2_switches, dict)
+            and victory_road_2_switches.get("two") is True
+        ):
+            return (
+                "Authoritative Victory Road exit route. Both 2F switches are "
+                "ON. Ignore every 3F boulder and reach warp (26,8), which "
+                "lands on 2F at (27,7). Then walk EAST through exit "
+                "(29,7)/(29,8)."
+            )
+        if victory_road_3_events.get("switch") is False:
+            if strength_active is False:
+                return (
+                    "Authoritative Victory Road 3F switch route. Activate "
+                    "BLASTOISE's STRENGTH once and finish its dialogue. From "
+                    "the (23,7) landing, the trusted setup is UP x4, LEFT x4."
+                )
+            if (
+                isinstance(position[0], int)
+                and isinstance(position[1], int)
+                and position[0] < 10
+                and position[1] < 8
+                and isinstance(victory_road_3_boulders, list)
+                and victory_road_3_boulders
+                and victory_road_3_boulders[0] == {"x": 22, "y": 3}
+            ):
+                return (
+                    "Authoritative Victory Road recovery. This is the dead-end "
+                    "(2,0) 3F pocket reached from 2F (1,1); switch 0x660 is "
+                    "still FALSE, so no forward path exists. Use DIGLETT's DIG "
+                    "or an Escape Rope now, re-enter Victory Road, and let the "
+                    "trusted 1F/2F switch solvers replay. Never use 2F (1,1) "
+                    "again."
+                )
+            return (
+                "Authoritative Victory Road 3F switch route. With Strength "
+                "active, start at the (23,7) landing with UP x4, LEFT x4. "
+                "Then execute DOWN, LEFT, UP x4, RIGHT, UP, LEFT x27, UP, "
+                "LEFT x2, DOWN x2, RIGHT, DOWN, LEFT x8, UP, LEFT, DOWN x6, "
+                "LEFT, DOWN, RIGHT. This places it on switch (3,5). Ignore "
+                "boulders (13,12) and (24,10); never Dig after boulder one moves."
+            )
+        if victory_road_3_events.get("hole_boulder") is False:
+            return (
+                "Authoritative Victory Road 3F route. Switch 0x660 is ON. Do "
+                "not push the nearby boulders at (13,12)/(24,10). From the "
+                "(23,7) landing use DOWN, LEFT x3, DOWN x2 to reach trusted "
+                "route start (20,10). The harness then reaches boulder four "
+                "at (22,15), pushes it RIGHT into hole (23,15), and follows "
+                "it down to 2F."
+            )
+        return (
+            "Authoritative Victory Road final-switch route. The 3F hole boulder "
+            "is on 2F at (23,16). Push it WEST along row 16 onto switch (9,16), "
+            "then use the (25,14)->(27,15)->(26,8)->(27,7) stair chain and exit "
+            "2F through (29,7)/(29,8)."
+        )
+    if map_id in VICTORY_ROAD_MAP_IDS:
+        return (
+            "Authoritative Pokemon League route. Continue NORTH/WEST through "
+            "Victory Road toward Indigo Plateau. Use Strength to place boulders "
+            "on switches; do not backtrack toward Route 23."
         )
     return None
 
@@ -11112,6 +12672,11 @@ SILPH_CO_MAP_IDS = frozenset(
 SILPH_CO_ELEVATOR_MAP_ID = 0xEC
 SILPH_CO_CARD_KEY_MAP_ID = 0xD2
 SILPH_CO_CARD_KEY_TILE = (21, 16)
+SILPH_CO_GIOVANNI_ENTRY_MAP_ID = 0xD0
+SILPH_CO_GIOVANNI_ENTRY_PAD_TILE = (11, 11)
+SILPH_CO_GIOVANNI_ENTRY_DOOR_STAND = (18, 8)
+SILPH_CO_GIOVANNI_ROUTE_MAP_ID = 0xD4
+SILPH_CO_GIOVANNI_PAD_TILE = (5, 7)
 SILPH_CO_GIOVANNI_MAP_ID = 0xEB
 
 
@@ -11207,30 +12772,79 @@ def silph_co_route_guidance(
     # Without this the climb directive re-fires on re-entry and marches the run
     # back up a finished dungeon, exactly as the Tower once did.
     if master_ball or (isinstance(badges, list) and "Marsh" in badges):
+        if map_id == SILPH_CO_ELEVATOR_MAP_ID:
+            return prefix + (
+                "Silph Co. is COMPLETE. In the elevator, use the panel at "
+                "(3,0), choose 1F, exit through (1,3) or (2,3), then leave the "
+                "building for Saffron City."
+            )
+        if (
+            map_id == SILPH_CO_GIOVANNI_MAP_ID
+            and isinstance(position[0], int)
+            and position[0] < 11
+        ):
+            return prefix + (
+                "Silph Co. is COMPLETE. Do NOT use (5,5): its destination "
+                "0xFF is the LAST_MAP sentinel, not the Saffron exit. Reverse "
+                "the entry chain: take 11F pad (3,2) to 7F, then 7F pad (5,3) "
+                "to 3F. From 3F use the elevator at (20,0), choose 1F, and "
+                "leave through the south doors."
+            )
+        if (
+            map_id == SILPH_CO_GIOVANNI_ROUTE_MAP_ID
+            and isinstance(position[0], int)
+            and position[0] < 10
+        ):
+            return prefix + (
+                "Silph Co. is COMPLETE. To activate the west-side 7F pad, "
+                "stand on (5,3), step LEFT to (4,3), then step RIGHT back onto "
+                "(5,3); this fresh re-entry teleports to 3F. Never press DOWN "
+                "while standing on the pad. From 3F use the elevator at (20,0), "
+                "choose 1F, and leave through the south doors."
+            )
         exits = [
             warp
             for warp in (game_state.get("warps") or [])
             if isinstance(warp, dict)
             and isinstance(warp.get("destination_map"), int)
+            and warp["destination_map"] != 0xFF
             and warp["destination_map"] not in SILPH_CO_MAP_IDS
             and warp["destination_map"] != SILPH_CO_ELEVATOR_MAP_ID
         ]
-        exit_text = (
-            f"The exit to Saffron City is at ({exits[0]['x']},{exits[0]['y']})."
-            if exits
-            else "Descend to 1F and leave through the south doors."
-        )
+        if exits:
+            exit_text = (
+                f"The exit to Saffron City is at ({exits[0]['x']},"
+                f"{exits[0]['y']})."
+            )
+        elif elevator is not None:
+            exit_text = (
+                f"Take the elevator at ({elevator['x']},{elevator['y']}), "
+                "choose 1F, then leave through the south doors."
+            )
+        else:
+            exit_text = (
+                "Use the top-wall stairs to reach a floor with the elevator, "
+                "choose 1F, then leave through the south doors."
+            )
         return prefix + (
             "Silph Co. is COMPLETE — Giovanni is beaten and there is nothing "
             f"left in this building. {exit_text} Leave and do not climb again."
         )
 
     if map_id == SILPH_CO_ELEVATOR_MAP_ID:
-        floor = "5F" if card_key is False else "11F"
+        floor = "5F" if card_key is False else "3F"
+        purpose = (
+            "to collect the Card Key"
+            if card_key is False
+            else (
+                "then unlock the Card Key door and take the staged pad chain "
+                "3F (11,11) -> 7F (5,3) -> 7F (5,7) -> 11F (3,2)"
+            )
+        )
         return prefix + (
             "This is the Silph Co. elevator. Interact once with the panel at "
             f"(3,0), choose {floor}, then step out through the doors at (1,3) "
-            "or (2,3) and reobserve before any further input."
+            f"or (2,3) and reobserve {purpose}."
         )
 
     if card_key is None:
@@ -11280,33 +12894,419 @@ def silph_co_route_guidance(
             )
         return prefix + body + _silph_co_pad_warning(pads)
 
-    if map_id == SILPH_CO_GIOVANNI_MAP_ID:
+    if map_id == SILPH_CO_GIOVANNI_ENTRY_MAP_ID:
+        entry_pad = next(
+            (
+                warp
+                for warp in pads
+                if warp.get("destination_map") == SILPH_CO_GIOVANNI_ROUTE_MAP_ID
+            ),
+            None,
+        )
+        pad_tile = (
+            (entry_pad["x"], entry_pad["y"])
+            if entry_pad is not None
+            else SILPH_CO_GIOVANNI_ENTRY_PAD_TILE
+        )
         return prefix + (
-            "Card Key is owned and this is the top floor. Defeat the Rocket at "
-            "(15,9), reach Giovanni at (6,9) and beat him, then speak to the "
-            "Silph president at (7,5) to receive the MASTER BALL. Do not leave "
-            "until key_items.master_ball becomes true."
+            "Card Key is owned. This is the REQUIRED entry floor for Giovanni. "
+            "Use the verified door action: stand at (18,8) or (18,9), face "
+            "LEFT toward the closed door, and press A once. The success text "
+            "starts with 'Bingo!'; clear that text before moving, then step "
+            "left through the opened doorway. Do not bump the door with "
+            "movement—only A opens it. Then take teleport pad "
+            f"({pad_tile[0]},{pad_tile[1]}) to arrive on 7F at (5,3)."
+            + _silph_co_pad_warning(pads)
+        )
+
+    if map_id == SILPH_CO_GIOVANNI_ROUTE_MAP_ID:
+        if isinstance(position[0], int) and position[0] >= 10:
+            return prefix + (
+                "This is the WRONG EAST side of 7F; pad (5,7) is behind the "
+                "west-side Card Key route and cannot be walked to from here. "
+                "Return to the elevator at (18,0), choose 3F, walk into the "
+                "corridor to (18,8), face LEFT and press A to open the Card Key "
+                "door, then take 3F pad (11,11) to arrive at 7F (5,3). Do not "
+                "loop around this east half again."
+            )
+        pad = next(
+            (
+                warp
+                for warp in pads
+                if warp.get("destination_map") == SILPH_CO_GIOVANNI_MAP_ID
+            ),
+            None,
+        )
+        pad_tile = (
+            (pad["x"], pad["y"])
+            if pad is not None
+            else SILPH_CO_GIOVANNI_PAD_TILE
+        )
+        return prefix + (
+            "Card Key is owned and 3F pad (11,11) placed RED on the CORRECT "
+            "WEST side of 7F at (5,3). Do not return to the elevator. Walk "
+            f"south to the fixed teleport pad at ({pad_tile[0]},{pad_tile[1]}) "
+            "to arrive on the west side of 11F."
+            + _silph_co_pad_warning(pads)
+        )
+
+    if map_id == SILPH_CO_GIOVANNI_MAP_ID:
+        if isinstance(position[0], int) and position[0] >= 11:
+            return prefix + (
+                "This is the SEALED EAST side of 11F. The Rocket at (15,9) "
+                "is already defeated and only gives post-battle dialogue; "
+                "Giovanni cannot be reached through this corridor. Return via "
+                "the elevator at (13,0), choose 3F, stand at (18,8), face LEFT "
+                "and press A to unlock the Card Key door, then take pad chain "
+                "3F (11,11) -> 7F (5,3) -> 7F (5,7) -> 11F (3,2). Do not walk "
+                "this east corridor again."
+            )
+        return prefix + (
+            "Card Key is owned and this is Giovanni's WEST side of 11F. Defeat "
+            "the required Rocket at (3,16), then Giovanni at (6,9), but each "
+            "battle is one-time: if either NPC is absent or gives post-battle "
+            "dialogue, it is already cleared—never walk south to check again. "
+            "After Giovanni is absent or defeated, use the emulator-verified "
+            "president route: from (5,6), press UP once to (5,5), RIGHT once "
+            "to (6,5), face RIGHT toward the president at (7,5), and press A. "
+            "The dialogue begins 'PRESIDENT' and awards the MASTER BALL. Do "
+            "not use the elevator or leave until key_items.master_ball becomes "
+            "true."
         )
 
     body = (
-        "Card Key is owned, so the locked doors now open — step into a closed "
-        "door once to unlock it instead of routing around it. Stage: reach 11F "
-        "and defeat Giovanni. "
+        "Card Key is owned. Silph doors open by facing them and pressing A, "
+        "not by walking into them. Giovanni's west room is reached ONLY by "
+        "this chain: on 3F stand (18,8), face LEFT and press A; take 3F pad "
+        "(11,11), arrive 7F (5,3), take 7F pad (5,7), arrive 11F (3,2). "
+        "Stage: reach 3F and start that chain. "
     )
     if elevator is not None:
         body += (
             f"Take the elevator at ({elevator['x']},{elevator['y']}), interact "
-            "with the panel, and choose 11F."
+            "with the panel, and choose 3F."
         )
     else:
-        upward = [warp for warp in stairs if warp["destination_map"] > map_id]
         body += (
-            f"Climb using the staircase at ({upward[0]['x']},{upward[0]['y']}) "
-            f"toward {upward[0]['destination_name']}."
-            if upward
-            else "Find the elevator or an ascending staircase in the top wall."
+            "Use a staircase in the top wall to reach a floor with the "
+            "elevator, then choose 3F."
+            if stairs
+            else "Ride a pad back out, find the elevator, and choose 3F."
         )
     return prefix + body + _silph_co_pad_warning(pads)
+
+
+def trusted_exact_route_guidance(
+    game_state: dict[str, Any],
+) -> Optional[str]:
+    """Story/item routes outrank generic puzzle-route replay."""
+    return (
+        item_gate_guidance(game_state)
+        or endgame_route_guidance(game_state)
+        or rock_tunnel_route_guidance(game_state)
+        or celadon_route_guidance(game_state)
+        or pokemon_tower_route_guidance(game_state)
+        or silph_co_route_guidance(game_state)
+    )
+
+
+def trusted_story_route_action(game_state: dict[str, Any]) -> Optional[str]:
+    """Return one verified cardinal step for fragile completed-story routes."""
+    badges = game_state.get("badges")
+    seafoam = game_state.get("seafoam_boulders")
+    coordinates = game_state.get("coordinates")
+    if (
+        not isinstance(coordinates, dict)
+        or game_state.get("screen_text")
+    ):
+        return None
+    map_id = game_state.get("map_id")
+    position = (coordinates.get("x"), coordinates.get("y"))
+    if not all(isinstance(value, int) for value in position):
+        return None
+    switches_2f = game_state.get("victory_road_2_switches")
+    if (
+        isinstance(badges, list)
+        and "Earth" in badges
+        and map_id == 0xC2
+    ):
+        far_side_exit = {
+            (27, 7): "down",
+            (27, 8): "right",
+            (28, 7): "right",
+            (28, 8): "right",
+        }.get(position)
+        if far_side_exit is not None:
+            return far_side_exit
+    if (
+        isinstance(badges, list)
+        and "Earth" in badges
+        and map_id in {0xC2, 0xC6}
+        and isinstance(switches_2f, dict)
+        and switches_2f.get("two") is True
+    ):
+        exit_action = VICTORY_ROAD_EXIT_ACTIONS.get(
+            (map_id, position[0], position[1])
+        )
+        if exit_action is not None:
+            return exit_action
+    if (
+        isinstance(badges, list)
+        and "Volcano" in badges
+        and "Earth" not in badges
+        and map_id == 0x2D
+    ):
+        viridian_gym_steps = {
+            (15, 7): "left",
+            (14, 7): "left",
+            (13, 7): "down",
+            (13, 8): "down",
+            (13, 9): "down",
+            (13, 10): "down",
+            (13, 11): "right",
+            (14, 11): "down",
+            (14, 12): "right",
+            (15, 12): "right",
+            (16, 12): "right",
+            (17, 12): "right",
+            (18, 12): "up",
+            (18, 11): "right",
+            (19, 9): "up",
+            (19, 6): "up",
+            (19, 3): "up",
+            (19, 2): "up",
+            (17, 1): "up",
+            (14, 1): "up",
+            (11, 1): "left",
+            (10, 1): "down",
+            (10, 2): "left",
+            (9, 2): "left",
+            (8, 2): "left",
+            (7, 2): "down",
+            (7, 3): "down",
+            (7, 4): "left",
+            (6, 4): "left",
+            (5, 4): "left",
+            (4, 4): "up",
+            (4, 3): "up",
+            (4, 2): "up",
+            (4, 1): "left",
+        }
+        return viridian_gym_steps.get(position)
+    if (
+        isinstance(badges, list)
+        and "Earth" in badges
+        and map_id == 0x6C
+        and game_state.get("victory_road_1_switch_on") is False
+        and game_state.get("strength_active") is True
+    ):
+        far_side_action = VICTORY_ROAD_1_FAR_SIDE_ACTIONS.get(position)
+        if far_side_action is not None:
+            return far_side_action
+        if position == (1, 1):
+            return "right"
+        if position == (2, 1):
+            return "left"
+        boulder = game_state.get("victory_road_1_boulder")
+        if (
+            isinstance(boulder, dict)
+            and isinstance(boulder.get("x"), int)
+            and isinstance(boulder.get("y"), int)
+        ):
+            return VICTORY_ROAD_1_ROUTE_ACTIONS.get(
+                (
+                    position[0],
+                    position[1],
+                    boulder["x"],
+                    boulder["y"],
+                )
+            )
+    if (
+        isinstance(badges, list)
+        and "Earth" in badges
+        and map_id == 0xC2
+        and game_state.get("strength_active") is True
+    ):
+        switches = game_state.get("victory_road_2_switches")
+        boulders = game_state.get("victory_road_2_boulders")
+        events_3f = game_state.get("victory_road_3_events")
+        if (
+            isinstance(switches, dict)
+            and switches.get("one") is True
+            and switches.get("two") is False
+            and isinstance(events_3f, dict)
+            and events_3f.get("hole_boulder") is True
+            and isinstance(boulders, list)
+            and len(boulders) >= 3
+            and isinstance(boulders[2], dict)
+        ):
+            final_setup = {
+                (28, 11): "down",
+                (28, 12): "down",
+                (28, 13): "down",
+                (28, 14): "down",
+                (28, 15): "down",
+                (28, 16): "left",
+                (27, 16): "left",
+                (26, 16): "left",
+                (25, 16): "left",
+            }
+            setup_action = final_setup.get(position)
+            if setup_action is not None:
+                return setup_action
+            boulder_x = boulders[2].get("x")
+            boulder_y = boulders[2].get("y")
+            if (
+                isinstance(boulder_x, int)
+                and boulder_y == 16
+                and boulder_x > 9
+                and position[1] == 16
+                and position[0] - boulder_x in {1, 2}
+            ):
+                return "left"
+            return None
+        if (
+            isinstance(switches, dict)
+            and switches.get("one") is False
+            and isinstance(boulders, list)
+            and boulders
+            and isinstance(boulders[0], dict)
+            and isinstance(boulders[0].get("x"), int)
+            and isinstance(boulders[0].get("y"), int)
+        ):
+            return VICTORY_ROAD_2_ROUTE_ACTIONS.get(
+                (
+                    position[0],
+                    position[1],
+                    boulders[0]["x"],
+                    boulders[0]["y"],
+                )
+            )
+        if isinstance(switches, dict) and switches.get("one") is True:
+            open_action = VICTORY_ROAD_2_OPEN_ACTIONS.get(position)
+            if open_action is not None:
+                return open_action
+            if position == (23, 7):
+                return "left"
+            if position == (22, 7):
+                return "right"
+    if (
+        isinstance(badges, list)
+        and "Earth" in badges
+        and map_id == 0xC6
+        and game_state.get("strength_active") is True
+    ):
+        events = game_state.get("victory_road_3_events")
+        boulders = game_state.get("victory_road_3_boulders")
+        if (
+            isinstance(events, dict)
+            and events.get("switch") is False
+            and isinstance(boulders, list)
+            and boulders
+            and isinstance(boulders[0], dict)
+            and isinstance(boulders[0].get("x"), int)
+            and isinstance(boulders[0].get("y"), int)
+        ):
+            return VICTORY_ROAD_3_ROUTE_ACTIONS.get(
+                (
+                    position[0],
+                    position[1],
+                    boulders[0]["x"],
+                    boulders[0]["y"],
+                )
+            )
+        if (
+            isinstance(events, dict)
+            and events.get("switch") is True
+            and events.get("hole_boulder") is False
+            and isinstance(boulders, list)
+            and len(boulders) >= 4
+            and isinstance(boulders[3], dict)
+            and isinstance(boulders[3].get("x"), int)
+            and isinstance(boulders[3].get("y"), int)
+        ):
+            return VICTORY_ROAD_3_HOLE_ACTIONS.get(
+                (
+                    position[0],
+                    position[1],
+                    boulders[3]["x"],
+                    boulders[3]["y"],
+                )
+            )
+    if (
+        not isinstance(badges, list)
+        or "Marsh" not in badges
+        or "Volcano" in badges
+        or not isinstance(seafoam, dict)
+        or not all(
+            seafoam.get(stage) is True
+            for stage in SEAFOAM_BOULDER_EVENT_PAIRS
+        )
+    ):
+        return None
+    verified_steps = {
+        # 1F east stair entry. Landing on (23,15) requires one step off
+        # before re-entry; (24,15) then enters the stair from the east.
+        (0xC0, 23, 15): "right",
+        (0xC0, 24, 15): "left",
+        # B1F east descent from the lower-right 1F stair.
+        (0x9F, 23, 15): "up",
+        (0x9F, 23, 14): "up",
+        (0x9F, 23, 13): "up",
+        (0x9F, 23, 12): "up",
+        (0x9F, 23, 11): "right",
+        (0x9F, 24, 11): "right",
+        (0x9F, 25, 11): "left",
+        # B2F east descent.
+        (0xA0, 25, 11): "down",
+        (0xA0, 25, 12): "down",
+        (0xA0, 25, 13): "down",
+        # Reach the verified B3F Surf edge from the east pocket.
+        (0xA1, 25, 6): "left",
+        (0xA1, 24, 6): "left",
+        (0xA1, 23, 6): "down",
+        (0xA1, 25, 7): "left",
+        (0xA1, 24, 7): "left",
+        (0xA1, 23, 7): "down",
+        (0xA1, 25, 8): "left",
+        (0xA1, 24, 8): "left",
+        (0xA1, 23, 8): "down",
+        # Current-free B3F water crossing after Surf activates at (23,9).
+        (0xA1, 23, 10): "left",
+        (0xA1, 22, 10): "left",
+        (0xA1, 21, 10): "left",
+        (0xA1, 20, 10): "left",
+        (0xA1, 19, 10): "up",
+        (0xA1, 19, 9): "up",
+        (0xA1, 19, 8): "left",
+        (0xA1, 18, 8): "left",
+        (0xA1, 17, 8): "left",
+        (0xA1, 16, 8): "left",
+        (0xA1, 15, 8): "up",
+        (0xA1, 15, 7): "up",
+        (0xA1, 15, 6): "left",
+        (0xA1, 14, 6): "left",
+        (0xA1, 13, 6): "left",
+        (0xA1, 12, 6): "down",
+        (0xA1, 12, 7): "down",
+        (0xA1, 12, 8): "down",
+        (0xA1, 12, 9): "down",
+        (0xA1, 12, 10): "left",
+        (0xA1, 11, 10): "left",
+        (0xA1, 10, 10): "left",
+        (0xA1, 9, 10): "left",
+        (0xA1, 8, 10): "left",
+        (0xA1, 7, 10): "left",
+        (0xA1, 6, 10): "down",
+        (0xA1, 6, 11): "down",
+        (0xA1, 6, 12): "left",
+        # Approach B4F (25,4) from the west so (25,3) cannot fire.
+        (0xA1, 22, 3): "down",
+        (0xA1, 22, 4): "right",
+        (0xA1, 23, 4): "right",
+        (0xA1, 24, 4): "right",
+    }
+    return verified_steps.get((map_id, position[0], position[1]))
 
 
 class ClipRecorder:
@@ -11572,7 +13572,9 @@ Make progress deliberately:
   rejection appears as puzzle_feedback in the next game state.
 - Trusted route guidance is only coarse waypoint context, never a complete
   tile-by-tile solution. Learned transition_graph edges are the ground truth
-  for spinner tiles and forced movement.
+  for spinner tiles and forced movement. Exact story or exit guidance wins
+  over generic frontier exploration. Those turns may use one precise
+  interaction button (A/B/START/SELECT) when the stated objective requires it.
 - Puzzle-mode game state may include graph_neighborhood: learned edges and
   UNTRIED frontier entries near you, one per line. A frontier_directive, when
   present, is authoritative: ride the listed UNTRIED entries nearest-first and
@@ -13101,8 +15103,6 @@ class ViewerServer:
                 if action == "press" and button not in VALID_BUTTONS:
                     self._json(400, {"status": "error", "message": "Invalid button"})
                     return
-                if action == "stop":
-                    set_desired_running(runtime_dir, False)
                 command: dict[str, Any] = {
                     "action": action,
                     "button": button or None,
@@ -13276,6 +15276,7 @@ class PokemonRunner:
         self.stuck_decision_count = 0
         self.puzzle_feedback: Optional[dict[str, Any]] = None
         self.committed_route: Optional[dict[str, Any]] = None
+        self.trusted_story_phase: Optional[str] = None
         # Process-lifetime replay guard: one solved-route attempt per
         # (map, entrance), deliberately not reset by map changes.
         self.solved_route_attempts: dict[tuple[int, int, int], None] = {}
@@ -13373,6 +15374,7 @@ class PokemonRunner:
             "current_clip": None,
             "last_checkpoint": None,
             "completed": False,
+            "mewtwo_caught": False,
             "clips": [],
         }
         self.livestream_enabled = bool(getattr(args, "livestream", False))
@@ -15397,6 +17399,8 @@ class PokemonRunner:
                 decision_state["puzzle_feedback"] = self.puzzle_feedback
                 self.puzzle_feedback = None
         route_state = dict(game_state)
+        route_state["completed"] = self.status.get("completed") is True
+        route_state["phase"] = self.status.get("phase")
         floor_trail = self.navigation_memory.floor_trail
         if (
             position is not None
@@ -15404,16 +17408,26 @@ class PokemonRunner:
             and floor_trail[-1] == position[0]
         ):
             route_state["previous_map_id"] = floor_trail[-2]
-        route_guidance = (
-            item_gate_guidance(game_state)
-            or rock_tunnel_route_guidance(game_state)
-            or celadon_route_guidance(game_state)
-            or pokemon_tower_route_guidance(game_state)
-            or silph_co_route_guidance(game_state)
-            or rocket_hideout_route_guidance(route_state)
+        exact_route_guidance = trusted_exact_route_guidance(route_state)
+        route_guidance = exact_route_guidance or rocket_hideout_route_guidance(
+            route_state
         )
         if route_guidance:
             decision_state["route_guidance"] = route_guidance
+        decision_navigation_mode = self.navigation_mode
+        if exact_route_guidance:
+            # Frontier exploration is useful in the Hideout's spinner maze,
+            # but contradicts exact story/exit guidance elsewhere. In Silph it
+            # told the brain to stay on 10F while the trusted route said 11F.
+            decision_state.pop("frontier_directive", None)
+            if decision_navigation_mode == "puzzle":
+                # Preserve the underlying episode and learned graph, but issue
+                # this turn under the normal precision contract. Story gates
+                # such as the 11F Rocket require A; movement-only puzzle mode
+                # otherwise strands the player forever beside the target.
+                decision_navigation_mode = "normal"
+                decision_state.pop("navigation_mode", None)
+                decision_state.pop("stuck_assessment", None)
         navigation_guidance = self.navigation_memory.guidance(
             position if route_context else None
         )
@@ -15453,7 +17467,7 @@ class PokemonRunner:
             "collision_map": collision_map,
             "history": list(self.history[-8:]),
             "navigation_origin": list(position) if route_context else None,
-            "navigation_mode": self.navigation_mode,
+            "navigation_mode": decision_navigation_mode,
             "crowd_advisory": crowd_advisory,
             "web_research": web_research,
             "force_precision": bool(
@@ -15734,6 +17748,7 @@ class PokemonRunner:
             "route_target",
             "solved_route",
             "frontier_coverage",
+            "trusted_story_route",
             "operator",
         }
         if source not in allowed_sources:
@@ -15913,6 +17928,141 @@ class PokemonRunner:
                 return route
         return None
 
+    def _advance_trusted_story_route(
+        self, game_state: dict[str, Any]
+    ) -> bool:
+        """Issue one coordinate-verified story step without changing AI ownership."""
+        if self.status.get("phase") != "overworld":
+            return False
+        position = navigation_position(game_state)
+        if position is None:
+            return False
+        direction = trusted_story_route_action(game_state)
+        events = game_state.get("victory_road_3_events")
+        hole_route_active = bool(
+            position[0] == 0xC6
+            and isinstance(events, dict)
+            and events.get("switch") is True
+            and events.get("hole_boulder") is False
+        )
+        if hole_route_active:
+            if getattr(self, "trusted_story_phase", None) != "vr3_hole":
+                setup_actions = {
+                    (23, 2): "down",
+                    (23, 3): "down",
+                    (23, 4): "down",
+                    (23, 5): "down",
+                    (23, 6): "left",
+                    (23, 7): "down",
+                    (23, 8): "left",
+                    (22, 6): "down",
+                    (22, 7): "down",
+                    (22, 8): "left",
+                    (21, 8): "left",
+                    (20, 8): "down",
+                    (20, 9): "down",
+                }
+                if (position[1], position[2]) == (20, 10):
+                    self.trusted_story_phase = "vr3_hole"
+                else:
+                    direction = setup_actions.get(
+                        (position[1], position[2])
+                    )
+        elif getattr(self, "trusted_story_phase", None) == "vr3_hole":
+            self.trusted_story_phase = None
+        if direction is None:
+            return False
+        buttons = [direction]
+        boulder = game_state.get("victory_road_1_boulder")
+        route_switch_pending = bool(
+            position[0] == 0x6C
+            and game_state.get("victory_road_1_switch_on") is False
+        )
+        if position[0] == 0xC2:
+            switches = game_state.get("victory_road_2_switches")
+            boulders = game_state.get("victory_road_2_boulders")
+            if (
+                isinstance(switches, dict)
+                and switches.get("one") is False
+                and isinstance(boulders, list)
+                and boulders
+            ):
+                boulder = boulders[0]
+                route_switch_pending = True
+            elif (
+                isinstance(switches, dict)
+                and switches.get("one") is True
+                and switches.get("two") is False
+                and isinstance(game_state.get("victory_road_3_events"), dict)
+                and game_state["victory_road_3_events"].get("hole_boulder") is True
+                and isinstance(boulders, list)
+                and len(boulders) >= 3
+            ):
+                boulder = boulders[2]
+                route_switch_pending = True
+        if position[0] == 0xC6:
+            events = game_state.get("victory_road_3_events")
+            boulders = game_state.get("victory_road_3_boulders")
+            if (
+                isinstance(events, dict)
+                and events.get("switch") is False
+                and isinstance(boulders, list)
+                and boulders
+            ):
+                boulder = boulders[0]
+                route_switch_pending = True
+            elif (
+                isinstance(events, dict)
+                and events.get("switch") is True
+                and events.get("hole_boulder") is False
+                and isinstance(boulders, list)
+                and len(boulders) >= 4
+            ):
+                boulder = boulders[3]
+                route_switch_pending = True
+        direction_delta = {
+            "up": (0, -1),
+            "down": (0, 1),
+            "left": (-1, 0),
+            "right": (1, 0),
+        }[direction]
+        if (
+            route_switch_pending
+            and isinstance(boulder, dict)
+            and (
+                position[1] + direction_delta[0],
+                position[2] + direction_delta[1],
+            )
+            == (boulder.get("x"), boulder.get("y"))
+        ):
+            buttons.append(direction)
+        self.committed_route = None
+        self.status["committed_route"] = None
+        self.navigation_memory.finish(position)
+        self.navigation_memory.begin(
+            list(position), buttons, phase="overworld"
+        )
+        self._record_execution_evidence(
+            source="trusted_story_route",
+            buttons=buttons,
+            game_state=game_state,
+        )
+        self.player.replace(buttons)
+        self.settle_candidate = None
+        self.settle_samples = 0
+        self.position_settled = False
+        self.last_decision_finished = (
+            time.monotonic() + TRUSTED_STORY_SETTLE_SECONDS
+        )
+        self.status["brain_status"] = "route"
+        self.status["last_action"] = buttons
+        self.status["gameplay_progress_at"] = utc_now()
+        self.status["committed_route"] = {
+            "source": "trusted_story_route",
+            "remaining": None,
+        }
+        return True
+
     def _advance_committed_route(self, game_state: dict[str, Any]) -> bool:
         """Execute the next committed-route step through the settled gate.
 
@@ -15923,6 +18073,19 @@ class PokemonRunner:
         route so the very same slot falls through to a fresh brain decision.
         No blind multi-input execution ever happens here.
         """
+        exact_route_state = {
+            **game_state,
+            "completed": self.status.get("completed") is True,
+            "phase": self.status.get("phase"),
+        }
+        if trusted_exact_route_guidance(exact_route_state) is not None:
+            # A persisted solved/frontier route may fire before the next model
+            # prompt. Never let it override a current story route (the stale
+            # Seafoam "solution" immediately replayed the entrance exit).
+            self.committed_route = None
+            self.status["committed_route"] = None
+            self.navigation_memory.cancel_pending()
+            return False
         position = navigation_position(game_state)
         route_context = bool(
             position is not None and not game_state.get("screen_text")
@@ -16063,12 +18226,32 @@ class PokemonRunner:
             self.status["completed"] = True
             self._rotate_clip("Pokemon Red completed: Hall of Fame")
             self._set_control_mode("paused")
+        if (
+            game_state.get("mewtwo_caught") is True
+            and not self.status.get("mewtwo_caught")
+        ):
+            self.status["mewtwo_caught"] = True
+            self._rotate_clip("Postgame milestone: Mewtwo caught")
+            self._set_control_mode("paused")
 
     def _restore_completed_state(self, game_state: dict[str, Any]) -> bool:
-        if game_state.get("hall_of_fame") is not True:
+        hall_of_fame_map = game_state.get("hall_of_fame") is True
+        hall_of_fame = bool(
+            hall_of_fame_map
+            or game_state.get("hall_of_fame_completed") is True
+        )
+        mewtwo_caught = game_state.get("mewtwo_caught") is True
+        if not hall_of_fame and not mewtwo_caught:
             return False
-        self.status["completed"] = True
-        if getattr(self, "control_mode", None) != "paused":
+        if hall_of_fame:
+            self.status["completed"] = True
+        if mewtwo_caught:
+            self.status["completed"] = True
+            self.status["mewtwo_caught"] = True
+        if (
+            (hall_of_fame_map or mewtwo_caught)
+            and getattr(self, "control_mode", None) != "paused"
+        ):
             self._set_control_mode("paused")
         return True
 
@@ -16526,7 +18709,10 @@ class PokemonRunner:
                     # R1/R4 committed routes consume the settled decision
                     # slot one verified cardinal at a time; any surprise
                     # aborts and the same slot requests a fresh decision.
-                    if not self._advance_committed_route(game_state):
+                    if (
+                        not self._advance_trusted_story_route(game_state)
+                        and not self._advance_committed_route(game_state)
+                    ):
                         self._request_decision(
                             image, game_state, collision_ascii(self.pyboy)
                         )
@@ -16849,6 +19035,7 @@ def supervisor_main(args: argparse.Namespace) -> int:
         },
     }
     atomic_write_json(runtime_dir / "desired.json", desired)
+    initialize_control_cursor_at_eof(runtime_dir)
     stop_requested = threading.Event()
     child: Optional[subprocess.Popen[Any]] = None
     supervisor_exit_code = 0
@@ -16915,11 +19102,20 @@ def supervisor_main(args: argparse.Namespace) -> int:
 
             now = time.time()
             restart_times.append(now)
-            while restart_times and now - restart_times[0] > 600:
+            while (
+                restart_times
+                and now - restart_times[0] > SUPERVISOR_RESTART_WINDOW_SECONDS
+            ):
                 restart_times.popleft()
-            if len(restart_times) > 10:
-                LOGGER.error("Pokemon supervisor restart circuit opened")
-                return 1
+            if len(restart_times) > SUPERVISOR_RESTART_LIMIT:
+                LOGGER.error(
+                    "Pokemon supervisor restart circuit cooling down for %s seconds",
+                    SUPERVISOR_RESTART_COOLDOWN_SECONDS,
+                )
+                if stop_requested.wait(SUPERVISOR_RESTART_COOLDOWN_SECONDS):
+                    break
+                restart_times.clear()
+                continue
             time.sleep(min(30, 2 ** min(len(restart_times), 4)))
     finally:
         if child and child.poll() is None:
