@@ -24186,6 +24186,7 @@ class PokemonRunner:
             "trusted_mewtwo_capture",
             "trusted_mewtwo_finalize",
             "trusted_cerulean_cave_flee",
+            "trusted_yellow_caterpie_capture",
             "trusted_gold_bugsy_battle",
             "trusted_gold_ilex",
             "trusted_gold_goldenrod",

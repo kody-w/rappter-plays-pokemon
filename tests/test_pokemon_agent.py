@@ -357,6 +357,16 @@ def test_execution_evidence_is_bounded_private_and_free_of_model_prose(tmp_path)
         for line in evidence_file.read_text().splitlines()
     ]
     assert records[-1]["source"] == "trusted_gold_goldenrod"
+    runner._record_execution_evidence(
+        source="trusted_yellow_caterpie_capture",
+        buttons=["down", "a"],
+        game_state=state,
+    )
+    records = [
+        json.loads(line)
+        for line in evidence_file.read_text().splitlines()
+    ]
+    assert records[-1]["source"] == "trusted_yellow_caterpie_capture"
 
 
 def test_improvement_directive_is_run_bound_expiring_and_enum_only(tmp_path):
