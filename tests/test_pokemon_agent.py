@@ -5312,6 +5312,55 @@ def test_request_decision_keeps_episode_but_drops_puzzle_off_route(tmp_path):
     assert runner.puzzle_feedback == {"reason": "pending"}
 
 
+def test_request_decision_learns_movement_without_collision_grid(tmp_path):
+    memory = NavigationMemory(tmp_path / "navigation-memory.json")
+    memory.begin([1, 4, 20], ["up"], phase="overworld")
+    runner = PokemonRunner.__new__(PokemonRunner)
+    runner.screens_dir = tmp_path
+    runner.run_id = "yellow"
+    runner.decision_sequence = 0
+    runner.control_generation = 0
+    runner.control_mode = "ai"
+    runner.emulator_pause_requested = False
+    runner.status = {"phase": "overworld", "model_calls": 0}
+    runner.navigation_memory = memory
+    runner.decision_positions = deque(maxlen=6)
+    runner.stuck_decision_count = 0
+    runner.puzzle_feedback = None
+    runner.navigation_mode = "normal"
+    runner.stuck_web_research_enabled = False
+    runner.total_decisions = 0
+    runner.last_edge_count = 0
+    runner.steps_since_new_edge = 0
+    runner.edge_count_history = deque(
+        maxlen=pokemon_module.EDGE_LEARNING_WINDOW_DECISIONS + 1
+    )
+    runner.history = []
+    runner.pending_decision_id = None
+    runner.decision_pending = False
+    runner.brain_requests = queue.Queue()
+    runner._maybe_start_web_research = lambda **kwargs: None
+    runner._crowd_route_advisory = lambda **kwargs: None
+    image = SimpleNamespace(
+        save=lambda path, format=None: Path(path).write_bytes(b"png")
+    )
+    game_state = {
+        "game_id": "yellow",
+        "map_id": 1,
+        "coordinates": {"x": 4, "y": 19},
+        "screen_text": "",
+    }
+
+    runner._request_decision(image, game_state, None)
+
+    request = runner.brain_requests.get_nowait()
+    assert memory.distinct_edge_count() == 1
+    assert request["navigation_origin"] == [1, 4, 19]
+    assert request["movement_context"] is True
+    assert request["force_precision"] is True
+    assert runner.status["navigation_memory_count"] == 1
+
+
 class _PlayerSpy:
     def __init__(self):
         self.replaced = []
@@ -7775,6 +7824,36 @@ def test_latest_frame_recovers_once_after_storage_exhaustion(tmp_path):
     assert (tmp_path / "latest.png").read_bytes() == b"png"
     assert runner.status["storage_write_error"] is None
     assert runner.status["storage_recovered_at"]
+
+
+def test_brain_persistence_recovers_without_stopping_runtime(
+    monkeypatch,
+    tmp_path,
+):
+    attempts = 0
+
+    def flaky_write(path, payload):
+        nonlocal attempts
+        attempts += 1
+        if attempts == 1:
+            raise OSError(errno.ENOSPC, "disk full")
+        Path(path).write_text(json.dumps(payload))
+
+    monkeypatch.setattr(pokemon_module, "atomic_write_json", flaky_write)
+    runner = PokemonRunner.__new__(PokemonRunner)
+    runner.runtime_dir = tmp_path
+    runner.history = [{"buttons": ["up"]}]
+    runner.total_decisions = 1
+    runner.status = {}
+    cleanup_calls = []
+    runner._enforce_retention = lambda: cleanup_calls.append(True)
+
+    assert runner._persist_brain_state() is True
+    assert attempts == 2
+    assert cleanup_calls == [True]
+    assert runner.status["recording_suspended"] is True
+    assert runner.status["storage_write_error"] is None
+    assert runner.status["brain_persistence_error"] is None
 
 
 def test_decision_request_backs_off_when_screenshot_cannot_be_saved(

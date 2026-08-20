@@ -21125,6 +21125,7 @@ class PokemonRunner:
             "evidence_run_id": self.run_id,
             "evidence_events": 0,
             "evidence_error": None,
+            "brain_persistence_error": None,
             "improvement_cycle": None,
             "model_calls": 0,
             "actions_taken": 0,
@@ -23457,33 +23458,36 @@ class PokemonRunner:
         self.navigation_memory.observe_warps(
             game_state.get("map_id"), game_state.get("warps")
         )
-        route_context = bool(
+        movement_context = bool(
             self.status.get("phase") == "overworld"
             and position is not None
             and not game_state.get("screen_text")
-            and collision_grid_valid(collision_map)
         )
-        if route_context:
+        route_context = bool(
+            movement_context and collision_grid_valid(collision_map)
+        )
+        if movement_context:
             self.navigation_memory.finish(position)
             self.decision_positions.append(position)
         else:
             self.navigation_memory.cancel_pending()
             self.decision_positions.clear()
-        self.status["navigation_memory_count"] = len(
-            self.navigation_memory.attempts
+        self.status["navigation_memory_count"] = (
+            len(self.navigation_memory.attempts)
+            + self.navigation_memory.distinct_edge_count()
         )
         stuck_assessment = self.navigation_memory.stuck_assessment(
-            position if route_context else None
+            position if movement_context else None
         )
         episode = stuck_assessment["episode"]
         # Puzzle mode enters when the shared assessment activates and exits
         # only when the episode itself resets (map/key-item/badge/story
         # progress or sustained discovery), never on one novel coordinate.
-        # Enforcement is gated on route_context: battles, dialogue, and
+        # Enforcement is gated on movement_context: battles, dialogue, and
         # other non-overworld decisions keep the persisted episode intact
         # but are issued in normal mode so the brain can still press a/b.
         self.navigation_mode = (
-            "puzzle" if (episode is not None and route_context) else "normal"
+            "puzzle" if (episode is not None and movement_context) else "normal"
         )
         if self.navigation_mode == "puzzle":
             self.stuck_decision_count += 1
@@ -23610,7 +23614,7 @@ class PokemonRunner:
                 decision_state.pop("navigation_mode", None)
                 decision_state.pop("stuck_assessment", None)
         navigation_guidance = self.navigation_memory.guidance(
-            position if route_context else None
+            position if movement_context else None
         )
         if navigation_guidance is not None:
             decision_state["navigation_memory"] = navigation_guidance
@@ -23647,7 +23651,7 @@ class PokemonRunner:
             "game_state": decision_state,
             "collision_map": collision_map,
             "history": list(self.history[-8:]),
-            "navigation_origin": list(position) if route_context else None,
+            "navigation_origin": list(position) if movement_context else None,
             "navigation_mode": decision_navigation_mode,
             "crowd_advisory": crowd_advisory,
             "web_research": web_research,
@@ -23656,6 +23660,7 @@ class PokemonRunner:
                 or navigation_guidance
                 or crowd_advisory
                 or web_research
+                or (movement_context and not route_context)
                 or (
                     improvement_cycle is not None
                     and improvement_cycle["strategy"]
@@ -23666,7 +23671,7 @@ class PokemonRunner:
                     }
                 )
             ),
-            "movement_context": route_context,
+            "movement_context": movement_context,
         }
         self.decision_sequence += 1
         self.pending_decision_id = request["decision_id"]
@@ -23915,16 +23920,47 @@ class PokemonRunner:
         self.history.append(history_item)
         self.history = self.history[-50:]
         self.total_decisions += 1
-        atomic_write_json(
-            self.runtime_dir / "brain.json",
-            {
-                "history": self.history,
-                "total_decisions": self.total_decisions,
-                "updated_at": utc_now(),
-            },
-        )
+        self._persist_brain_state()
         if decision["checkpoint"]:
             self._rotate_clip(f"Copilot checkpoint: {decision['objective'][:120]}")
+
+    def _persist_brain_state(self) -> bool:
+        payload = {
+            "history": self.history,
+            "total_decisions": self.total_decisions,
+            "updated_at": utc_now(),
+        }
+        for attempt in range(2):
+            try:
+                atomic_write_json(self.runtime_dir / "brain.json", payload)
+            except OSError as error:
+                if not storage_capacity_error(error):
+                    raise
+                self.status["storage_write_error"] = str(error)
+                self.status["recording_suspended"] = True
+                if attempt == 0:
+                    try:
+                        self._enforce_retention()
+                    except OSError as cleanup_error:
+                        LOGGER.error(
+                            "Storage cleanup failed after brain persistence "
+                            "error %s: %s",
+                            error,
+                            cleanup_error,
+                        )
+                    continue
+                self.status["brain_persistence_error"] = str(error)
+                LOGGER.error(
+                    "Storage remains exhausted; brain history is memory-only"
+                )
+                return False
+            else:
+                if attempt:
+                    self.status["storage_recovered_at"] = utc_now()
+                self.status["storage_write_error"] = None
+                self.status["brain_persistence_error"] = None
+                return True
+        return False
 
     def _maybe_commit_solved_route(
         self,
