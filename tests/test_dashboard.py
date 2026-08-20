@@ -325,24 +325,41 @@ def test_gold_reader_exposes_verified_generation_two_progress():
     memory[0xD5E2] = 0xFF
     memory[0xD116] = 1
     memory[0xD0EF] = 16
+    memory[0xD6A8] = 6
+    memory[0xDBE4] = 0b00000001
+    memory[0xDBE4 + 31] = 0b00000100
+    memory[0xDC04] = 0b00000011
+    memory[0xDC04 + 31] = 0b00000100
+    memory[0xD1EA] = 0
+    memory[0xD1EB] = 0x02
+    memory[0xD1EC] = 0x58
+    memory[0xD1ED] = 34
+    memory[0xD1EE] = 56
+    memory[0xD1EF] = 12
     memory[0xD7B7 + 0x0044 // 8] |= 1 << (0x0044 % 8)
     memory[0xD7B7 + 0x0762 // 8] |= 1 << (0x0762 % 8)
     memory[0xD7B7 + 0x001A // 8] |= 1 << (0x001A % 8)
     memory[0xD7B7 + 0x001E // 8] |= 1 << (0x001E % 8)
     memory[0xD7B7 + 0x0014 // 8] |= 1 << (0x0014 % 8)
+    memory[0xD7B7 + 0x0010 // 8] |= 1 << (0x0010 % 8)
     memory[0xD7B7 + 0x0647 // 8] |= 1 << (0x0647 % 8)
     memory[0xD7B7 + 0x0411 // 8] |= 1 << (0x0411 % 8)
     memory[0xD7B7 + 0x03FB // 8] |= 1 << (0x03FB % 8)
     memory[0xD7B7 + 0x03FC // 8] |= 1 << (0x03FC % 8)
-    memory[0xD7B7 + 0x002A // 8] |= 1 << (0x002A % 8)
-    memory[0xD7B7 + 0x0533 // 8] |= 1 << (0x0533 % 8)
-    memory[0xD7B7 + 0x04E2 // 8] |= 1 << (0x04E2 % 8)
+    memory[0xD7B7 + 0x002B // 8] |= 1 << (0x002B % 8)
+    memory[0xD7B7 + 0x0029 // 8] |= 1 << (0x0029 % 8)
+    memory[0xD7B7 + 0x0535 // 8] |= 1 << (0x0535 % 8)
+    memory[0xD7B7 + 0x04E4 // 8] |= 1 << (0x04E4 % 8)
+    memory[0xD7B7 + 0x044C // 8] |= 1 << (0x044C % 8)
+    memory[0xD7B7 + 0x06FA // 8] |= 1 << (0x06FA % 8)
+    memory[0xD7B7 + 0x053C // 8] |= 1 << (0x053C % 8)
 
     snapshot = PokemonGoldMemoryReader(memory).snapshot()
 
     assert snapshot["map_id"] == 0x1804
     assert snapshot["location"] == "New Bark Town"
     assert snapshot["coordinates"] == {"x": 6, "y": 5}
+    assert snapshot["underground_switch_position"] == 6
     assert len(snapshot["badges"]) == 16
     assert snapshot["party"] == [{
         "nickname": "",
@@ -353,11 +370,21 @@ def test_gold_reader_exposes_verified_generation_two_progress():
     }]
     assert snapshot["in_battle"] is True
     assert snapshot["enemy_species_id"] == 16
+    assert snapshot["pokedex"] == {"caught": 2, "seen": 3, "total": 251}
+    assert snapshot["play_time"] == {
+        "hours": 600,
+        "minutes": 34,
+        "seconds": 56,
+        "frames": 12,
+        "maxed": False,
+    }
     assert snapshot["elite_four_completed"] is True
     assert snapshot["red_defeated"] is True
     assert snapshot["ultimate_run_completed"] is True
     assert snapshot["story_events"] == {
         "got_hm_flash": True,
+        "got_hm_cut": True,
+        "got_hm_fly": False,
         "got_starter": True,
         "got_mystery_egg": True,
         "gave_mystery_egg_to_elm": False,
@@ -365,9 +392,60 @@ def test_gold_reader_exposes_verified_generation_two_progress():
         "beat_bird_keeper_rod": True,
         "beat_bird_keeper_abe": True,
         "cleared_slowpoke_well": True,
+        "herded_farfetchd": True,
         "beat_hiker_daniel": True,
         "beat_pokemaniac_larry": True,
+        "beat_firebreather_ray": True,
+        "kurt_left_for_well": True,
+        "beat_bug_catcher_benny": True,
         "sprout_1f_parlyz_heal_collected": True,
+        "farfetchd_position": None,
+        "beat_beauty_victoria": False,
+        "beat_beauty_samantha": False,
+        "beat_lass_carrie": False,
+        "beat_lass_bridget": False,
+        "beat_whitney": False,
+        "made_whitney_cry": False,
+        "fought_sudowoodo": False,
+        "got_hm_surf": False,
+        "beat_camper_ivan": False,
+        "released_the_beasts": False,
+        "beat_morty": False,
+        "beat_kimono_naoko": False,
+        "beat_kimono_sayo": False,
+        "beat_kimono_zuki": False,
+        "beat_kimono_kuni": False,
+        "beat_kimono_miki": False,
+        "got_tm_rock_smash": False,
+        "got_hm_strength": False,
+        "jasmine_explained_sickness": False,
+        "jasmine_returned_to_gym": False,
+        "cleared_radio_tower": False,
+        "cleared_rocket_hideout": False,
+        "used_radio_tower_card_key": False,
+        "used_basement_key": False,
+        "received_card_key": False,
+        "refused_to_help_lance": False,
+        "decided_to_help_lance": False,
+        "got_secret_potion": False,
+        "beat_jasmine": False,
+        "beat_chuck": False,
+        "beat_pryce": False,
+        "beat_clair": False,
+        "got_hm_whirlpool": False,
+        "got_hm_waterfall": False,
+        "beat_rocket_gruntm18": False,
+        "met_rival_rocket_base": False,
+        "beat_rival_underground": False,
+        "beat_rocket_commander": False,
+        "learned_hail_giovanni": False,
+        "opened_rocket_transmitter_door": False,
+        "learned_slowpoketail": False,
+        "learned_raticate_tail": False,
+        "opened_giovanni_office": False,
+        "rocket_electrode_1": False,
+        "rocket_electrode_2": False,
+        "rocket_electrode_3": False,
     }
 
 
@@ -385,6 +463,45 @@ def test_gold_reader_does_not_decode_overworld_tiles_as_text():
     memory[0xC4A0 : 0xC4A0 + 360] = bytes([0xF6]) * 360
 
     assert PokemonGoldMemoryReader(memory).snapshot()["screen_text"] == ""
+
+
+def test_project_dashboard_projects_gold_badges_and_party():
+    snapshot = project_dashboard_snapshot({
+        "game_id": "gold",
+        "game_state": {
+            "game_id": "gold",
+            "location": "Union Cave 1F",
+            "badges": ["Zephyr", "Hive"],
+            "johto_badge_bits": 3,
+            "kanto_badge_bits": 0,
+            "party_count": 1,
+            "party": [{
+                "nickname": "CROCONAW",
+                "species_id": 159,
+                "level": 18,
+                "hp": 50,
+                "max_hp": 54,
+            }],
+            "pokedex": {"caught": None, "seen": None, "total": 251},
+            "play_time": {
+                "hours": 600,
+                "minutes": 34,
+                "seconds": 56,
+                "frames": 12,
+                "maxed": False,
+            },
+            "red_defeated": False,
+        },
+    })
+
+    assert snapshot["badges"] == {
+        "earned": ["Zephyr", "Hive"],
+        "count": 2,
+        "total": 16,
+    }
+    assert snapshot["pokedex"]["total"] == 251
+    assert snapshot["play_time"]["hours"] == 600
+    assert snapshot["party"][0]["nickname"] == "CROCONAW"
 
 
 def test_hall_of_fame_completion_event_persists_postgame():

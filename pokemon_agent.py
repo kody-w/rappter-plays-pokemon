@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import base64
+import errno
 import hashlib
 import http.server
 import importlib.util
@@ -82,21 +83,43 @@ GOLD_BADGE_NAMES = (
     "Volcano",
     "Earth",
 )
+GOLD_FARFETCHD_EVENT_IDS = tuple(range(0x06E9, 0x06F3))
 GOLD_MAP_NAMES = {
+    (0x01, 0x09): "Route 38 Ecruteak Gate",
+    (0x01, 0x07): "Olivine Cafe",
+    (0x01, 0x0C): "Route 38",
+    (0x01, 0x0D): "Route 39",
+    (0x01, 0x0E): "Olivine City",
     (0x03, 0x01): "Sprout Tower 1F",
     (0x03, 0x02): "Sprout Tower 2F",
     (0x03, 0x03): "Sprout Tower 3F",
+    (0x03, 0x0F): "National Park",
+    (0x03, 0x0D): "Burned Tower 1F",
+    (0x03, 0x0E): "Burned Tower B1F",
     (0x03, 0x1D): "Union Cave 1F",
     (0x03, 0x1E): "Union Cave B1F",
     (0x03, 0x1F): "Union Cave B2F",
     (0x03, 0x20): "Slowpoke Well B1F",
     (0x03, 0x21): "Slowpoke Well B2F",
+    (0x03, 0x22): "Olivine Lighthouse 1F",
+    (0x03, 0x23): "Olivine Lighthouse 2F",
+    (0x03, 0x24): "Olivine Lighthouse 3F",
+    (0x03, 0x25): "Olivine Lighthouse 4F",
+    (0x03, 0x26): "Olivine Lighthouse 5F",
+    (0x03, 0x27): "Olivine Lighthouse 6F",
+    (0x03, 0x2C): "Ilex Forest",
     (0x08, 0x01): "Azalea Pokemon Center",
     (0x08, 0x04): "Kurt's House",
     (0x08, 0x05): "Azalea Gym",
     (0x08, 0x06): "Route 33",
     (0x08, 0x07): "Azalea Town",
     (0x0A, 0x01): "Route 32",
+    (0x0A, 0x02): "Route 35",
+    (0x0A, 0x03): "Route 36",
+    (0x0A, 0x04): "Route 37",
+    (0x0A, 0x0E): "Route 35 Goldenrod Gate",
+    (0x0A, 0x0F): "Route 35 National Park Gate",
+    (0x0A, 0x11): "Route 36 National Park Gate",
     (0x18, 0x03): "Route 29",
     (0x18, 0x04): "New Bark Town",
     (0x18, 0x05): "Professor Elm's Lab",
@@ -109,9 +132,55 @@ GOLD_MAP_NAMES = {
     (0x1A, 0x0B): "Route 31 Violet Gate",
     (0x0A, 0x05): "Violet City",
     (0x0A, 0x07): "Violet Gym",
+    (0x0B, 0x01): "Route 34",
+    (0x0B, 0x02): "Goldenrod City",
+    (0x0B, 0x03): "Goldenrod Gym",
+    (0x0B, 0x08): "Goldenrod Flower Shop",
+    (0x0B, 0x0A): "Goldenrod PP Speech House",
+    (0x0B, 0x14): "Ilex Forest Azalea Gate",
+    (0x0B, 0x15): "Route 34 Ilex Forest Gate",
+    (0x04, 0x05): "Ecruteak Dance Theater",
+    (0x04, 0x07): "Ecruteak Gym",
+    (0x04, 0x09): "Ecruteak City",
     (0x10, 0x02): "Indigo Plateau Pokemon Center",
     (0x10, 0x08): "Hall of Fame",
     (0x13, 0x02): "Mt. Silver Outside",
+    (0x16, 0x03): "Cianwood City",
+    (0x16, 0x01): "Route 40",
+    (0x16, 0x02): "Route 41",
+    (0x16, 0x05): "Cianwood Gym",
+    (0x16, 0x06): "Cianwood Pokemon Center",
+    (0x16, 0x07): "Cianwood Pharmacy",
+    (0x02, 0x02): "Mahogany Gym",
+    (0x02, 0x04): "Route 42 Ecruteak Gate",
+    (0x02, 0x05): "Route 42",
+    (0x02, 0x06): "Route 44",
+    (0x02, 0x07): "Mahogany Town",
+    (0x09, 0x03): "Route 43 Mahogany Gate",
+    (0x09, 0x04): "Route 43 Gate",
+    (0x09, 0x05): "Route 43",
+    (0x09, 0x06): "Lake of Rage",
+    (0x03, 0x29): "Team Rocket Base B1F",
+    (0x03, 0x2A): "Team Rocket Base B2F",
+    (0x03, 0x2B): "Team Rocket Base B3F",
+    (0x03, 0x28): "Mahogany Mart",
+    (0x03, 0x35): "Ice Path 1F",
+    (0x03, 0x36): "Ice Path B1F",
+    (0x03, 0x37): "Ice Path B2F Mahogany Side",
+    (0x03, 0x38): "Ice Path B2F Blackthorn Side",
+    (0x03, 0x39): "Ice Path B3F",
+    (0x03, 0x11): "Radio Tower 1F",
+    (0x03, 0x12): "Radio Tower 2F",
+    (0x03, 0x13): "Radio Tower 3F",
+    (0x03, 0x14): "Radio Tower 4F",
+    (0x03, 0x15): "Radio Tower 5F",
+    (0x03, 0x2E): "Goldenrod Underground Switch Room",
+    (0x03, 0x30): "Goldenrod Underground Warehouse",
+    (0x03, 0x48): "Dragon's Den 1F",
+    (0x03, 0x49): "Dragon's Den B1F",
+    (0x05, 0x01): "Blackthorn Gym 1F",
+    (0x05, 0x02): "Blackthorn Gym 2F",
+    (0x05, 0x0A): "Blackthorn City",
     (0x03, 0x42): "Silver Cave Room 1",
     (0x03, 0x43): "Silver Cave Room 2",
     (0x03, 0x44): "Silver Cave Room 3",
@@ -133,6 +202,9 @@ GOLD_KEY_ITEMS = {
     "squirt_bottle": 0xAF,
     "rainbow_wing": 0xB2,
 }
+GOLD_FLY_SPECIES = frozenset({
+    16, 17, 18, 21, 22, 83, 84, 85, 163, 164, 165, 169,
+})
 GOLD_ROUTE_29_ACTIONS = {
     **{(x, 11): "right" for x in range(0, 27)},
     (27, 11): "down",
@@ -227,6 +299,1262 @@ GOLD_UNION_CAVE_LARRY_ACTIONS = {
     **{(7, y): "down" for y in range(23, 27)},
     **{(x, 26): "left" for x in range(4, 8)},
     **{(4, y): "up" for y in range(24, 27)},
+}
+GOLD_UNION_CAVE_RAY_ACTIONS = {
+    **{(4, y): "down" for y in range(23, 28)},
+    **{(x, 27): "right" for x in range(4, 16)},
+    (16, 27): "right",
+    **{(17, y): "down" for y in range(27, 31)},
+}
+GOLD_AZALEA_KURT_ACTIONS = {
+    (30, 15): "right",
+    **{(31, y): "up" for y in range(10, 16)},
+    **{(x, 10): "left" for x in range(10, 32)},
+    **{(9, y): "up" for y in range(6, 11)},
+}
+GOLD_SLOWPOKE_WELL_WEST_ACTIONS = {
+    **{(14, y): "up" for y in range(5, 8)},
+    **{(x, 4): "left" for x in range(11, 15)},
+    **{(11, y): "down" for y in range(4, 7)},
+    **{(x, 6): "left" for x in range(8, 12)},
+    **{(x, 5): "left" for x in range(6, 8)},
+    **{(5, y): "up" for y in range(4, 6)},
+}
+GOLD_AZALEA_GYM_BENNY_ACTIONS = {
+    **{(7, y): "up" for y in range(10, 13)},
+    **{(x, 10): "right" for x in range(7, 9)},
+    **{(9, y): "up" for y in range(3, 11)},
+    **{(x, 3): "left" for x in range(8, 10)},
+}
+GOLD_AZALEA_GYM_BUGSY_ACTIONS = {
+    **{(4, y): "down" for y in range(2, 6)},
+    (4, 5): "left",
+    **{(3, y): "down" for y in range(5, 9)},
+    **{(x, 8): "right" for x in range(3, 5)},
+    (7, 6): "down",
+    (7, 7): "left",
+}
+GOLD_AZALEA_GYM_EXIT_ACTIONS = {
+    (1, 2): "down",
+    (2, 2): "down",
+    (3, 2): "down",
+    (4, 2): "down",
+    (5, 2): "right",
+    (6, 2): "right",
+    (7, 2): "down",
+    (8, 2): "down",
+    (9, 2): "down",
+    (0, 3): "down",
+    (1, 3): "down",
+    (2, 3): "left",
+    (3, 3): "left",
+    (4, 3): "left",
+    (5, 3): "left",
+    (7, 3): "right",
+    (8, 3): "down",
+    (9, 3): "down",
+    (0, 4): "down",
+    (1, 4): "down",
+    (4, 4): "up",
+    (5, 4): "up",
+    (8, 4): "down",
+    (9, 4): "down",
+    (0, 5): "down",
+    (1, 5): "left",
+    (3, 5): "right",
+    (4, 5): "up",
+    (5, 5): "up",
+    (6, 5): "left",
+    (8, 5): "right",
+    (9, 5): "down",
+    (0, 6): "down",
+    (2, 6): "right",
+    (3, 6): "up",
+    (6, 6): "up",
+    (7, 6): "left",
+    (9, 6): "down",
+    (0, 7): "down",
+    (2, 7): "up",
+    (3, 7): "up",
+    (4, 7): "left",
+    (6, 7): "up",
+    (7, 7): "up",
+    (9, 7): "down",
+    (0, 8): "down",
+    (1, 8): "down",
+    (3, 8): "up",
+    (4, 8): "up",
+    (5, 8): "left",
+    (6, 8): "up",
+    (8, 8): "right",
+    (9, 8): "down",
+    (0, 9): "down",
+    (1, 9): "down",
+    (4, 9): "up",
+    (5, 9): "up",
+    (9, 9): "down",
+    (0, 10): "down",
+    (1, 10): "down",
+    (2, 10): "down",
+    (3, 10): "down",
+    (6, 10): "down",
+    (7, 10): "down",
+    (8, 10): "down",
+    (9, 10): "down",
+    (0, 11): "right",
+    (1, 11): "right",
+    (2, 11): "right",
+    (3, 11): "right",
+    (4, 11): "down",
+    (5, 11): "down",
+    (6, 11): "left",
+    (7, 11): "left",
+    (8, 11): "left",
+    (9, 11): "left",
+    (2, 12): "up",
+    (4, 12): "down",
+    (5, 12): "down",
+    (7, 12): "up",
+    (2, 13): "up",
+    (4, 13): "down",
+    (5, 13): "down",
+    (3, 14): "down",
+    (4, 14): "down",
+    (5, 14): "down",
+    (6, 14): "down",
+    (7, 14): "down",
+    (3, 15): "right",
+    (4, 15): "down",
+    (5, 15): "down",
+    (6, 15): "left",
+    (7, 15): "left",
+}
+GOLD_ILEX_FARFETCHD_ACTIONS = {
+    1: {
+        (2, 42): "up",
+        (2, 41): "up",
+        (2, 40): "left",
+        **{(1, y): "up" for y in range(34, 41)},
+        (1, 33): "right",
+        **{(2, y): "up" for y in range(30, 34)},
+        **{(x, 29): "right" for x in range(2, 8)},
+        **{(8, y): "down" for y in range(29, 34)},
+        **{(x, 34): "right" for x in range(8, 14)},
+        (14, 34): "up",
+        (14, 33): "up",
+    },
+    2: {
+        **{(14, y): "up" for y in range(30, 33)},
+        (14, 29): "right",
+        **{(15, y): "up" for y in range(27, 30)},
+    },
+    3: {
+        **{(15, y): "up" for y in range(24, 27)},
+        **{(x, 23): "right" for x in range(15, 20)},
+    },
+    4: {
+        (20, 23): "down",
+        **{(x, 24): "right" for x in range(20, 28)},
+        (28, 24): "up",
+        (28, 23): "up",
+    },
+    5: {
+        (28, 22): "down",
+        (28, 23): "down",
+        (28, 24): "right",
+        **{(29, y): "down" for y in range(24, 30)},
+        (29, 30): "left",
+    },
+    6: {
+        **{(28, y): "down" for y in range(30, 35)},
+        **{(x, 35): "left" for x in range(26, 29)},
+    },
+    7: {
+        **{(x, 35): "left" for x in range(22, 26)},
+        **{(21, y): "up" for y in range(33, 36)},
+        (21, 32): "right",
+    },
+    8: {
+        **{(22, y): "up" for y in range(29, 33)},
+        **{(x, 28): "left" for x in range(16, 23)},
+    },
+    9: {
+        (15, 28): "left",
+        **{(14, y): "down" for y in range(28, 35)},
+        **{(x, 35): "left" for x in range(12, 15)},
+    },
+    10: {
+        (11, 35): "up",
+        **{(x, 34): "left" for x in range(9, 12)},
+        **{(8, y): "up" for y in range(30, 35)},
+        **{(x, 29): "left" for x in range(6, 9)},
+    },
+}
+GOLD_ILEX_FARFETCHD_INTERACTIONS = {
+    1: ((14, 32), "up"),
+    2: ((15, 26), "up"),
+    3: ((20, 23), "down"),
+    4: ((28, 22), "right"),
+    5: ((28, 30), "down"),
+    6: ((25, 35), "left"),
+    7: ((22, 32), "up"),
+    8: ((15, 28), "down"),
+    9: ((11, 35), "left"),
+    10: ((5, 29), "up"),
+}
+GOLD_ILEX_CUT_EXIT_ACTIONS = {
+    **{(x, 29): "right" for x in range(5, 8)},
+    **{(8, y): "up" for y in range(26, 30)},
+    (8, 23): "down",
+    (7, 22): "down",
+    (7, 23): "down",
+    (8, 25): "up",
+    **{(x, 24): "left" for x in range(1, 9)},
+    **{(0, y): "up" for y in range(19, 25)},
+    (0, 18): "right",
+    (1, 18): "up",
+    (1, 17): "right",
+    **{(2, y): "up" for y in range(16, 18)},
+    (2, 15): "right",
+    (3, 15): "up",
+    **{(x, 14): "right" for x in range(3, 8)},
+    **{(8, y): "up" for y in range(13, 15)},
+    **{(x, 12): "right" for x in range(8, 10)},
+    **{(10, y): "up" for y in range(11, 13)},
+    **{(x, 10): "right" for x in range(10, 18)},
+    (18, 10): "up",
+    **{(x, 9): "right" for x in range(18, 22)},
+    **{(22, y): "up" for y in range(5, 10)},
+    (22, 4): "right",
+    **{(23, y): "up" for y in range(1, 5)},
+    **{(x, 0): "left" for x in range(16, 24)},
+    (15, 0): "down",
+    (15, 1): "left",
+    **{(14, y): "down" for y in range(1, 4)},
+    **{(x, 4): "left" for x in range(12, 15)},
+    **{(11, y): "down" for y in range(4, 7)},
+    **{(x, 7): "left" for x in range(4, 12)},
+    (3, 7): "up",
+    (3, 6): "left",
+    (2, 6): "left",
+    (1, 6): "up",
+}
+GOLD_GOLDENROD_CARRIE_ACTIONS = {
+    (1, 13): "up",
+    (1, 12): "left",
+    **{(0, y): "up" for y in range(8, 13)},
+    (0, 5): "down",
+    (0, 6): "down",
+    **{(x, 7): "right" for x in range(0, 2)},
+    **{(2, y): "up" for y in range(5, 8)},
+    (2, 4): "left",
+    (1, 4): "up",
+    (1, 3): "up",
+    (1, 2): "right",
+    (2, 2): "up",
+    **{(x, 2): "up" for x in range(3, 12)},
+    **{(x, 1): "right" for x in range(2, 12)},
+    (12, 1): "down",
+    **{(x, 2): "right" for x in range(12, 18)},
+    **{(18, y): "down" for y in range(2, 6)},
+    **{(x, 6): "left" for x in range(16, 19)},
+    (15, 6): "down",
+    (15, 7): "down",
+    (15, 8): "right",
+    (16, 8): "down",
+    (16, 9): "right",
+    **{(17, y): "down" for y in range(9, 12)},
+    (17, 12): "left",
+    (16, 12): "left",
+    (15, 12): "down",
+    (15, 13): "left",
+    (14, 13): "left",
+}
+GOLD_GOLDENROD_BRIDGET_ACTIONS = {
+    **{(13, y): "up" for y in range(7, 14)},
+    (13, 6): "left",
+    (12, 6): "left",
+    (11, 6): "left",
+}
+GOLD_GOLDENROD_WHITNEY_ACTIONS = {
+    (10, 6): "right",
+    (11, 6): "down",
+    (11, 7): "down",
+    (11, 8): "down",
+    (11, 9): "left",
+    (10, 9): "left",
+    (9, 9): "up",
+    (9, 8): "up",
+    (9, 7): "left",
+    (8, 7): "up",
+    (8, 6): "up",
+    (8, 5): "up",
+}
+GOLD_GOLDENROD_WHITNEY_RETRY_ACTIONS = {
+    (3, 13): "up",
+    (3, 12): "up",
+    (3, 11): "left",
+    (2, 11): "up",
+    (2, 10): "left",
+    (1, 10): "up",
+    (1, 9): "left",
+    **GOLD_GOLDENROD_CARRIE_ACTIONS,
+    **{(13, y): "up" for y in range(10, 14)},
+    (13, 9): "left",
+    (12, 9): "left",
+    **GOLD_GOLDENROD_WHITNEY_ACTIONS,
+}
+GOLD_GOLDENROD_EXIT_ACTIONS = {
+    (2, 1): "down",
+    (3, 1): "down",
+    (4, 1): "down",
+    (6, 1): "down",
+    (7, 1): "left",
+    (8, 1): "left",
+    (9, 1): "left",
+    (10, 1): "left",
+    (11, 1): "left",
+    (12, 1): "left",
+    (13, 1): "left",
+    (14, 1): "left",
+    (15, 1): "left",
+    (16, 1): "left",
+    (17, 1): "left",
+    (1, 2): "down",
+    (2, 2): "left",
+    (3, 2): "left",
+    (4, 2): "left",
+    (5, 2): "left",
+    (6, 2): "left",
+    (12, 2): "up",
+    (13, 2): "up",
+    (14, 2): "up",
+    (15, 2): "up",
+    (16, 2): "up",
+    (17, 2): "right",
+    (18, 2): "down",
+    (19, 2): "down",
+    (0, 3): "down",
+    (1, 3): "down",
+    (9, 3): "down",
+    (10, 3): "left",
+    (11, 3): "left",
+    (18, 3): "down",
+    (19, 3): "left",
+    (0, 4): "down",
+    (1, 4): "left",
+    (2, 4): "down",
+    (6, 4): "down",
+    (8, 4): "down",
+    (9, 4): "left",
+    (13, 4): "down",
+    (17, 4): "down",
+    (18, 4): "down",
+    (0, 5): "down",
+    (2, 5): "down",
+    (3, 5): "down",
+    (5, 5): "down",
+    (6, 5): "down",
+    (7, 5): "down",
+    (8, 5): "down",
+    (11, 5): "down",
+    (12, 5): "down",
+    (13, 5): "down",
+    (14, 5): "left",
+    (16, 5): "down",
+    (17, 5): "down",
+    (18, 5): "down",
+    (0, 6): "down",
+    (2, 6): "down",
+    (3, 6): "down",
+    (5, 6): "down",
+    (6, 6): "down",
+    (7, 6): "right",
+    (8, 6): "down",
+    (10, 6): "right",
+    (11, 6): "down",
+    (12, 6): "down",
+    (13, 6): "down",
+    (15, 6): "right",
+    (16, 6): "right",
+    (17, 6): "right",
+    (18, 6): "down",
+    (19, 6): "down",
+    (0, 7): "down",
+    (1, 7): "left",
+    (2, 7): "left",
+    (3, 7): "left",
+    (5, 7): "down",
+    (6, 7): "down",
+    (8, 7): "down",
+    (9, 7): "down",
+    (11, 7): "down",
+    (12, 7): "down",
+    (13, 7): "down",
+    (15, 7): "up",
+    (18, 7): "right",
+    (19, 7): "down",
+    (0, 8): "down",
+    (5, 8): "down",
+    (6, 8): "down",
+    (8, 8): "down",
+    (9, 8): "down",
+    (11, 8): "down",
+    (12, 8): "down",
+    (13, 8): "down",
+    (15, 8): "up",
+    (16, 8): "left",
+    (19, 8): "down",
+    (0, 9): "down",
+    (1, 9): "down",
+    (3, 9): "right",
+    (4, 9): "right",
+    (5, 9): "down",
+    (6, 9): "right",
+    (7, 9): "down",
+    (8, 9): "right",
+    (9, 9): "right",
+    (10, 9): "down",
+    (11, 9): "down",
+    (12, 9): "right",
+    (13, 9): "down",
+    (16, 9): "up",
+    (17, 9): "left",
+    (19, 9): "down",
+    (0, 10): "down",
+    (1, 10): "right",
+    (2, 10): "down",
+    (5, 10): "down",
+    (7, 10): "down",
+    (10, 10): "down",
+    (11, 10): "down",
+    (13, 10): "down",
+    (14, 10): "down",
+    (15, 10): "left",
+    (17, 10): "up",
+    (19, 10): "down",
+    (0, 11): "down",
+    (2, 11): "right",
+    (3, 11): "down",
+    (5, 11): "right",
+    (6, 11): "down",
+    (7, 11): "down",
+    (8, 11): "down",
+    (9, 11): "down",
+    (10, 11): "down",
+    (11, 11): "down",
+    (12, 11): "down",
+    (13, 11): "down",
+    (14, 11): "left",
+    (17, 11): "up",
+    (19, 11): "down",
+    (0, 12): "right",
+    (1, 12): "down",
+    (3, 12): "down",
+    (6, 12): "right",
+    (7, 12): "right",
+    (8, 12): "right",
+    (9, 12): "right",
+    (10, 12): "down",
+    (11, 12): "down",
+    (12, 12): "down",
+    (13, 12): "down",
+    (15, 12): "right",
+    (16, 12): "right",
+    (17, 12): "up",
+    (19, 12): "down",
+    (1, 13): "right",
+    (2, 13): "down",
+    (3, 13): "down",
+    (4, 13): "left",
+    (6, 13): "up",
+    (7, 13): "up",
+    (8, 13): "up",
+    (10, 13): "right",
+    (11, 13): "right",
+    (12, 13): "right",
+    (13, 13): "right",
+    (14, 13): "right",
+    (15, 13): "up",
+    (18, 13): "right",
+    (19, 13): "down",
+    (2, 14): "down",
+    (3, 14): "down",
+    (7, 14): "up",
+    (12, 14): "up",
+    (13, 14): "up",
+    (17, 14): "down",
+    (19, 14): "down",
+    (2, 15): "down",
+    (3, 15): "down",
+    (9, 15): "down",
+    (10, 15): "down",
+    (13, 15): "up",
+    (15, 15): "down",
+    (16, 15): "left",
+    (17, 15): "down",
+    (18, 15): "down",
+    (19, 15): "down",
+    (1, 16): "down",
+    (2, 16): "down",
+    (3, 16): "down",
+    (4, 16): "down",
+    (5, 16): "down",
+    (6, 16): "down",
+    (9, 16): "down",
+    (10, 16): "left",
+    (11, 16): "left",
+    (12, 16): "left",
+    (15, 16): "down",
+    (17, 16): "down",
+    (18, 16): "left",
+    (19, 16): "left",
+    (0, 17): "right",
+    (1, 17): "right",
+    (2, 17): "down",
+    (3, 17): "down",
+    (4, 17): "left",
+    (5, 17): "left",
+    (6, 17): "left",
+    (7, 17): "left",
+    (8, 17): "left",
+    (9, 17): "left",
+    (12, 17): "up",
+    (13, 17): "left",
+    (14, 17): "left",
+    (15, 17): "left",
+    (16, 17): "left",
+    (17, 17): "left",
+}
+GOLD_GOLDENROD_PP_EXIT_ACTIONS = {
+    (5, 4): "down",
+    (5, 5): "down",
+    (5, 6): "down",
+    (5, 7): "left",
+    (4, 7): "left",
+    (3, 7): "down",
+}
+GOLD_GOLDENROD_FLOWER_ACTIONS = {
+    (3, 6): "left",
+    (2, 6): "up",
+}
+GOLD_GOLDENROD_FLOWER_CITY_ACTIONS = {
+    (29, 8): "up",
+    (29, 7): "right",
+    (30, 7): "right",
+    (31, 7): "right",
+    (32, 7): "up",
+    (32, 6): "right",
+    (33, 6): "up",
+}
+GOLD_GOLDENROD_ROUTE35_ACTIONS = {
+    **{(21, y): "up" for y in range(3, 11)},
+    (21, 2): "left",
+    (20, 2): "left",
+    (19, 2): "up",
+}
+GOLD_GOLDENROD_RADIO_ACTIONS = {
+    (15, 29): "up",
+    **{(x, 28): "right" for x in range(15, 18)},
+    **{(18, y): "up" for y in range(16, 29)},
+    **{(x, 16): "left" for x in range(5, 19)},
+    (5, 16): "up",
+}
+GOLD_GOLDENROD_UNDERGROUND_ACTIONS = {
+    (14, 29): "up",
+    **{(x, 28): "right" for x in range(14, 18)},
+    **{(18, y): "up" for y in range(8, 29)},
+    **{(x, 8): "left" for x in range(13, 19)},
+    **{(13, y): "up" for y in range(6, 9)},
+    **{(x, 6): "left" for x in range(9, 14)},
+    (9, 6): "up",
+}
+GOLD_UNDERGROUND_NORTH_ENTRY_ACTIONS = {
+    **{(20, y): "up" for y in range(26, 29)},
+    (20, 25): "right",
+}
+GOLD_UNDERGROUND_RIVAL_ENTRY_ACTIONS = {
+    (23, 3): "down",
+    **{(x, 4): "left" for x in range(20, 24)},
+    **{(x, 5): "left" for x in range(20, 24)},
+}
+GOLD_UNDERGROUND_LOWER_EXIT_ACTIONS = {
+    (4, 24): "right",
+    (5, 24): "down",
+    (5, 25): "down",
+}
+GOLD_RADIO_TOWER_1F_ACTIONS = {
+    **{(3, y): "up" for y in range(2, 5)},
+    **{(x, 2): "right" for x in range(3, 15)},
+    **{(15, y): "up" for y in range(4)},
+}
+GOLD_RADIO_TOWER_2F_ACTIONS = {
+    (0, 1): "up",
+    (1, 3): "up",
+    (1, 2): "up",
+    (8, 3): "up",
+    (5, 2): "left",
+    (4, 2): "left",
+    (3, 2): "up",
+    **{(x, 2): "left" for x in range(8, 15)},
+    (8, 2): "up",
+    (1, 1): "left",
+    (2, 1): "left",
+    (3, 1): "left",
+    (4, 1): "left",
+    (5, 1): "down",
+    (6, 1): "left",
+    (7, 1): "left",
+    (8, 1): "left",
+}
+GOLD_RADIO_TOWER_3F_ACTIONS = {
+    **{(x, 1): "left" for x in range(7, 10)},
+    (7, 1): "up",
+}
+GOLD_RADIO_TOWER_4F_ACTIONS = {
+    (5, 2): "right",
+    (6, 2): "right",
+    (7, 2): "down",
+    (7, 3): "down",
+    **{(x, 4): "left" for x in range(4, 8)},
+    (4, 4): "up",
+    (4, 3): "left",
+    (3, 3): "up",
+    (3, 2): "left",
+    (2, 2): "up",
+    (2, 1): "left",
+    (1, 1): "left",
+    (0, 1): "up",
+    **{(x, 0): "left" for x in range(1, 10)},
+}
+GOLD_RADIO_TOWER_5F_EXIT_ACTIONS = {
+    **{(3, y): "up" for y in range(1, 4)},
+    **{(x, 1): "left" for x in range(4)},
+    (0, 1): "up",
+}
+GOLD_RADIO_TOWER_4F_EXIT_ACTIONS = {
+    (0, 3): "down",
+    **{(x, 4): "right" for x in range(8)},
+    **{(7, y): "up" for y in range(1, 5)},
+    (7, 1): "right",
+    (8, 1): "right",
+    (9, 1): "up",
+}
+GOLD_RADIO_TOWER_3F_EXIT_ACTIONS = {
+    **{(1, y): "up" for y in range(2, 5)},
+    **{(x, 1): "left" for x in range(1, 9)},
+    (0, 1): "up",
+}
+GOLD_RADIO_TOWER_2F_EXIT_ACTIONS = {
+    (14, 7): "up",
+    (14, 6): "right",
+    (15, 6): "right",
+    **{(16, y): "up" for y in range(1, 7)},
+    (16, 1): "left",
+    (15, 1): "up",
+}
+GOLD_RADIO_TOWER_1F_EXIT_ACTIONS = {
+    (2, 7): "down",
+    (3, 7): "down",
+}
+GOLD_ROUTE35_GATE_ACTIONS = {
+    **{(4, y): "up" for y in range(1, 8)},
+}
+GOLD_ROUTE35_NATIONAL_PARK_ACTIONS = {
+    **{(9, y): "up" for y in range(19, 34)},
+    **{(x, 19): "left" for x in range(6, 10)},
+    **{(5, y): "up" for y in range(11, 20)},
+    (5, 11): "left",
+    (5, 12): "left",
+    (4, 12): "up",
+    (4, 11): "left",
+    **{(3, y): "up" for y in range(7, 12)},
+    **{(4, y): "up" for y in range(6, 12)},
+    (4, 6): "left",
+    (3, 6): "up",
+}
+GOLD_NATIONAL_PARK_ROUTE36_ACTIONS = {
+    **{(19, y): "up" for y in range(25, 35)},
+    (19, 24): "right",
+    (20, 24): "up",
+    (20, 23): "up",
+    (20, 22): "right",
+    (21, 22): "right",
+    (22, 22): "up",
+    (22, 21): "up",
+    (22, 20): "right",
+    (23, 20): "right",
+    (24, 20): "up",
+    **{(x, 19): "right" for x in range(24, 34)},
+}
+GOLD_ROUTE36_SUDOWOODO_ACTIONS = {
+    (22, 13): "down",
+    (22, 14): "down",
+    **{(x, 15): "right" for x in range(22, 29)},
+    (29, 15): "up",
+    **{(x, 14): "right" for x in range(29, 32)},
+    (32, 14): "up",
+    (32, 13): "up",
+    **{(x, 12): "right" for x in range(32, 35)},
+    (35, 12): "up",
+    (35, 11): "up",
+}
+GOLD_KIMONO_MIKI_ACTIONS = {
+    **{(x, 5): "right" for x in range(6, 10)},
+    **{(10, y): "up" for y in range(3, 6)},
+}
+GOLD_KIMONO_KUNI_ACTIONS = {
+    (10, 2): "up",
+}
+GOLD_KIMONO_ZUKI_ACTIONS = {
+    (10, 1): "down",
+    **{(x, 2): "left" for x in range(8, 11)},
+}
+GOLD_KIMONO_SAYO_ACTIONS = {
+    (7, 2): "up",
+    **{(x, 1): "left" for x in range(4, 8)},
+}
+GOLD_KIMONO_NAOKO_ACTIONS = {
+    (3, 1): "down",
+    (3, 2): "left",
+    (2, 2): "left",
+}
+GOLD_DANCE_THEATER_SURF_ACTIONS = {
+    (1, 2): "down",
+    (1, 3): "right",
+    **{(2, y): "down" for y in range(3, 8)},
+    (2, 8): "right",
+    (3, 8): "down",
+    (3, 9): "down",
+    **{(x, 10): "right" for x in range(3, 6)},
+}
+GOLD_DANCE_THEATER_EXIT_ACTIONS = {
+    (6, 10): "down",
+    (6, 11): "down",
+    (6, 12): "down",
+    (6, 13): "left",
+}
+GOLD_ECRUTEAK_HEAL_ACTIONS = {
+    (23, 22): "down",
+    (23, 23): "left",
+    (22, 23): "left",
+    **{(21, y): "down" for y in range(23, 28)},
+    (21, 28): "right",
+    (22, 28): "right",
+    (24, 29): "up",
+    (24, 28): "left",
+    (23, 28): "up",
+}
+GOLD_ECRUTEAK_BURNED_TOWER_ACTIONS = {
+    (7, 7): "left",
+    (6, 7): "left",
+    (5, 7): "up",
+    (5, 6): "up",
+}
+GOLD_BURNED_TOWER_POISON_HEAL_ACTIONS = {
+    (0x03, 0x0D, 9, 15): "down",
+    (0x04, 0x09, 5, 5): "up",
+    (0x04, 0x09, 5, 6): "down",
+    (0x04, 0x09, 5, 7): "right",
+    **{(0x04, 0x09, 6, y): "down" for y in range(7, 14)},
+    (0x04, 0x09, 6, 13): "right",
+    (0x04, 0x09, 7, 13): "right",
+    (0x04, 0x09, 8, 13): "down",
+    **{(0x04, 0x09, 8, y): "down" for y in range(14, 24)},
+    (0x04, 0x09, 8, 23): "right",
+    (0x04, 0x09, 9, 23): "right",
+    (0x04, 0x09, 10, 23): "down",
+    **{(0x04, 0x09, 10, y): "down" for y in range(24, 28)},
+    **{(0x04, 0x09, x, 28): "right" for x in range(10, 23)},
+    (0x04, 0x09, 23, 28): "up",
+}
+GOLD_BURNED_TOWER_BEASTS_ACTIONS = {
+    (13, 12): "down",
+    (13, 13): "down",
+    (13, 14): "right",
+}
+GOLD_BURNED_TOWER_EXIT_ACTIONS = {
+    (0x03, 0x0E, 8, 14): "left",
+    (0x03, 0x0E, 7, 14): "down",
+    (0x03, 0x0E, 7, 15): "down",
+    (0x03, 0x0D, 7, 15): "right",
+    (0x03, 0x0D, 8, 15): "right",
+    (0x03, 0x0D, 9, 15): "down",
+    (0x03, 0x0D, 10, 15): "down",
+}
+GOLD_ROUTE36_ROCK_SMASH_ACTIONS = {
+    **{(x, 9): "right" for x in range(32, 43)},
+}
+GOLD_ECRUTEAK_GYM_ACTIONS = {
+    (4, 13): "right",
+    (5, 13): "right",
+    **{(6, y): "up" for y in range(9, 14)},
+    **{(x, 9): "left" for x in range(4, 7)},
+    (3, 9): "up",
+    (3, 8): "up",
+    **{(x, 7): "right" for x in range(3, 6)},
+    **{(6, y): "up" for y in range(2, 8)},
+    (6, 2): "left",
+}
+GOLD_LIGHTHOUSE_1F_ACTIONS = {
+    (11, 14): "right",
+    (12, 14): "up",
+    (12, 13): "up",
+    (12, 12): "right",
+    (13, 12): "right",
+    **{(14, y): "up" for y in range(4, 16)},
+    **{(15, y): "left" for y in range(4, 16)},
+    (15, 2): "down",
+    **{(x, 3): "left" for x in range(6, 16)},
+    (5, 3): "down",
+    (5, 4): "down",
+    (5, 5): "left",
+    (4, 5): "left",
+    **{(3, y): "down" for y in range(5, 11)},
+}
+GOLD_LIGHTHOUSE_2F_ACTIONS = {
+    (3, 11): "down",
+    (3, 12): "down",
+    (3, 13): "right",
+    (4, 13): "down",
+    (4, 14): "right",
+    **{(x, 14): "right" for x in range(5, 12)},
+    **{(x, 2): "left" for x in range(8, 14)},
+    (8, 2): "down",
+    **{(x, 3): "left" for x in range(6, 9)},
+    (9, 15): "up",
+    (12, 14): "up",
+    (12, 13): "up",
+    (12, 12): "right",
+    (13, 12): "right",
+    **{(14, y): "up" for y in range(3, 13)},
+    **{(x, 2): "left" for x in range(11, 15)},
+    (10, 2): "left",
+    **{(x, 3): "left" for x in range(6, 11)},
+    (5, 15): "up",
+    **{(x, 14): "right" for x in range(5, 12)},
+    (10, 3): "up",
+}
+GOLD_LIGHTHOUSE_3F_ACTIONS = {
+    (5, 3): "down",
+    (5, 4): "down",
+    (5, 5): "left",
+    (4, 5): "left",
+    **{(3, y): "down" for y in range(5, 8)},
+    (3, 8): "left",
+    **{(2, y): "down" for y in range(8, 13)},
+    (2, 13): "right",
+    (3, 13): "right",
+    (4, 13): "down",
+    **{(x, 14): "right" for x in range(4, 12)},
+    (12, 14): "up",
+    (12, 13): "up",
+    (12, 12): "right",
+    (13, 12): "right",
+    **{(14, y): "up" for y in range(3, 13)},
+    (14, 3): "left",
+    (3, 6): "left",
+    (2, 6): "down",
+    (2, 7): "down",
+    (12, 3): "right",
+    (9, 3): "down",
+    (9, 4): "down",
+}
+GOLD_LIGHTHOUSE_4F_ACTIONS = {
+    (13, 3): "left",
+    (13, 4): "down",
+    (13, 5): "right",
+    **{(14, y): "down" for y in range(5, 15)},
+    **{(3, y): "down" for y in range(8, 13)},
+    (3, 13): "right",
+    (4, 13): "down",
+    (4, 14): "down",
+    **{(x, 15): "right" for x in range(4, 15)},
+    **{(15, y): "up" for y in range(4, 16)},
+    (15, 3): "left",
+    **{(9, y): "down" for y in range(5, 8)},
+}
+GOLD_LIGHTHOUSE_5F_ACTIONS = {
+    (3, 5): "up",
+    (3, 4): "down",
+    **{(x, 5): "left" for x in range(13, 16)},
+    (12, 5): "up",
+    (12, 4): "up",
+    **{(x, 3): "left" for x in range(10, 13)},
+    (9, 3): "up",
+    **{(x, 2): "left" for x in range(5, 10)},
+    (4, 2): "down",
+    (4, 3): "down",
+    (4, 4): "left",
+    **{(9, y): "down" for y in range(7, 16)},
+}
+GOLD_LIGHTHOUSE_6F_ACTIONS = {
+    **{(9, y): "up" for y in range(10, 16)},
+    (9, 9): "left",
+    (8, 9): "up",
+}
+GOLD_LIGHTHOUSE_1F_EXIT_ACTIONS = {
+    (17, 13): "up",
+    (17, 12): "left",
+    **{(x, 12): "left" for x in range(12, 17)},
+    **{(12, y): "down" for y in range(12, 15)},
+    (12, 15): "left",
+    (11, 15): "down",
+}
+GOLD_LIGHTHOUSE_2F_EXIT_ACTIONS = {
+    **{(x, 2): "right" for x in range(5, 11)},
+    (11, 2): "down",
+    **{(x, 3): "right" for x in range(11, 15)},
+    **{(15, y): "down" for y in range(3, 10)},
+    (15, 9): "right",
+    (16, 9): "right",
+    (17, 9): "down",
+}
+GOLD_LIGHTHOUSE_3F_EXIT_ACTIONS = {
+    (17, 9): "down",
+    **{(x, 10): "left" for x in range(15, 18)},
+    **{(14, y): "down" for y in range(10, 15)},
+    **{(x, 15): "left" for x in range(5, 15)},
+    **{(4, y): "up" for y in range(12, 16)},
+    **{(x, 12): "left" for x in range(2, 5)},
+    **{(2, y): "up" for y in range(5, 13)},
+    **{(x, 5): "right" for x in range(2, 5)},
+    (5, 5): "up",
+}
+GOLD_LIGHTHOUSE_4F_EXIT_ACTIONS = {
+    (17, 7): "down",
+}
+GOLD_LIGHTHOUSE_5F_EXIT_ACTIONS = {
+    (17, 5): "up",
+    (17, 4): "down",
+}
+GOLD_LIGHTHOUSE_6F_EXIT_ACTIONS = {
+    **{
+        (x, y): "up"
+        for x in range(8, 18)
+        for y in range(10, 16)
+    },
+    **{
+        (x, y): "down"
+        for x in range(10, 18)
+        for y in range(2, 9)
+    },
+    **{(x, 9): "right" for x in range(8, 17)},
+    (17, 9): "up",
+}
+GOLD_OLIVINE_CIANWOOD_ACTIONS = {
+    (27, 22): "down",
+    **{(27, y): "up" for y in range(24, 30)},
+    **{(x, 23): "left" for x in range(28)},
+}
+GOLD_OLIVINE_LIGHTHOUSE_RETURN_ACTIONS = {
+    **{(x, 13): "left" for x in range(24, 30)},
+    **{(23, y): "down" for y in range(11, 24)},
+    **{(x, 23): "right" for x in range(23, 26)},
+    (26, 23): "down",
+    (26, 24): "down",
+    (26, 25): "right",
+    (27, 12): "down",
+    **{(27, y): "down" for y in range(25, 29)},
+    **{(x, 28): "right" for x in range(27, 29)},
+    (29, 28): "up",
+}
+GOLD_OLIVINE_GYM_ACTIONS = {
+    **{(x, 28): "left" for x in range(27, 30)},
+    **{(27, y): "up" for y in range(22, 28)},
+    **{(x, 22): "left" for x in range(23, 28)},
+    **{(23, y): "up" for y in range(18, 22)},
+    **{(x, 18): "left" for x in range(17, 24)},
+    (16, 18): "right",
+    (17, 18): "up",
+    (17, 17): "up",
+    **{(x, 16): "left" for x in range(11, 18)},
+    (11, 16): "up",
+    **{(x, 15): "left" for x in range(9, 12)},
+    **{(9, y): "up" for y in range(12, 15)},
+    (9, 12): "right",
+    (10, 12): "up",
+}
+GOLD_ROUTE39_ECRUTEAK_ACTIONS = {
+    **{(12, y): "down" for y in range(5, 8)},
+    **{(x, 8): "right" for x in range(12, 20)},
+    **{(x, 20): "right" for x in range(11, 15)},
+    **{(15, y): "up" for y in range(9, 20)},
+}
+GOLD_ROUTE38_GATE_ECRUTEAK_ACTIONS = {
+    **{(x, y): "right" for y in (4, 5) for x in range(10)},
+}
+GOLD_ECRUTEAK_ROUTE42_ACTIONS = {
+    **{(x, 16): "right" for x in range(25, 32)},
+    **{(32, y): "down" for y in range(16, 27)},
+    **{(x, 27): "right" for x in range(32, 40)},
+}
+GOLD_ROUTE42_EAST_ACTIONS = {
+    **{(18, y): "up" for y in range(11, 15)},
+    **{(x, 11): "right" for x in range(18, 33)},
+}
+GOLD_ROUTE42_WEST_ACTIONS = {
+    **{(34, y): "down" for y in range(6, 10)},
+    (34, 9): "left",
+    **{(33, y): "down" for y in range(9, 11)},
+    **{(x, 11): "right" for x in range(20, 33)},
+    **{(18, y): "down" for y in range(11, 15)},
+}
+GOLD_ROUTE42_NOCTOWL_ACTIONS = {
+    **{(x, 13): "right" for x in range(43, 60)},
+}
+GOLD_MAHOGANY_LAKE_ACTIONS = {
+    **{(0, y): "down" for y in range(4, 7)},
+    **{(x, 6): "right" for x in range(7)},
+    **{(x, 8): "left" for x in range(9, 17)},
+    (8, 8): "up",
+    (8, 7): "up",
+    (8, 6): "left",
+    **{(7, y): "up" for y in range(4, 7)},
+    (7, 4): "right",
+    **{(8, y): "up" for y in range(2, 5)},
+    (8, 2): "right",
+    (9, 2): "up",
+}
+GOLD_LAKE_LANCE_ACTIONS = {
+    (21, 25): "down",
+    (21, 26): "right",
+    (22, 26): "down",
+    (22, 27): "down",
+}
+GOLD_ROUTE43_MAHOGANY_ACTIONS = {
+    **{(x, 17): "right" for x in range(3, 9)},
+    **{(9, y): "up" for y in range(9, 18)},
+    **{(x, 9): "right" for x in range(9, 16)},
+    **{(16, y): "down" for y in range(9, 15)},
+    (16, 15): "left",
+    **{(15, y): "down" for y in range(15, 41)},
+    **{(x, 40): "left" for x in range(10, 16)},
+    **{(9, y): "down" for y in range(40, 47)},
+}
+GOLD_MAHOGANY_HIDEOUT_ACTIONS = {
+    (13, 8): "left",
+    (12, 8): "left",
+    (11, 8): "up",
+}
+GOLD_MAHOGANY_GYM_ACTIONS = {
+    (3, 12): "left",
+    (2, 12): "down",
+    (2, 13): "down",
+    **{(x, 14): "right" for x in range(2, 7)},
+    (6, 14): "up",
+}
+GOLD_MAHOGANY_GYM_PRYCE_ACTIONS = {
+    (7, 2): "left",
+    (6, 2): "down",
+    (6, 5): "down",
+    (6, 13): "left",
+    (3, 13): "up",
+    (3, 4): "right",
+}
+GOLD_MAHOGANY_ROUTE42_RETURN_ACTIONS = {
+    (2, 15): "up",
+    **{(x, 14): "right" for x in range(2, 10)},
+    **{(10, y): "up" for y in range(12, 15)},
+    (10, 12): "right",
+    **{(11, y): "up" for y in range(8, 13)},
+    **{(x, 8): "left" for x in range(8, 12)},
+    (8, 8): "up",
+    **{(x, 7): "left" for x in range(9)},
+}
+GOLD_MAHOGANY_MART_STAIRS_ACTIONS = {
+    (5, 4): "right",
+    (6, 4): "right",
+    (7, 4): "up",
+}
+GOLD_MAHOGANY_MART_EXIT_ACTIONS = {
+    **{(x, 3): "left" for x in range(4, 8)},
+    (4, 3): "up",
+    (3, 3): "up",
+    (4, 2): "up",
+    (3, 2): "up",
+    (3, 1): "right",
+    (4, 1): "right",
+    **{(5, y): "down" for y in range(1, 7)},
+    (5, 7): "left",
+    (4, 7): "down",
+    (3, 7): "down",
+}
+GOLD_ROCKET_B1F_STAIRS_ACTIONS = {
+    (2, 15): "up",
+    (2, 14): "right",
+    (5, 13): "down",
+    (5, 14): "left",
+    (4, 14): "left",
+}
+GOLD_ROCKET_B2F_PASSWORD_STAIRS_ACTIONS = {
+    (3, 14): "up",
+    **{(x, 13): "right" for x in range(3, 21)},
+    (20, 13): "down",
+    (21, 13): "left",
+    (22, 13): "left",
+    **{(20, y): "down" for y in range(14, 17)},
+    **{(x, 16): "right" for x in range(20, 25)},
+    **{(24, y): "up" for y in range(12, 17)},
+    **{(x, 12): "right" for x in range(24, 27)},
+    **{(26, y): "down" for y in range(12, 15)},
+    (26, 14): "right",
+    **{(28, y): "up" for y in range(3, 10)},
+    (28, 3): "left",
+    (27, 3): "left",
+    (26, 3): "up",
+    (26, 2): "right",
+}
+GOLD_ROCKET_B3F_SECOND_PASSWORD_EXIT_ACTIONS = {
+    (27, 1): "down",
+    (28, 5): "up",
+    (28, 4): "up",
+    (28, 3): "left",
+    (27, 3): "up",
+    (27, 2): "up",
+}
+GOLD_ROCKET_B2F_OFFICE_CROSSING_ACTIONS = {
+    (27, 3): "right",
+    (27, 2): "right",
+    (28, 3): "up",
+    (28, 2): "up",
+    **{(x, 1): "left" for x in range(4, 29)},
+    (3, 1): "down",
+    (3, 2): "down",
+}
+GOLD_ROCKET_B2F_GRUNT_RESET_ACTIONS = {
+    **{(x, 1): "right" for x in range(5, 28)},
+    (28, 1): "down",
+    (28, 2): "down",
+    (28, 3): "left",
+    (27, 3): "up",
+}
+GOLD_ROCKET_B3F_COMMANDER_APPROACH_ACTIONS = {
+    (3, 3): "down",
+    (3, 4): "down",
+    (3, 5): "right",
+    **{(4, y): "down" for y in range(5, 11)},
+    **{(x, 10): "right" for x in range(4, 8)},
+}
+GOLD_ROCKET_B3F_OFFICE_DOOR_ACTIONS = {
+    (8, 10): "right",
+    (9, 10): "right",
+    **{(x, 10): "left" for x in range(12, 15)},
+}
+GOLD_ROCKET_B3F_BOSS_ACTIONS = {
+    (10, 10): "up",
+    (11, 10): "up",
+    (10, 9): "up",
+    (11, 9): "up",
+}
+GOLD_ROCKET_B3F_MURKROW_ACTIONS = {
+    (8, 4): "left",
+    (7, 4): "up",
+}
+GOLD_ROCKET_B3F_TRANSMITTER_SIDE_ACTIONS = {
+    (3, 2): "down",
+    (27, 2): "right",
+    **{(28, y): "down" for y in range(2, 15)},
+    (28, 14): "left",
+}
+GOLD_ROCKET_B2F_TRANSMITTER_SIDE_ACTIONS = {
+    **{(x, 1): "right" for x in range(3, 28)},
+    (27, 1): "down",
+}
+GOLD_ROCKET_B2F_TRANSMITTER_DOOR_ACTIONS = {
+    (20, 15): "up",
+    (20, 14): "up",
+    **{(x, 13): "left" for x in range(16, 21)},
+}
+GOLD_ROCKET_ELECTRODE_ENTRY_ACTIONS = {
+    (7, 11): "right",
+    (11, 10): "left",
+    (10, 10): "up",
+    (10, 9): "left",
+    (9, 9): "left",
+    (8, 11): "up",
+    (8, 10): "up",
+}
+GOLD_ROCKET_ELECTRODE_2_ACTIONS = {
+    (12, 10): "left",
+    (11, 10): "left",
+    (10, 10): "up",
+    **{(x, 9): "right" for x in range(8, 10)},
+    **{(10, y): "up" for y in range(7, 10)},
+    **{(x, 7): "left" for x in range(8, 11)},
+}
+GOLD_ROCKET_ELECTRODE_1_ACTIONS = {
+    **{(x, 7): "right" for x in range(8, 10)},
+    **{(10, y): "up" for y in range(5, 8)},
+    **{(x, 5): "left" for x in range(8, 11)},
+}
+GOLD_ROCKET_B2F_EXIT_ACTIONS = {
+    **{(14, y): "down" for y in range(11, 14)},
+    **{(x, 14): "left" for x in range(4, 15)},
+}
+GOLD_ROCKET_B1F_EXIT_ACTIONS = {
+    (3, 4): "up",
+    (3, 3): "up",
+    (3, 2): "right",
+    (4, 2): "right",
+    **{(x, 2): "right" for x in range(5, 28)},
+}
+GOLD_CIANWOOD_PHARMACY_ACTIONS = {
+    **{(x, 17): "left" for x in range(10, 21)},
+    **{(9, y): "down" for y in range(16, 30)},
+    **{(x, 29): "right" for x in range(9, 12)},
+    **{(12, y): "down" for y in range(29, 49)},
+    **{(x, 48): "right" for x in range(12, 15)},
+    **{(19, y): "down" for y in range(33, 40)},
+    (19, 39): "right",
+    **{(20, y): "down" for y in range(39, 46)},
+    (20, 45): "left",
+    (19, 45): "down",
+    (19, 46): "left",
+    (18, 46): "down",
+    (18, 47): "down",
+    **{(x, 48): "left" for x in range(16, 19)},
+    (15, 48): "up",
+}
+GOLD_CIANWOOD_PHARMACY_INTERIOR_ACTIONS = {
+    **{(2, y): "up" for y in range(4, 8)},
+}
+GOLD_CIANWOOD_PHARMACY_EXIT_ACTIONS = {
+    **{(2, y): "down" for y in range(4, 8)},
+}
+GOLD_CIANWOOD_HEAL_ACTIONS = {
+    **{(x, 32): "right" for x in range(9, 12)},
+    **{(12, y): "down" for y in range(32, 45)},
+    **{(x, 44): "right" for x in range(8, 23)},
+    (23, 44): "up",
+}
+GOLD_CIANWOOD_CENTER_HEAL_ACTIONS = {
+    **{(3, y): "up" for y in range(4, 8)},
+}
+GOLD_CIANWOOD_CENTER_EXIT_ACTIONS = {
+    **{(3, y): "down" for y in range(2, 8)},
+}
+GOLD_CIANWOOD_GYM_ACTIONS = {
+    **{(x, 44): "left" for x in range(9, 24)},
+    (8, 44): "up",
+}
+GOLD_CIANWOOD_GYM_EXIT_ACTIONS = {
+    (4, 2): "left",
+    (3, 2): "down",
+    (3, 3): "down",
+    (3, 4): "right",
+    **{(4, y): "down" for y in range(4, 18)},
+}
+GOLD_CIANWOOD_FLY_ACTIONS = {
+    (8, 44): "down",
+    (8, 45): "down",
+    (8, 46): "right",
+}
+GOLD_GOLDENROD_FLOWER_EXIT_ACTIONS = {
+    (2, 5): "down",
+    (2, 6): "down",
+    (2, 7): "down",
+    (3, 7): "down",
 }
 GOLD_SPROUT_HEAL_EXIT_ACTIONS = {
     (0x03, 0x03, 9, 5): "right",
@@ -377,6 +1705,12 @@ DEFAULT_MAX_CLIPS = 200
 DEFAULT_MAX_STATES = 256
 DEFAULT_MAX_STORAGE_GB = 20.0
 DEFAULT_MIN_FREE_GB = 2.0
+PLAYER_LOG_MAX_BYTES = 16 * 1024 * 1024
+GIT_CHECKPOINT_SCHEMA_VERSION = 1
+GIT_CHECKPOINT_MAX_STATE_BYTES = 4 * 1024 * 1024
+GIT_CHECKPOINT_TIMEOUT_SECONDS = 30
+GIT_CHECKPOINT_REF_PREFIX = "refs/rappter-pokemon/checkpoints/v1"
+GIT_CHECKPOINT_CONFIG_NAME = "git-checkpoint-archive.json"
 STATUS_HEARTBEAT_FRESH_SECONDS = 15
 SUPERVISOR_HEARTBEAT_TIMEOUT_SECONDS = 45
 SUPERVISOR_STARTUP_TIMEOUT_SECONDS = 180
@@ -4136,216 +5470,219 @@ SPECTATOR_CSS = zlib.decompress(base64.b64decode(  # generated from web/pages-v2
 )).decode("utf-8")
 
 SPECTATOR_JS = zlib.decompress(base64.b64decode(  # generated from web/pages-v2/watch/spectator.js
-    b"eNrNfdt220a24Lu+Alon0yQ7FCwrccYtxc6SZeVYfWzZR1LSk/HySBAJiYhJgAFAKWqFa51/mHmc"
-    b"5/mFeZ9P6S+ZfanLrkIBpJTunkmvTijUrvuufa9dG6Mir+roJhunRfQiGhejxSzN6/g6rQ+nKf58"
-    b"dXc07vequkyTWW+wt8EVipu0nCZ3XVUUiK0zSZPxNMvTrkoaxtYap3WSTbvqMIStAf/O01GdFfnb"
-    b"5DLtrGpBbfVqnsHHsnM1GMTWmcNEXy3qusi7qiHUlr+SZVqXa9QlsEZlnnr1Klk1YgW4dZm4A1ff"
-    b"36TJtJ6s08CEIG0DhDmrqxNYuPJ+nheLfNQ9fq6faNDGBNZqRM8h0My7/f9yvv/D2ft3+2dHB+cn"
-    b"h2cnR4en0NY3GuD4/enZyfn+hw/nR6/he69M5vM6LbdwT6utefE5nRX51s1OT1c4Ofzx6PAvh6+h"
-    b"sbf7P2Fb7y9/BlyLr8o0/Wva/7gRRb3bqtp98mRUzGaLPKuztIrzooqrYpQl097QQswX5Xyalil0"
-    b"FgO0LLpcjD6nNXwtk9E0DdTlWtBuXcYw2lHaLBwns0UVZ0Vv45NZkZOzg/OD98ffH/1rY+j3UD8b"
-    b"padpCUe82g1MLPJrLMopAAIZWeS7+K94Gl8XxTUMGKaz+/RPX23v9JYDqPlpsLF0duXs8O3hO9iP"
-    b"n85f/XRGe/L19p/MttjS07P9t4fn747evj06PYSBv0bQpzvb29sa9sej14fvCe6tD/dcgL2BnUZc"
-    b"eHP++nD/9duj42arzwT42cn+8emH9ydn64G/O3x9tN8K+tU2gU5TICkpIXO+mE75Q1kUM+dDnSJy"
-    b"A1nYJwrmlM3ScZacADENFib5Ipl+8DvgzwcTJBHTUIUkwwq9nvy4n1e3aXmSVotp7dRJRqMUTsj4"
-    b"DSCeUzBP83GWXze+EyqeZTN/2vj5ezi3izI9rZMSmty3FRXFT6DJcVKnZ3fztMLC9DY6Tev+gNuA"
-    b"ouTAkPrmQrWUEc0NjaguM+pmW39QfGR/Oi1u0zGU1OUi1btUzrI8wQW9SqaV+prUdTqb14fzYjSx"
-    b"DcEBhkWdfyiLWVYhn1S/4jKtiulN2sdm1ZwA9CbFdaH+RNMTWNj9RT1pDrwuk7yaF2XdLKJlaPlM"
-    b"aHQKVNTtx6DfafrLIgVyCsVbT72yk3SUZjfOltGGECWG7ayxVu82AeKXXyvEqupkmr4mCNiYOv21"
-    b"FlhHjMBU1Pzb1J0mVf0jguBcnC5NCazpNaxnJYa0cQXsgLYfiHgBnDgbHRe3/UGElA62e1Hm0fW0"
-    b"uEymZ5OsiudpeVWUgP+jFOjqLWLZUrRRTYpbGmEfalf4AwlundVT+jGDvpNr+nmPoB9YjqKVHVLl"
-    b"E1w5+2laJHhgFFYt4b/3yw0em0J/OLLXhAZidTZfvODO9wDOWTXz1ROUYlxqWnHaagKL6+KHOcz3"
-    b"IKlSnGez0ggWtjpOZs5+gDwVfRn1K+4RRtKbAhb0ou+iXsS/gBn0qD0t8Xm903JhOaOKV6rWEMut"
-    b"6BVPsvE4xSO8qdd1j/evDEPQOiOIkud4Lm+zqoZpXwNzAnmUKvSG0abahYFZThZ6vIH1ifmF5v2W"
-    b"p+2Xl3i4COCEfwUgBJYzoPzQgC+urkiCRtD3+ncDKi3LoiSYH/LkBlY4uZzythzYxqESzTe7au7l"
-    b"QOsAYtWSMUmqOA+qlwL+BsBKkJWAmElI7EGhMWO2xm0tq814fS++uCfMWMbRF/cKC5YXe1QB23Al"
-    b"Smdz8EDI1nQ/UdRRya3C/Sw38P/yxM+TskoPknlymU2z+q4vDyeUJTPNk344eXuaJuVo8oG+9qfF"
-    b"KMEW4klSTeJqClJV/+nArAh1xw2gMAtiMCw7bcFOL/rDHxrFs2Kcaghmz1uADSDn4kaq6Spydo+i"
-    b"G/S8G+0MI6y361UZRldlco2z3o3Cw1zubfBi4FBbRun1WgN/Lq6ik/kchQkiaoSyJCz21HZ8J8pj"
-    b"WlpgZ8X3ajTumg1UnV1Fye2APsZxrAb1Ob2r+oNPIBuXIBLEPxdZ3u8NYWyIEj3kl8Ob4W1Sj0A1"
-    b"0SPVzSlFhRcLdvF4MbtMS3+6Aws6YblGAuAnaPm334iLaUDq0IPUgzCgBgv0CHDIT6GcPm4++W8f"
-    b"97f+a7L11+2tP51vfbp/Pny683z5xRPA4aruY7+DVtivdhxg6nrQRBS5rh7uGMRBWfXnClCG1pJn"
-    b"tiSmyFPN8puspk3TuwjzdvbRSnL6EPHKuMdqb4PohIX5wx8kX4b/10VJXxWiqS9AcUjzObU0TJ9d"
-    b"haEhwD5OfQgbMbRjnSf1JAdm57H8EZCyOj2dAxYn0A6K1qBwOmSgTK+yX0lznM+3brIUpOYtd4vF"
-    b"TEbl3bwu9BFXk2mUxyDPjYvZDz+gSupMqrmNqv8vO1uBw6EWACTZfm+rN9Rcevn7BgrIfUK9/JhM"
-    b"Fyg6t42WF+vyrib5emVDfSKqWV4/3y/L5K7/9Bs+is1pUzmoo8Wsr0gGdTLULACbi1685B/A/k9r"
-    b"JD/YIOz5mBSPPlDK3naPSY4mI3Z5nPPiyINp/drKu8xIh1qECctxUj52BDlXcPY+KztQu6wkuCwe"
-    b"Et920mCXzhijbnino2VjTI6Y6FqjIpIVfQHlCmT0CQko6tcu1gNBIh0bucSxXq2SxGyDLaIY6R0M"
-    b"ALpC9BlE+5y6/YtST7hb59yDFla+Bvp1WSSlPvCt9idNRXoDb6wgg3Fve13VmUuS7PWo+igpA9Fh"
-    b"IeFRLVwm4+t0awS7Xzdb+Nt//I/oSfQ8IqCKGgItCRCOjzR+jYA4mMZBaUTdcQpzKkqiNx9RT98i"
-    b"yE/AUxXW0d8B6RFWPgdcUOedodwh8TdsFI5gTH8Z5Gy1CCeL60ndMcfuFarSNH905VExm4OquhJD"
-    b"yjQfpyWIkMATkdwMVm77Vg3q8CM3vYJjDUP6PU2MJuno8xzoZf3IBphfVm1IxysrDyac9bQ+01aI"
-    b"viJNWEMdZsJNVGSicpFrQvK3//hfSh5oM25EnaaNqN12ETVoBYG7rMEYQix7cKc1S8rPZlan2Bce"
-    b"L+yGh40EPjjAFzxEKxQ4y7N6USRT1WcoOFc1HCvmwiROUWEdI0N/B+JTPEt+ZeK8zdyXPl5Ni6Ls"
-    b"9z37y1ZouQew40+3t7cHmg14q0iNKmrOPVxYgi5nhngTLeZoOByDOmlHuqxg2AWqmGo6y4t1WI7s"
-    b"pu+2N7gIMI4PIPmmZHSrFOsQBLMmYxwQzI+OQW/oWfGGwnT3SW8voQF+GXBHWFosavVN71/YUBi1"
-    b"mQmjkJFQzgkOyiI9KYrZWzRN9ovpGP/whOCbrFggJrimzniEKkMfVgFEMDJ7CY0KLZ1s/9L143qS"
-    b"5v2kustHEdex8940/Wqdk0yxJJ6CbqB1/gSPWqRgYzKm9hWWR82ay4gGGPXPyW5iTQcKUplFjXVg"
-    b"oA+8Y81VE9mzwqL5AuvI03EwBGorxHDsxV+CCqjFOWujNiK03HFRbI6wb9PmMSu/7nT8rmER92zk"
-    b"exL6tW9ad23tDqzyOKC26Hw/Yc8GOjic7++kn8I6LQIw1mnhODEM0gYM/FGbVyByXS+R63iJWt0u"
-    b"UbvTJQq5XKIWh0vUdLdEXc6WKOxqiYKOlqjVpB8FaJJFMu2aUQTlCEheCaqSLGG0bvhwohUeHO6h"
-    b"iXeDAC6CFFhoO7Sq5eLfoImSgTq4DQONkPE4reqyuHMgHKzSB4vIRwPnTPsBIrEUmrODzy1N0njW"
-    b"aI8MlnFVjtjLKtYy7P+IOr0fDXFA0N5xBpygIp2UKWYLkac+HI/Upq4qyJ395OjHyVX6Iwl4JzgO"
-    b"x2yCm5PliTpNF1/cNywxyy/um+YlNgkTG2SThKmm7BtBI1DUAOuL/plvsk073DK6CFY3jFB9xYSb"
-    b"ZL8CWXm8mKbkm9jHsr6jhROLExaw336TJB3+2vS9kQMhtrnmsxhVwYC12GCndV1aVhhwdgrux0hi"
-    b"eBd/dBxiJJxpH4U2v/QY/4VzKUIdZ2wB9qvPEXB9Nq+imJREpNBHFZC4abq1gF1RjZxOkhJVTZhK"
-    b"bBq4V/6bXR7tko04IbFWc1V08b58EY4MsXL0P2IxTinKJ1oIx4wuE5tnbNKwfzuqGI3nPSL4yQJl"
-    b"pDpjtItgwYjwk1g5jkA0iKMTJHwZWRSi4/0z9KJHl4CovNDjrETSgsdsL0pg9eWiw3g/Y5tIv+Sq"
-    b"xz0zkF3Ys0VdzKD/kXGZ06bGUetmYrtiz4yTbpcQ0LhCQ5voobazOlZea9Uw1QGYpNM5aJnGT+gJ"
-    b"dj6udO1/CwF10IFOswGB0ytoqB50gzyGkFbEkumYAikykpZkEM91KQ4NwmXI1csFihKOBmqJMbuq"
-    b"WYvL8j5qYdvD6D8/247+GPV3oj/+0ZapLR9GXw8GA+2HRRzQ0qsjiSL/USKrL9AbKqRJHU+Q3Hli"
-    b"ipLMtYi5UXukBtmAi2ysKZAi0EOes+/glzTaJc/URgcND0n6ahbor75MRp/7gtB7jF7O0SozjFcM"
-    b"isYegSE2TsVxkMbkeWUrMpC4HTQGq/rJAjERF5diTczBQcsDCxDQA1rGB1ozIoaowQSSuShGdXH9"
-    b"SYnHL9LmMFdzF7YGknXCaleThLIn2Seg3tefikUZXZbFbQVYQYQOZgp0ssDe44hNkRGFY3ADHiXC"
-    b"kjUIkQhIuAJqU3XweiCH74w4Lvbdk9GRq3dggrIXlLB+uNlKLvEqIMFjwVDB+R4YZB3ddfrs+dgN"
-    b"gWkIx6GlfKU+yg2ib4ULk8cdV8UMw5vgN55+/irRFNag8U0EI5ALKXQ4mg7D9eUfdQhdNQ0G4nyQ"
-    b"AyJ/cgF6V8+lRp6qF+PG9/98+v44rsjNlF3d9e8N57xBn7z5C7cTffOIElsuRqPzPyt3hb6oCpaD"
-    b"8Onk6fhaKqKXVCH9sTN98avxJB416us0T0uSS3blbtjPFvQKVict57BItQMrvlvgiuziuxg+cFbe"
-    b"VcA4imMKe63S6dXRWIwuKQFndx3FWS/dMLoPFS8HUgpoKNGWi5jzexYwwImCPdtQwxwTJntPnkRn"
-    b"IDRdFguUopQ8N9ZB9WU6S7K8gkGTQJfkIOXdwt/ECeNGyEqTnlMvvv7oHOHRoixhulhEIQrb7Zql"
-    b"a8eV7F9xI8Eo6AQPlVtuSPFNwCSQNWgZFNTirbrYIrsMDwXgtGIlCbGxvTEf9ujrXngFjqzY0+co"
-    b"PROjF010ZHvv1QJpA3Kz9fhzu7jl9+GrJitCzHhI7lzYiP2jrbOmEKH8znZfu7Y8QNvjrPo+yzOY"
-    b"pIMbKhyg72GTckIg6sguX3pY92W0HW8/laEoPlaK2nsuwAokDOl6GyYEzOcqeh6h1jf1ZBRMw3ER"
-    b"qvSyNQZdTDaIl1qGYTEKfRtTqR0jXbhRRcV8jnLN+CbJR2hbjm6FoMVq1lWZAPbFUmDiBq0cQ9SC"
-    b"cSAZjw9vYLnR+4okml2Kyk3lkRGo21bJ+rashB+cq5rkpTlwnrA4K0o9Wz0RPNodXZv1WtX1Rusi"
-    b"0xJr4TGrIthtJc3SsGhZ3TGpemJpV4ySZG9njOvTmI2GGKxmwQK9GUxDxo1qlMorUIqNEK6HvobQ"
-    b"u4JU9T5w793z5lBUf96Nabtal56eGjMMCXVmNGpAKQxSaRLYryWTk6Q6/BUY5L9hQCBF+gwjDA50"
-    b"Ar0VQaCAIDeuSQUJiYhFDbDJ4UVZxWFIBGjIoJKSP5tOB81IRGwUIxYRqBmo2Aw8UUIA4u41Emue"
-    b"C+jJ2Wwxw2P5K/5w5mUotlNpQLofTQw0QdWA/fbtC91WsP8z2G7TeaBPu2Ka8PdbFpQFYVxQGaql"
-    b"lmua5tfAhe1gmgsCkNn4NE/mgLS1npo5Q6GN53tKNihnGIkIG/hjjp4Q/KECWvBTASpj+iv9xOgL"
-    b"faxU4AbrtRxmo3+dU9gE/KHCKM7TKYwxHZ9X7Bo2TdgQCQDW8Q50IWrQ8DIatrXZ2IdYz2cYPd+2"
-    b"wZ9NODPXYfT0m05IWohh9LUFktsXm8mz+nNZFGjh6gmNzLeJ0YJiLBhKg2obXhWL6ZiX7SCpRsmY"
-    b"Fu1sgoOhrycg3V4Wt4aSATx+fpeU1YQMDMV0lOQF/jyEvZnQ2rmL1cQCDgqqABl0ONEQd3PBu1AX"
-    b"QLt7n+zaBE65aiHm6gY0UMYqbk4hcKDh2kWIs3w0XYwxmhEjS00b+hJTqJ+4yv7K+maoJ3Ve9LD7"
-    b"MshRg9Is5dHsBmrvhmUG3UC/qxNNVsLDxdlsh1eQdoIAngfxqnOP1anFTeboLj6OdK2jucdupZhr"
-    b"BNYpRIG9WsNoGw7Xs6eD1tZxFA9tG+s0W3Zh7HoBUOuKmdEgLQtQ6RC6E6xlGvy3INDfYG8BkiUi"
-    b"W2YpMqLIEBDuHnr96ASwuFvJlXAPQcb+jAeFdnGejkCpPM/o4E7Tm5SIwmSO/wZecQ6/Pg1WhWsI"
-    b"/PEIIPca6y6H0c7XA7tNm7rcDsNZRW8bG8CwhdDis2eDUJs0mTWaIzhq6en2drClyXyNZiZzwqlv"
-    b"nj37KjweXs01WmJAGlGjtb4xwdix+ZqUKFV9dkBA6UsXWkGoKO3Gji9XUgti34hoFChLrJ6EWEEj"
-    b"PvaSjDEMDW8CBn4tVDzjJ0vWZcNkcwwzUgUgTPDdzJSkZFOTBA2zVO0HySHzpqLWBD/2JsWiJGEH"
-    b"ZMFFzXKPkVUwihpZljpeuCq8zoPA0QocKo+i6d5j6pQQEI+DwL4V9dQYqeazPz2goprRwyvy/Jv1"
-    b"GjupBoiL1NjL1Yip+m0RGtdlGS3VafRfPf1mZ+drDKMcrMAuK5o+FL1sTYtfuCygWs+IRH/Ocqbc"
-    b"QghPrlMjHK+HXa44avqMTVe8AVrF8ESdUAXN0F5GXz8XuOEbvV7jDVm6pdRvb8uhph8NARPEYwaq"
-    b"a1UXOVGbRDvN6eBNFvUYqYm1XZM18SYt74jsKNsSKS/1hG/64T8N6iNGhosewHgh8QvgoDphEVRA"
-    b"in0L4GcLhobrBxC07cg4SnuAnCtNioQ/LdejH2GUgfr2yejowcGpuizF0pier1lBdeDVCbSKIlO4"
-    b"bouKa6O0OnVc2x9jzsfeDUm7cFLov7qVcxUnwVSeQ93pt9Kk6QR2aaBq8HTCAuEXjnSKvfNRNP33"
-    b"PAh/XN59R3MAT5Or1Kd1PHpPItafo2+j7SCdw9wAdBXM9RvqK2iohOHJOMxHwLjL/iBO6ZfvvuPd"
-    b"GMRY7y0Rjw5PTgcic7/fvgjmPmGp27dzxHqzPHxBW9z7Ut2vkOjiXsYNG2H463fqv7vynobsg/Ig"
-    b"1IfMX/qkdgiU9A4JFftnW4/GuQii4k2SO3NpgO8HsF7zJHr+DVR2Lt2C/OCCKtj/pGCh0lffOHWU"
-    b"7NBSi4Ch0jfbxu+BwzHDvfjiHv9e4sUB6n05MTGH9LeEVAB4ZZ07Xc4uRFjkhfu9ub771+nvW1uS"
-    b"DRdigSmwhqb6LU7RAP68gJUBqAYQr4cdcGBToJ3lDC9OXPiV1RZ01qYOYI10/U5gbhAWn6GbK/ZB"
-    b"xSH7VNI1SHYhH7dTU4wQkzp1JZTPnNrjL6Pebi/6slmuNrR5e7S9imJ+wQungz3PqKoky+/EOKHh"
-    b"qK+tsHhx0RT5d6Ps9TGlztuA22lG0eLtt8mwwhZCcaDOlK/kUbTswSSbjqF1GwbiWhbcS74Y8+Qk"
-    b"kONL1Ko3dAvrUCCCdG+Q0qeeLG54HrBnEUIZK2gacDLH4Hgab5+qt3oHN6WB4585geMi+sBZxaKM"
-    b"MkwAyMOnEDS7iE3XcwFpdrbWVBDQnQljBLeuBshtsqmztc1qnuS6VQQNtUp2HgESuuJrbAHaSiPM"
-    b"DR32me/ModfrjEfm4pRBo3/B9CJe5eXFQAZ66dtJN26OwY5pEmxonmy5kkD+1eqQTQhvKt/EdPsR"
-    b"h46/zagJVGdG0QhQu/nxvJEaZcLEptT+xW0e7WTu7PNk/m+0jC/CRp0WY47sA4owsEG1851XY5fj"
-    b"RTWwIuFNcAIVoY4aoDGEl9G2+AgfnngAIH7FO89E8KNdCZvnZgpc0gsKQqgqrfdrIOuXCxGfmJRZ"
-    b"sjXFfElGk7PDBxbnI/cyevPB7uVkvsRja/7mUS4v1BV2uuHY0obi+RdNvEVb3lpIO5mHcWAL++oZ"
-    b"GC9IRc5OTONJYxYwyguUL+1ge4LSSCqn8m4Eywjd2wppY9oKJ/NBC1VFUBsL4bFPI4Ib4fuRd/9d"
-    b"KV23ZvRuIbAaj117LQMyeGQmAdMSOf1UWChsoamxjP7P/4Y9dOGWFyoy1IAJMRuUJcoUhpK2CljO"
-    b"KM3UPJsWnDqVgjw2bJzkrrrEUCefU7R1qEK2jO6asAL+qrBGqCi4ZY/OhGBnJs2xaiV0z2q6dm4f"
-    b"/WpY9MmuAnu6RGZCA+/69f5uWRMUW68OdcfK1wbb1Q/kRXCyKDTToBnnqG7wYVkXML+HGQrmgPvb"
-    b"//zvIgXc8pE5JzYU5fPX0vM6fsepF6C/IOBSZK242HtsbggOTDdI0OI9tENRkn9LjcEjk0yER+F6"
-    b"GVePAeEHj8xU4Y7AxgZ8hydeR0ng1h/D2b9L60ZCCzsaklIfl9qCRuFpgs4JJev84NF5L0T72vZh"
-    b"mm8xuttEemZxrF3d15AelUnjuMjTqJ5kVaSG0BM3FiVVQAOwR5IF5X2n7NL6uzZOY5E1VOvYcG2t"
-    b"lte9TKk2X0PhqfoZVcmNra5t2buc1RB+iqhGLY8iwTd2blVGxm7kInY9WBKTIg5ikA0xicS8PwY2"
-    b"gezin8zQAwDGFq5grHEmBC3s2aw2fIqvsilIIv1X7AlSNPQxe00zU/FhyJDXoKMtKVQaNNQxT7PA"
-    b"1ixTNuqlZ3vhgPl2E3XYgv3bbw1b7YtmApam5TaUo8VtqD1fSzM0uCNziyfxNYyuzTwunGtKxbQ7"
-    b"KUfwaupijlGXGLEd96Rhhy8RNO8JUQi/TUj7e660BK/0Pvae6vcU9UodwBh/WWTy9OorvVTM87ZX"
-    b"db0roLAarIBECQlIzkVe707o2vd4vQsHHVf/mima/8m3NzvGprq1txIBPTj983UyusOEAaejMpvX"
-    b"NssIK9cGeXC93hrgP1cCiZQDgLNSeNfWFUr6CajNvFv6H9jMJsFy9ri0Dh32Xv3V76suh9AiBwCb"
-    b"W6HqnQaq3KXEEoBWY/kvDCjGcx0/uYFDXZRPOHXl1tP4GfwPDqoOK4h/rnpOxSLn6/2RGpdXSP4d"
-    b"tEnROHnIlJ3wEAtA/6NJ01r/+TQC+Rr2kGOWewOfEWBKZEcT5V6Yxg+c9DEtixxIJ8MYxJjQT/nG"
-    b"bEtCAZ+ckMtO5fhsv4Opwrj1n0c5UXu8Jb7Iq8UcEwoBZuNpXuNWP7K2R598H7c3gykZmtmAmkdl"
-    b"RfYfLyT9AGNY6WYAoQpOzN12GPiUIuz9MHUZnebHpaXB6850IVLRrUHwMnjlZiPFazPhLKWGlHk1"
-    b"1t7q03S0AEItkjeEUhf0MI+nuUIxwrzKtSX78zK7wV9mDFE2xvwFaPV+DO1vJaitN5T/DCiHdznw"
-    b"6g+/s4KbM5QJsWFLywL0M72fVXYNy49pinkTLUqp3GdkC9FZf5C4wc++t8xDg054CkCm3Y75rJmX"
-    b"PkgYhuOzG3399VfmQ1JPAPiJFbZpF9RdDZ3uIL1cwHJtm/QRRX6VwQd7bVO+42Gf/Ijt53iWzPsV"
-    b"/UbKJm58RlEcx1wyFB/5qQ83dpShYiwagCr40VSkT59QNbd/mraWA53embd6KVI9rHMqzOk22+Am"
-    b"+wmfOZX9yVbqcOS3EgCMD8oANf6aKlwJHnkXabFj4CR9vkE8bGQ2exghCOS3og60KCGIPGdttjGy"
-    b"0wwProtJIEIn2CDgzs1uINID2HSBdXoGu3vuprmjaZtnA655yzjQt3/tmNNo289QxalH5eau9N6q"
-    b"3AVvmDst8kbeApFlBYgMXVmSKQzap46foDGTdti5oc1fjVrUEVzjhr7Z+BoVyOHf5LYxfQT6wg3F"
-    b"GQiyENbk9ky52+6yo30WhZzGLRhQ2UolabFRWXbmsliyFNlY4xDiRb1KJTSp9FXR6R2IQtNpC+Nt"
-    b"XJRfndtHIZarM/l4JD4G9Cf1+Ycc54Q6EAo9finOxghD0W1SKdnyAWl0HpJMRwVPi4UJUuAARlPa"
-    b"ssZpDt9gtMvs7R2dNCFHUKPjll1r7FkgO6q6Jog2sTqbTom5x6KJVbNq3k38O8yq5a7iP2RW/G/D"
-    b"WsQDLUM5JJjcqJEyz6sKwitWgv+4fAm/kMji0yl+f+DepK6aTmUyvjD3Na5q4jYotGI18zeQhvul"
-    b"TLTA3ztppAFCDqXoo2FSDx2fSe8gkw4+rIlmRkqspwyX2EJCaR51E/QJN0A9/jfU1M1DSL9ZXpDp"
-    b"1GcCzeSB3J4ub0sh+LB79m4uW8rrAnyKe5IJY+Sx4QQvjQvCgjD13KxwFONBJzPAA4gqEjwRSZ62"
-    b"e+ZkO/dFPlIyjyWFghC2DK43W9RNsrfqHr9zm99Ju9Wk/jQPvlrO6wjHHsW/okzKDPgaDmDsU/ve"
-    b"O/zaa6Hpa0xrkbdO7PekkepOJtXKi9dILIXvd6yVWMrla3I1lg9PYkVxethZsKNGZi9XLjQnu513"
-    b"rnuo27Pcho+8LO0+O0VJi0tpW+kgqTMc4l6NibWzz/8HE+PdW48PB5nnOKtUbZFLwuvkVJsEIgnt"
-    b"9eE2qxdJmRBdKyd9PCNpWvtrGQ7OGv1gURsfDNLhM1JLtrW1DW8rLEi709hoUiCgOkqAdVACuFHB"
-    b"TkcSUCkzBkiWmJ2JY9VXianOymw4tMrPLecM8YLMKo3dxMTrZtbLgdP8xcBN0e24ruo6GU1eU8Ih"
-    b"zozRZ0TnR41s0l4O8OYvuAnmNynmLWm0unjuw1L2Nnntw/hsN4/1+Ovfg7c2+Opgb+PB/LSbl3by"
-    b"0cfxUJd/euTtgTzz9/HLdl7piPkbj2NbOsOWz70of1aAfTXuIyGmn4BcrbNqzJVNMy/IZyuumyiv"
-    b"d9tNraFx0/fSX+cwLL5uavO84Z82RRxd84a+z6kja2Smb/PF5TQbnX9O6ZIciv38X7Sn4j0nnVPC"
-    b"ufGEhBsGKtriPHDy3tSNTc6hOmbPvn/Fi9POuh+FSWQ+36JBuQCknrzQT9I1CjEJvavj0DcHyq6P"
-    b"DytKnBpigf0qssip462xX48oIpXC7ro1eempAiOKt0S04FTcksMvdJWOd4JjaOiXgvEfvNvZMY/d"
-    b"iXlwFXpwb+APVocV0B00VdZxBU3hrdeM+kq5pO1NFro6So/H6tdMwrW+XVXry+ibbV318ZfVsJ+d"
-    b"7a+fm1uHnvuQVxr53JskH1eT5HPK9mh74nFvh5rKWF7JNxzaTNecM8R5wACIovP3pkEWm2REPm0A"
-    b"8OLPWOGVqCVyq6H/5jYSbtkEKCAGKGAsjBZzkinR6YgehR3b0Bp1q4GRTb5RyQ/onRWf0xwfjLPh"
-    b"A2pcGGXl0MVhpNbuJi2zqwxjWtkG13y2Qf0lrrql02lh4hHEKIAfcaAByAvFlbTvwxnV5n2bpVOZ"
-    b"yg0t4q/KiM/bbb4Vs12f7nDRmpk8187i6VGW3VaywuBrJfzU2TzVDvBBoV1g1OSDtrvymH21rTtl"
-    b"srAbPTUqAm8G+SpofwQOaLZrtkx9kK8szHHHKLRAwQJO698USbu3/mGS6MOHgHFQX6F1uTb13ODa"
-    b"GraBY4Svd1j7DB8JoqCDfuse8bzk+aM7YRK/7QAHLe+VBA4tHVTilrxw2iJuj6pqKtbny/h/Q8FV"
-    b"o6Ics+D/AVCgPx+pJ8A8Zy7z7+a5qygYOx0fyEfosRWrhn1kjo5SRnk15fxh+ge9jiKzhWA/A2lT"
-    b"lG/b09UTgpAWxdagPxbvtjhlaCOKUOZP0M4aHAw/Mk1PLUb9sx9Ojgc9c9XEwmp1E6F5+egWEv+M"
-    b"vrhHyKW4eNLiQiWUGMVWkROplNn831sjfX/3RPX42t5vBqUqq4uSaAdNvNLMDV0vqXjHymbosCX6"
-    b"uJA4huNuFoWPrJe0GsO6KsxKTkGrbObGbyYHLX+yeGmBGwQQ30nFiZwyiFYaTFP2IeZwvTcKsJkl"
-    b"XL3P3FWtb19l5iG3ec+9yUb+VMW7VHN6juHk8Mejw78cvj4/OXy7/9OpDqjdUHEHpK1yox/hz09I"
-    b"R+XffvJwSo2l7nZaavzLAkikohprdMhjNv2JP2PRktLsvA5b8ZkOYgs665Bd0/pSDJlu5+BqLWnN"
-    b"zFVsA2FzEHS/yhR+FiVYR9ymDrfZNFqQCdBPmRuu/jJ6ugMsGNe2zef2O171WCPM1T5jYuJ99PMB"
-    b"a0SyBR6liY7wwSLYLGS7Fb27wn48kEWA4FmSb/1gl+kVZr11X3XZgwpZJfV4zgmuU4FnIB0hJ0Ss"
-    b"ITaJlO1Rz6u0k0uKaGoQy6GR2MXjfxh4KUgj7Kf9C3cOmwJK9ZGrmtyNm8iQGymrzVPJfpSMmly3"
-    b"kNRJrKM2/cNJQyMvGhg7r2CqAZ7GYQ7Ggmz7A9hslB78XcD1HZvG2zi6Ifd1A/exR/+9SLdQG55a"
-    b"H4g0r6iEhKqWfHsfeyoMdmj4vRCGmqs4WGsdVJtqxwIWTHVg/pJenpwdUDBduzuA1bJRwOJnx0bv"
-    b"SDNWopOc0XPQWhHGvU5d9bs/6AjppWPoR/TK7HI+t1bPVKgMxm4mugZnZ75xx1KRF0nbrKtkYqcH"
-    b"If6vjiQ1BFaFYocjSQPElik9PYiB1R/9+pf7cogTHixkftA6QTdD8vC9VWH7Mt6sQ2v1IKyyrK3N"
-    b"fiyDUJMVQodVImmwm2XVjKLgumTvdYK41ct6Vslyks6zjYQ3gvV2TKgNDDnlFOk0BvYP2Xk+Nqb7"
-    b"YQGQa8UA6/zN1lzOX1qCgbnwPTBVwlEgKvk4ydEVMirvkGNEfMKsoKCZrs7h4muVgv0ExHgsxTK9"
-    b"PyJAbz4/Gu9Gx+9Pz07O9z98OD96LZ+FqapbIMCO/eSzxD+EgKm5MZ5KKDxoBAnroF6M2/Uk4k9D"
-    b"J2SOF2QEEoUvObPQK6FvkzJ/n58Ioc++4qEfYxFxCtno8zQ9GjXHXI/0iMUJBVaSpye6yGgky8BD"
-    b"etacJRe4yB1r527Uh8kn5XVF8kaHPVSD2RFONIjiq+9gKfnpNNEbYhwd5l1zVywQd+HERLhW0Lai"
-    b"mI8NskX+1QGqjKcIqwYRC9FHk6c2Q816wXEdIZKhoyjK2iNvkf7YA2r/udjncG4ZN4keYuVJ13Nk"
-    b"ohhXQL7SPmbB3R4sB/GF01hb9IjjjHtsgDrxFyENq/eonWex75cdMWXqjWLbhB2IsFTEWfWBD74M"
-    b"vGowE0ZublM9daHohZvwpPkSsuhqBvjO3/tkZDbAWzc7Pfn6kftgckcL4jEp0YY3iLjI3/HDOiiL"
-    b"K8+iesW94ZVV3yXaux78rjBoZbIQA2aSgQc5Mv4tr0eDN6v0kxUaShRtylPY8t3aPwVAkzRsGtLQ"
-    b"AtbwqRhJxR5rZme3ZUH+jpWanabq+P4xVVr17nFX3Ln3ADZ3o4HaqZUO5QAFfxJSf9yyPXFLx3z1"
-    b"WmxoRi3vWq4mEq0uMHcFWgN3ouY7sBisc7moSXJWeo8Z7yPfhcX989+EbXkP1oYtDKOzk/3j0w/v"
-    b"T87OXx/uv357dHzoPIY0cIK//n9YSmXUtsuFtjW9ni4rUs+yZXwPKClL/RobvzK53/KSbujt4uDa"
-    b"vTt8fbS/Yt0C7DXMWNG25bFRfdHFwhyn10WdJcR6E73/p2c/HG8V+fROqtDNEK7oIcaibrpKD463"
-    b"ElZBorreMgy+LNQauC8MBRMvhl+9ZLxeCH+g2ab80hUw6IX8tKyQetEJ+J4OXdN+PW1HHPzj+FHL"
-    b"BjisKZQpXF4uk+LbxzVif8JxPjcqbbjzLonsRt0W2AmW2UsCHIUTghHBNJutYTahilJDb1fyg1X9"
-    b"oJvNjqAbw569hzzbYxxDJ5Ased0GoTYR1eeRrbR7fcrtT6adrbeFsh4XfM5QOVeBi9pcalU0bWmv"
-    b"J7613Ty1+Sgirpd2GL0BlR1flH/TScTXd6UoWLHUFCQJomrfCeNcy8mpTyCqp1KjWavyCi/vQ++v"
-    b"tu3wOpduWw0yIfOu+7g38E7ex32+hoOv401rx5OR5G7Kzxa3E9/j6YlADxClbpJq7apbvzi1YY7p"
-    b"+nURuted4sqtQPkcBya/Js875h15CxguYlqS2zXGAVDOEpAHMbkdYHW/F+ybjOW4tAFHHS+cLdhU"
-    b"9X4pMQzPtC4/atRDxfbfT7JiUZl7xCmPdlc1O5TvQew2J25u2ANm7UZf7Ri7DWWdxLxYRlzCONnr"
-    b"EiUovIY8yWprtUayYooupwDYc6KKcb8Cjl60ijM9KdkLTsZUXldFeHJxLyNFKjSK6aXgfz9hiZUS"
-    b"8NSTBEgf5vA0RE9nEaHboo1cYe3jOZOUE84N/MT4dHx1VAwr/XWUpuOKUAbJEekTMCR9zzeOzLxG"
-    b"xfwuyuo9+D+ZavAw1yW0nFBY9srcVhU2tOWdOoMs0keRJzfZNV78i6mO59AIeVkIziEIIm/KTHw/"
-    b"IbQRl7K7+2r6NB97vK1Jme1IXr/9+0U51Y+Ey6EKDF+Ng1xRbVk1SVOtA8XRe8bKlJdq3I6UPYdB"
-    b"OPyh2XHkXXPhbNK4hPuXoIGRqcpGpKgzAud5lJITj2RsgY2ogQHysWs8ElnBTaiKakJ7AQ8QJx0Z"
-    b"QTaXwYZhlp6eYSBh5xwjjvTOPSrkI+q9KovPaTnFHHidJH1FIJQyj/fW84J8KNN5Qv405V7jJRCu"
-    b"kH9NMBEfQphlsprh0cGhFqfmZTFejDiFil5J6xTBKCfu4cBItC5m+6WhQDx6iIcX/D3KXt+XyTVl"
-    b"gmqa/K9U0WOMtlJE4WHhAFA088YYozNShgkwYwkNndPgOFTmvjHq3UYPJhsiqX/WEb5LwRYvnVsk"
-    b"NFBObTIf7fnuEHSe40ndFZeLO9QFCvexdQ9AfM6RE474R9M6o0bOxa43QNXx7003rX3S7O60hzeo"
-    b"+ZcF1a02Xe/BrCNG32m+GR+6NdveunrVHa/z3dCZW+HDUbyCgCnUt+WtKv6nNcDf1nei+l+GnpFx"
-    b"fDn+Ert5scLJQOg2AT97Jfr17vC2pMzif548ifZhD6eYQRNVMd10pJYP3Q5ZVUzJOIIvASuzmnmi"
-    b"esVN3q4dci/bttv8WMrJ8WnssaZ/DQOQsNG1JJV4qC+ITeJKBsXwl9Vm8UCKAXncTVuSZjkyi4ax"
-    b"IXEhDagtYC5gWdTJHxXLlO+SY8YTkDGZ2Sqp4hVs6RA5Q65FXCNMrBJ01wol6IoZ886kWDnhJ3WM"
-    b"VQZi/QAvr95Dgr3WruoEftknMF0vzWNDvlYEfWlx2Njr3QO/rh2/0wgv8coa4s2SsS2+2/re6/Do"
-    b"rmdZl+QmHOlm92oQSo/0AETrjoxrR8PBg5FHRsu1YU7Ahu1TR+Ea0uQxbLkWQ3pcTN2KJtaMrgur"
-    b"Io+RA4Npda3cY2+PWwov928ViV+uF631zo2B09ijisPZAzTDhan5URD4LPxq6tqh/MhUs4FlUwkO"
-    b"ODrFXegv+ckX55vyUa9OzitSza55Z8psn774JJL6qjd5TGJf7zZTe/7ftTL/etlX/0nZVXWyzQdl"
-    b"WVXGITf79Kp80076YkcZXqfJHG234bZk1GvDdOVAOilvDcZKM7llQzZ0NpA13H+GunF/IVTpZWSl"
-    b"79Oz/bcuXxHIFEjzpc2OzczkeF2Zb/XPkjt1eeAyVXnA5NmMosUcbxIQsL6ds7exHPK1xr2NDfaG"
-    b"hsTkbAS45CcBgCrISl8tapj6g6pRFvOV9XSuc6jwQHNfKKeFbpasHZ4db6OrC7RIru7Bzpbon8Uj"
-    b"JlDaxv0I+/vehswF+c+wFcJU5pdFUo7j2zKrU/sa8ErT4EHIQAYLmBnjIHS02h54vsog2COTnLbP"
-    b"8Rs4JNuN2kx1FNylTXTrbrd0W6xCKn/fH7rzTl9m49u2/vdufijn9foI0IECsCYnya1wuqn1ZyQg"
-    b"1kPJsFEY51BxFDnmCaypzYndW5Fse12McBBBt25MjvIK6ECmyUfW/QGGtUJoCUh6XYlCSUcQWUKX"
-    b"G7dZPi5uA7QE12QCxBjIiRkM1GiFZ8vqgtLSe3W4V/tmwP8FgCvKtQ=="
+    b"eNrNfdt220a24Lu+Al6TaZIdCpaU2ONIsbNkWWmrj29HUtKT4+WRIBISEYMEA4BS1ArXOv8w5/E8"
+    b"zy/M+3xKf8nsS112FQogpXT3THp1QqF23Xfte+3aGBWzqo6us3FaRM+jcTFaTNNZHV+l9WGe4s+X"
+    b"t0fjfq+qyzSZ9gZ7G1yhuE7LPLntqqJAbJ1JmozzbJZ2VdIwttY4rZMs76rDELYG/HuWjuqsmL1J"
+    b"LtLOqhbUVq/mGXwsO1eDQWydOUz05aKui1lXNYTa9FeyTOtyjboE1qjMU69eJqtGrAA3LxJ34Or7"
+    b"6zTJ68k6DUwI0jZAmLO6OoGFK+/PZsViNuoeP9dPNGhjAms1oucQaObt/n8/2//h9P3b/dOjg7Pj"
+    b"w9Pjo8MTaOupBnj3/uT0+Gz/w4ezo1fwvVcm83mdlpu4p9XmvPicTovZ5vVOT1c4Pvzx6PAvh6+g"
+    b"sTf7P2Fb7y9+BlyLL8s0/Wva/7gRRb2bqtp9/HhUTKeLWVZnaRXPiiquilGW5L2hhZgvynmelil0"
+    b"FgO0LLpYjD6nNXwtk1GeBupyLWi3LmMY7ShtFo6T6aKKs6K38cmsyPHpwdnB+3ffH/2pMfQ7qJ+N"
+    b"0pO0hCNe7QYmFvk1FmUOgEBGFrNd/Fecx1dFcQUDhunsbn/z1dZObzmAmp8GG0tnV04P3xy+hf34"
+    b"6ezlT6e0J19vfWO2xZaenO6/OTx7e/TmzdHJIQz8FYJu72xtbWnYH49eHb4nuDc+3DMB9hp2GnHh"
+    b"9dmrw/1Xb47eNVt9IsBPj/ffnXx4f3y6Hvjbw1dH+62gX20RaJ4CSUkJmWeLPOcPZVFMnQ91isgN"
+    b"ZGGfKJhTNk3HWXIMxDRYmMwWSf7B74A/H0yQROShCkmGFXo9+XF/Vt2k5XFaLfLaqZOMRimckPFr"
+    b"QDynYJ7OxtnsqvGdUPE0m/rTxs/fw7ldlOlJnZTQ5L6tqCh+Ak2Okzo9vZ2nFRamN9FJWvcH3AYU"
+    b"JQeG1DcXqqWMaG5oRHWZUTdb+oPiI/t5XtykYyipy0Wqd6mcZrMEF/QyySv1NanrdDqvD+fFaGIb"
+    b"ggMMizr/UBbTrEI+qX7FZVoV+XXax2bVnAD0OsV1of5E0xNY2P1FPWkOvC6TWTUvyrpZRMvQ8pnQ"
+    b"6ASoqNuPQb+T9JdFCuQUije3vbLjdJRm186W0YYQJYbtrLFW7yYB4je7UohV1UmeviII2Jg6/bUW"
+    b"WEeMwFTU/NvUzZOq/hFBcC5Ol6YE1vQK1rMSQ9q4BHZA2w9EvABOnI3eFTf9QYSUDrZ7Uc6iq7y4"
+    b"SPLTSVbF87S8LErA/1EKdPUGsWwp2qgmxQ2NsA+1K/yBBLfO6px+TKHv5Ip+3iHoB5ajaGWHVPkY"
+    b"V85+yosED4zCqiX89265wWNT6A9H9orQQKzOo+fPufM9gHNWzXz1BKUYl5pWnLaawOK6+GEO8z1I"
+    b"qhTn2aw0goWt3iVTZz9Anoq+jPoV9wgj6eWABb3ou6gX8S9gBj1qT0t8Xu+0XFjOqOKVqjXEcit6"
+    b"xZNsPE7xCD/S67rH+1eGIWidEUTJczyXN1lVw7SvgDmBPEoVesPokdqFgVlOFnq8gfWJ+YXm/Yan"
+    b"7ZeXeLgI4Jh/BSAEljOg/NCALy4vSYJG0Pf6dwMqLcuiJJgfZsk1rHBykfO2HNjGoRLNN7ts7uVA"
+    b"6wBi1ZIxSao4D6qXAv4GwEqQlYCYSUjsQaExY7bGbS2rTXl9z7+4I8xYxtEXdwoLlud7VAHbcCVK"
+    b"Z3PwQMjWdD9R1FHJrcL9LDfw//LEz5OySg+SeXKR5Vl925eHE8qSqeZJPxy/OUmTcjT5QF/7eTFK"
+    b"sIV4klSTuMpBqupvD8yKUHfcAAqzIAbDstMW7PSiP/yhUTwtxqmGYPa8CdgAci5upJquImd3KLpB"
+    b"z7vRzjDCertelWF0WSZXOOvdKDzM5d4GLwYOtWWUXq818OfiMjqez1GYIKJGKEvCYk9tx3eiPKal"
+    b"BXZWfK9G467ZQNXZVZTcDuhjHMdqUJ/T26o/+ASycQkiQfxzkc36vSGMDVGih/xyeD28SeoRqCZ6"
+    b"pLo5pajwYsEuvltML9LSn+7Agk5YrpEA+Ala/u034mIakDr0IPUgDKjBAj0CHPI2lNPHR4//x8f9"
+    b"zX9LNv+6tfnN2eanu2fD7Z1nyy8eAw5XdR/7HbTCfrXjAFPXgyaiyHX1cMcgDsqqP1eAMrSWPLMl"
+    b"MUWeaja7zmraNL2LMG9nH60kpw8Rr4x7rPY2iE5YmD/8QfJl+H9dlPRVIZr6AhSHNJ8TS8P02VUY"
+    b"GgLs49SHsBFDO9Z5Uk9mwOw8lj8CUlanJ3PA4gTaQdEaFE6HDJTpZfYraY7z+eZ1loLUvOlusZjJ"
+    b"qLyd14U+4moyjfIY5LlxMf3hB1RJnUk1t1H1/2VnK3A41AKAJNvvbfaGmksvf99AAbmPqZcfk3yB"
+    b"onPbaHmxLm5rkq9XNtQnoprN6mf7ZZnc9ref8lFsTpvKQR0tpn1FMqiToWYB2Fz0/AX/APZ/UiP5"
+    b"wQZhz8ekePSBUva2ekxyNBmxy+OcF0ceTOtXVt5lRjrUIkxYjpPysSPIuYKz91nZgdplJcFl8ZD4"
+    b"tpMGu3TGGHXDOx0tG2NyxETXGhWRrOgLKJcgo09IQFG/drEeCBLp2MgljvVqlSRmG2wRxUjvYADQ"
+    b"FaLPINrPqNu/KPWEu3XOPWhh5SugXxdFUuoD32p/0lSkN/DGCjIY97bXVZ25JMleD6qPkjIQHRYS"
+    b"HtTCRTK+SjdHsPt1s4W//ft/RI+jZxEBVdQQaEmAcHyk8WsExME0Dkoj6o45zKkoid58RD19kyA/"
+    b"AU9VWEd/B6RHWPkZ4II67wzlDom/YaNwBGP6yyBnq0U4WVxN6o45dq9QlaazB1ceFdM5qKorMaRM"
+    b"Z+O0BBESeCKSm8HKbd+sQR1+4KZXcKxhSL+nidEkHX2eA72sH9gA88uqDel4ZeXBhLOe1qfaCtFX"
+    b"pAlrqMNMuImKTFQuZpqQ/O3f/5eSB9qMG1GnaSNqt11EDVpB4C5rMIYQyx7caU2T8rOZ1Qn2hccL"
+    b"u+FhI4EPDvA5D9EKBc7yrF4UyVT1GQrOVQ3HirkwiRNUWMfI0N+C+BRPk1+ZOG8x96WPl3lRlP2+"
+    b"Z3/ZDC33AHZ8e2tra6DZgLeK1Kii5tzDuSXocmaIN9FijobDMaiTdqTLCoZdoIqpprM8X4flyG76"
+    b"bnuD8wDj+ACSb0pGt0qxDkEwazLGAcH86Bj0hp4VbyhMd5/09hIa4JcBd4SlxaJW3/T+hQ2FUZuZ"
+    b"MAoZCeWc4KAs0uOimL5B02S/yMf4hycEX2fFAjHBNXXGI1QZ+rAKIIKR2UtoVGjpZPuXrh/Xk3TW"
+    b"T6rb2SjiOnbej0y/WuckUyyJp6AbaJ0/waMWKdiYjKl9heVRs+YyogFG/TOym1jTgYJUZlFjHRjo"
+    b"A+9Yc9VE9qywaL7AOvJ0HAyB2goxHHvxl6ACanHO2qiNCC13XBSbI+zbtHnMyq+bj982LOKejXxP"
+    b"Qr/yTeuurd2BVR4H1Bad78fs2UAHh/P9rfRTWKdFAMY6LRwnhkHagIE/avMKRK7rJXIdL1Gr2yVq"
+    b"d7pEIZdL1OJwiZrulqjL2RKFXS1R0NEStZr0owBNskimXTOKoBwByStBVZIljNYNH060woPDPTTx"
+    b"bhDARZACC22HVrVc/Bs0UTJQB7dhoBEyHqdVXRa3DoSDVfpgEflo4JxpP0AklkJzdvC5pUkazxrt"
+    b"kcEyrsoRe1nFWob9H1Gn96MhDgjaO86AE1SkkzLFbCHy1IfjkXqkqwpyZz85+nFymf5IAt4xjsMx"
+    b"m+DmZLNEnabzL+4alpjlF3dN8xKbhIkNsknCVFP2jaARKGqA9UX/zDfZph1uGV0EqxtGqL5iwk2y"
+    b"X4GsPF7kKfkm9rGs72jhxOKEBey33yRJh78e+d7IgRDbXPNZjKpgwFpssNO6Li0rDDg7BfdjJDG8"
+    b"iz86DjESzrSPQptfeoz/wrkUoY4ztgD71ecIuD6bV1FMSiJS6KMKSFyebi5gV1QjJ5OkRFUTphKb"
+    b"Bu6U/2aXR7tkI05IrNVcFV28L56HI0OsHP2PWIwTivKJFsIxo8vE5hmbNOzfjipG43mPCH6yQBmp"
+    b"zhjtIlgwIvwkVo4jEA3i6BgJX0YWhejd/il60aMLQFRe6HFWImnBY7YXJbD6ctFhvJ+xTaRfctXj"
+    b"nhnILuzZoi6m0P/IuMxpU+OodTOxXbFnxkm3SwhoXKGhTfRQ21kdK6+1apjqAEzSfA5apvETeoKd"
+    b"jytd+99CQB10oNNsQOD0ChqqB90gjyGkFbFkOqZAioykJRnEc12KQ4NwGXL1coGihKOBWmLMrmrW"
+    b"4rJZH7WwrWH0355sRX+M+jvRH/9oy9SWD6OvB4OB9sMiDmjp1ZFEkf8okdUX6A0V0qSOJ0juPDFF"
+    b"SeZaxNyoPVKDbMBFNtYUSBHoIc/Zd/BLGu2SZ2qjg4aHJH01C/RXXySjz31B6D1GL+dolRnGKwZF"
+    b"Y4/AEBun4jhIY/K8shUZSNwOGoNV/WSBmIiLS7Em5uCg5YEFCOgBLeMDrRkRQ9RgAslcFKO6uP6k"
+    b"xOMXaXOYq7kLWwPJOmG1q0lC2ZPsE1Dv60/FoowuyuKmAqwgQgczBTpZYO9xxKbIiMIxuAGPEmHJ"
+    b"GoRIBCRcArWpOng9kMO3RhwX++7J6MjVOzBB2QtKWD/cbCWXeBWQ4LFgqOB8Dwyyju46ffZ87IbA"
+    b"NITj0FK+Uh/lBtG3woXJ446rYorhTfAbTz9/lWgKa9D4JoIRyIUUOhxNh+H68o86hK6aBgNxPsgB"
+    b"kT+5AL2r51IjT9WLceP7fz55/y6uyM2UXd727wznvEafvPkLtxN984gSmy5Go/M/K3eFvqgKloPw"
+    b"6eTp+FoqopdUIf2xM33xq/EkHjTqq3SWliSX7MrdsJ8t6CWsTlrOYZFqB1Z8t8AV2cV3MXzgtLyt"
+    b"gHEU7yjstUrzy6OxGF1SAs7uOoqzXrphdBcqXg6kFNBQoi0XMef3NGCAEwV7tqGGOSZM9h4/jk5B"
+    b"aLooFihFKXlurIPqy3SaZLMKBk0CXTIDKe8G/iZOGDdCVpr0nHrx9UfnCI8WZQnTxSIKUdhq1yxd"
+    b"O65k/4obCUZBJ3io3HJDim8CJoGsQcugoBZv1sUm2WV4KACnFStJiI3tjfmwR1/3witwZMWePkfp"
+    b"mRi9aKIj23svF0gbkJutx5/bxS2/D181WRFixkNy58JG7B9tnTWFCOV3tvvateUB2h5n1ffZLINJ"
+    b"OrihwgH6HjYpJwSijuzyhYd1X0Zb8da2DEXxsVLU3nMBViBhSNfbMCFgPlfR8wi1/khPRsE0HBeh"
+    b"Si9aY9DFZIN4qWUYFqPQt5FL7RjpwrUqKuZzlGvG18lshLbl6EYIWqxmXZYJYF8sBSZu0MoxRC0Y"
+    b"B5Lx+PAalhu9r0ii2aWo3FQeGYG6bZWsb8tK+MG5qklemAPnCYvTotSz1RPBo93RtVmvVV1vtC4y"
+    b"LbEWHrMqgt1W0iwNi5bVHZOqJ5Z2xShJ9nbGuD6N2WiIwWoWLNCbwTRk3KhGqbwCpdgI4Xroawi9"
+    b"K0hV7wP33j1vDkX1592Ytqt16empMcOQUGdGowaUwiCVJoH9WjI5SarDX4FB/gsGBFKkzzDC4EAn"
+    b"0FsRBAoIcuOaVJCQiFjUAI84vCirOAyJAA0ZVFLyZ9PpoBmJiI1ixCICNQMVm4EnSghA3L1CYs1z"
+    b"AT05my6meCx/xR/OvAzFdioNSPejiYEmqBqw3759rtsK9n8K2206D/RpV0wT/n7LgrIgjAsqQ7XU"
+    b"cuXp7Aq4sB1Mc0EAMhufzJI5IG2tp2bOUGjj+Z6SDcoZRiLCBv6YoycEf6iAFvxUgMqY/ko/MfpC"
+    b"HysVuMF6LYfZ6F9nFDYBf6gwirM0hzGm47OKXcOmCRsiAcA63oEuRA0aXkbDth419iHW8xlGz7Zs"
+    b"8GcTzsx1GG0/7YSkhRhGX1sguX2xmTyrPxdFgRauntDIfJtYmY5f4ppiOBgKhGonXhaLfMwrd5BU"
+    b"o2RM63Y6wfHQ12MQcC+KG0PMAB4/v03KakI2hiIfJbMCfx7C9kxo+Wy3V0Ue7Pff0vnkljp4rbYe"
+    b"iF5GCPF9caV7e5uhdpKzuawop/jjT3kyytTYsopYFQHDQXbm6I7jQozB0hqOT6riuqjR4o5hvk9B"
+    b"JfcGvesunosMTSxXjQKy63CpIWLrgrGMuup9snv/8Rkiw6c4m43yxTh1G+GRWeAAydOQ3JcBDZSx"
+    b"vj+jeEBQ9+2S2L4pzNa0oW90hfqJq+yvrHyHelLEQw+7LyM+NSgtiaRT3UDt3bAApRvod3WiaWx4"
+    b"uDibrUHHIVK06JTRRTWlPvJWrUQOBY3YwWFvTKfovksAObafbA+jnSfbAj/kIFpmLfGZI+777tDR"
+    b"QP9k2/bjDi7mkQX2JsQCvVrDaGvoLNSgtRuc9n07wTqBLoKbRmxI10feEeCKoRNFsJZJ89+CIT7F"
+    b"3gIsQkQSTVNk/JEh2Nw99PrRCRhyMYQrIWqATvMZzyIhxzwFgledZURI8vQ6JYI4meO/gTefwa9P"
+    b"g1XhMQItPYbDvca6S0C3rwd2Mx7pcjsMZxW9zWoAA3FDBH4yCLVJk1mjOYKjlra3toItTeZrNDOZ"
+    b"E+Y8ffLkq/B4eDXXaIkBaUSN1vrG5GXH5muuolT12QEBpS9caAWhouIbO75cSYRIXEJEo8BkEq1I"
+    b"aZCkp5dkjGFo6BQw8Guh4kcbXIsbJhtvWHBRAMLl0S28kFZiapJgZ5aq/SA5nMRU1Jr3x96kWJQk"
+    b"XILsvahZzjSyIUatI1dUxwtXhdd5EDhagUOlUcVaad1hxNS7NYxuCdNygEiDPPLNN9+AEAKHSO+7"
+    b"QN0wsTR9qQkS3j/55h4V1XLcvyIvXrNeAw3UAHGFG4iwGqtVvy0S/rpcpaU6jf6r7ac7O19jzOtg"
+    b"BWpaPeK+uGlrWuTEZanqZEr0/XM2Y7IvNKbkKjWazHqo6eoOps/YdMUboPVBTxQLVdDc8EX09TOB"
+    b"G76F8hVeZ6YrZf32thxS/NEcBkF5plkOoMWMSFWiIxzo1E4W9RhJkT1EZPq9TstbolnKEEiaZj3h"
+    b"a5n4T4N0iZHhogcwXqhnAjio+1kEFZBi3wL42YKh4foBBG07Mo6FJcALlNpLAqlWUtDpM8pA1/5k"
+    b"DCrBwam6LGXTmJ6tWUF14NUJtIryVrhuiz3ChtR1GiRsf4w5H3vXJIHDSaH/6lbOVFALswi+l0C/"
+    b"ldmDTmCXuUANnk5YIFbGUdewdz6Kpv+eB+GPy7ucag7gSXKZ+rSOR++piPpz9G20FaRzmMiB7u25"
+    b"Tl59XxCVRDwZh7MRcP2yP4hT+uX7Wnk3BjHWe0PEo8Pt1oHI3O+3z4OJalhk941Ssd4sD1/QcPq+"
+    b"VJdhJLq4N6fDFjP++p367668VCP7oKQV9SHzl75S5w1KeoeEiv2zrUfj3NpRwUHJrbnhwZc5WPN7"
+    b"HD17CpWdG9Igc7igCva/Klio9NVTp46SHVpqETBUerplnFQ4HDPc8y/u8O8l3vKg3pcTEyBKf0tI"
+    b"BYD5BbjT5fRcxLCeu9+b67t/lf6+tSXBciEWmKKgaKrf4hQN4M8LWBmAagDxetgBBzYF2llO8ZbL"
+    b"uV9ZbUFnbeoA1kjX7wTmBmHxGbq5Yh9U0LhPJV3rcRfycTs1BXQxqVP3d/nMqT3+Murt9qIvm+Vq"
+    b"Q5tXfdurKOYXvB082PMs4Eqy/E6MExqO+tpkjrdMTZF/kc3e9VO2ABsdnWcU2t9+9Q8rbCIUR1Xl"
+    b"fH+SQpsPJlk+htZtzI5rlnBvZGOAmpPtj2+8q97Qh6/jtgjSve5Ln3qyuOEmwp5FvGusoGnAyRxv"
+    b"MtB4+1S91ZX7SFpH/pkTeFdEHzgFXJRROhAAuf8UgjYbsel6LiDNTteaCgK6M2GM4NbVALlNNsW2"
+    b"tlnNk5luFUFDrZKRSICE7mMbQ4I28QhbRYdx5ztz6PU645E5P2HQ6L9gLhiv8vJ8IKPy9FWyazch"
+    b"ZMc0CTY0TzZ7SSD/HnzIoITXyq9juqqKQ8ffZtQEqtPYaASo3WSG3kiNMmECiWr/lj2PdjJ39nky"
+    b"/xdaxudhi1CLJUj2AUUYhaLa+c6rscvBvRpYkfAmOIGKuFQN0BjCi2hLfIQPjz0AEL/inSciUtWu"
+    b"hE1KlAOX9CK4EKpK6/0ayPrFQgSTJmWWbOaY3Mpocnb4wOJ85F5Grz/YvZzMl3hszd88yuW5yjdA"
+    b"11Fb2lA8/7yJt2gIXAtpJ/MwDmxiXz0D40UUydmJaTxuzAJGeY7ypR1sT1AaSeVUkpRgGaF7WyFt"
+    b"TFvhZD5ooaoIagNXPPZpRHAjfD8wUYMrpevWjN4tBFbjXm2vZUAGD0z7YFoiD62K4YUtNDWW0f/5"
+    b"37CHLtzyXIXxGjAhZoOyRGndUNJW0eUZ5QSbZ3nBeW6tm5ONIrvqxkmdfE7R1qEK2ay6a2JA+KvC"
+    b"GqGi4JY9OG2FnZm05aqV0D2r6dq5ffSrYZFw0LInTqSRNPCu3/HvluJCsfXqUHesfIGwXf1AEgsn"
+    b"5UUzZ53x9OoG75ciA5OxmKFgwr6//ef/FPn6lg9MELKhKJ+/lp5X9DvOkwH9BQGXIsXI+d5DE3nw"
+    b"LQKDBC2eRjsUJfm31Bg8MCNIeBSuI3L1GBB+8MC0Iu4IbCDHd3jidUgLbv07OPu3ad3IPmJHQ1Lq"
+    b"w/KQ0Cg8TdA5oWSdHzw4SYloX9s+TPMtRneb9dAsjrWr+xrSg9KevCtmaVRPsipSQ+iJ66WSKqAB"
+    b"2CPJgvK+VXZp/V0bp7HIGqp1IL+2Vsu7eaZUm6+h8ET9jKrk2lbXtuxdTkEJP0UIqpZHkeAbO7cq"
+    b"I2M3chG7HiyJSREHMcgG5URi3h8Dm0B28U9m6AEAYwtXMNY4E4IW9mxWGz7Fl1kOkkj/JXuCFA19"
+    b"yF7TzFQwHzLkNehoS76bBg11zNMssDXLlI166dle+HZDu4k6bMH+7beGrfZ5M1tO03IbSqjjNtSe"
+    b"XKcZx92RZseT+BpG12bSHU4Mpi4gOPlh8B7xYo4hshheH/ekYYdvfDQvddF9C5s9+PfcPwrev37o"
+    b"peLvKUSZOoAx/rLI5OnV96+pmOdt71V793VhNVgBiRISkJxb194F3rUvXXu3QzruaTbzaf+Tr9p2"
+    b"jE11a6+QAnpwru6rZHSL2R1ORmU2r21KGFauDfLger0xwH+uBBIpBwCnEPFyDCiU9LOFm3m39D+w"
+    b"aWiC5exxaR067L36q99XXQ6hRY7WNld41aMaVLlLiSUArcbyXxj9jec6fnwNh7ooH3Oe0c3t+An8"
+    b"Dw6qDiuIf656TsVixrkYIjUur5D8O2iTonHykCmV5CEWgP5Hk6a1/vNJBPI17CEHmPcGPiPA/NWO"
+    b"Jsq9MI0fOLl+WhY5kPuHMYgxoZ/y9eaW7A8+OSGXnUrI2n5hVsXc6z+PZkTt8Ur/YlYt5pj9CTAb"
+    b"T/MaKRiQtT345Pu4/SiYP6OZuql5VFakavLuDxxgtDFd4yBUwYm52w4Dz+k6hH+nQIa2+UFtafBu"
+    b"Ot1eVXRrELy5X7mpY/GOUzilrCFlXo21t/okHS2AUItMG6E8Ez1Mumruu4wwCXZtyf68zK7xlxlD"
+    b"lI0x2QRavR9C+1sJaut18j8DyuHFG7ynxY/i4OYMZfZy2NKyAP1M72eVXcHyY05p3kSLUipRHdlC"
+    b"dIomJG7ws+8t89CgE54CkGm3Yj5r5lkWjp0qoezrr78yH5J6AsCPrbBNu6Au1ujcFOnFApbLxGDB"
+    b"sC4z+GDv2MpHV+z7LLH9HE+Teb+i30jZxPVcCkrnkqH4yO+yuIGnDBVj0QBUwY+mIn36hKq5/dO0"
+    b"tRzoXNy81UuRl2OdU2FOt9kGNzNT+MypVF22Uocjv5UAYHxQBqjx11ThSvDIu0iLHQMn6fN172Ej"
+    b"Dd39CEEgGRl1oEUJQeQ5xbYNsM0zPLguJoEInWCDgDvXu4FID2DTBdbpGezuuZvmjqZtng245pXw"
+    b"QN/+HXHOeW4/QxWnHpWbi+17qxJNvGbutJg1kkyIlDhAZOh+mcw30T51/ASNmRzRznV6/mrUoo7g"
+    b"Gjf0zcbXqEAO/9q9jekj0OduKM5AkIWwJrdnyt12lx3tsyjkNG7BgMpWKqOOjcqyM5fFkqXIxhqH"
+    b"EG9VVir7TKXv9ea3IArleQvjbWQ1WJ2ISSGWqzP5eCQ+BvQn9fmHGc4JdSAUevxSnI0RhqKbpFKy"
+    b"5T1yHt0n85GKwBULE6TAAYymHHON0xy+bmqX2ds7OmlCjqBGxy271tizQCpbdacTbWJ1lufE3GPR"
+    b"xKpZNS+S/h1m1XKx9B8yK/63YS3iNZ2hHBJMbtTIb+hVBeEVK8F/XL6EX0hk8ekUPxZxZ/KM5bnM"
+    b"nBjmvsZVTdwGhVasZv4G0nC3lFkx+HsnjTRAyKEUfTRM6r7jM7k4ZIbI+zXRTB+K9ZThEltIKCen"
+    b"boI+4QaolxqHmrp5COk3ywuS5z4TaGZ65PZ0eVu+x/slRXATD1MSHuBT3JPM7iOPDWfjadzmFoSp"
+    b"56bwoxgPOpkBHkBUkeCJSPK03TMn27krZiMl81hSKAhhy+B600XdJHurki44qRecHGlN6k/z4DwA"
+    b"vI5w7FH8K8qkzICv4QDGPrXvvcWvvRaavsa0FrPWif2enF/dmb9aefEaWcDwsZW1soC5fE2uxvL+"
+    b"GccoTg87C3bUSMPmyoXmZLfzznUPdXtK4vCRl6XdZ6coaXEpxy4dJHWGQ9yrMbF29vn/YGK8e+vx"
+    b"4SDzHGeVqi0Sf3idnGiTQCShvT7cZvUiKROia+Wkj6ckTWt/LcPBWaMfLGrj6046fEZqyba2tuFt"
+    b"hgVpdxobTQoEVEcJsA5KADcq2OlIAiqlMQHJElNpcaz6KjHVWZkNh1b5iQCdIZ6TWaWxm5gl38x6"
+    b"OXCaPx+4+dQd11VdJ6PJK8oOxWlM+ozo/AKVzbDMAd78BTfB/CbFvCXnWRfPvV9+5SavvR+f7eax"
+    b"Hn/9e/DWBl8d7G3cm59289JOPvowHuryT4+83ZNn/j5+2c4rHTF/42FsS6dD87kXJTsLsK/GfSTE"
+    b"9GOQq3UKlLmyac4K8tmK6ybK6912U2to3PS99Nc5DIvvqtqkfPinzedHd8Sh7zPqyBqZ6dt8cZFn"
+    b"o7PPKV2SQ7Gf/1tM+Z6Tzv7h3HhCwg0DFW1x0j55b+raZlJRHbNn37/ixbdb3Y/CJDKfb9KgXABS"
+    b"T57r9wMbhfhigKvj0DcHyq6PDytKnBpigf0qssip462xX48oIpXC7ro1eempAiOKt0S04FTcknAx"
+    b"dJWOd4JjaOiXgvFfJ9zZMS8TinlwFXodceAPVocV0B00VdZxBU3hrdeM+kqJv+1NFro6Si/96qdn"
+    b"wrW+XVXry+jplq768Mtq2M/O1tfPzK1Dz33IK4187nUyG1eT5HPK9mh74nFvh5rKWF7JNxzaTNec"
+    b"3cN5bQKIovP3I4MsNh2IfIcC4MWfscIrUUskwkP/zU0k3LIJUEAMUMBYGC3mJDnR6Yhe8B3b0Bp1"
+    b"q4GRTT4oyq8dnhaf0xm+7icSqvC4MMrKoYvDSK3ddVpmlxnGtLINrvnGhvpLXHVL87ww8QhiFMCP"
+    b"ONAA5IXiUtr34Yxq875NqapM5YYW8VdlxOftNt+K6a5Pd7hozbSra6dc9SjLbitZYfC1srPq1Ktq"
+    b"B/ig0C4wavJB2115zL7a0p0yWdiNto2KwJtBvgran4HMTMVs12yZ+iCfxJjjjlFogYIFnNa/KZJ2"
+    b"b/3DJNGHDwHjoL5C63Jt6rnBtTVsA8cIX2+x9im+6ERBB/3WPeJ5yfNHd8IkftsBDloelwkcWjqo"
+    b"xC154bRF3B5V1VSsz5fx/4aCq0ZFOWbB/wOgQH8+Uu+1ec5c5t/Nc1dRMHY6PgAqkGFQF2oe2IpV"
+    b"wz4yR0cpo7zMOdmb/kFP2chUI9jPQNoURbMVXT0hCGlRbA36Y/Fuk/O7NqIIZf4E7azBwfCL4PQu"
+    b"ZtQ//eH43aBnrppYWK1uIjQvH91C4p/RF3cIuRQXT1pcqIQSo9gqciLvNZv/e2u8tdA9UT2+tse2"
+    b"QanK6qIk2kETrzRzQ9dLKh4dsxk6bIk+LiSO4bibReEj62UYx7CuClPIU9Aqm7nxm0kYzJ8sXlrg"
+    b"BgHER21xIicMopUG05R9NTtc77UCbKZ0V49pd1Xr2ye0echt3nNvspE/VfGI2Jzezjg+/PHo8C+H"
+    b"r86OD9/s/3SiA2o3VNwBaavc6Ef48xPSUfm3n+kdCbhOBWmp8S8LIJGKaqzRIY/Z9Cf+jEVLSrPz"
+    b"OmzFZzqILeisQ3ZN60sxZLqdg6u1pDUzV7ENhM1B0P2EVvgNm2AdcZs63GbTaEEmQD+/cbj6i2h7"
+    b"B1gwrm2bz+13PMGyRpirfXPGxPvotx7WiGQLvCAUHeHrUrBZyHYreiSH/XggiwDBsyTf+sEu0ktM"
+    b"Uew+wbMHFbJK6vGcwF3nbc9AOkJOiFhDbBIp24PewmknlxTR1CCWQyOxi5caMfBSkEbYT/sX7hw2"
+    b"BZTqI1f9ZMLSkCE38oubd639KBk1uW4hqZNYR236h5OGRl40MHZewVQDPI3DHIwF2fYHsNkoPfi7"
+    b"gOs7No2HjHRD7lMU7suc/uOebqE2PLW+5mmevAkJVS3J+j72VBjs0PB7mQ2ysYqDtdZBtal2LGDB"
+    b"VAfmL+nF8ekBBdO1uwNYLRsFLH52bPToN2MlOskZPQetFWHc69RVv/uDjpBeOoZ+RK9MTedza/Wm"
+    b"iEo37aaxa3B25hu3LBV5kbTNukomdnoQ4v/qSFJDYFUodjiSNEBsmdLT6yVY/cFPtbnPvDjhwULm"
+    b"B60TdDMkD99bFbYv4806tFYPwirLJv/do1ZDnELosEokDXbTrJpSFFyX7L1OELd6BtEqWc4LAWwj"
+    b"4Y1gvR2znwNDTjmfPY2B/UN2ng+N6b5fAORaMcA62bY1l/OXlmBgLnwPTJVwFIjKbJzM0BUyKm+R"
+    b"Y0R8wqygoJmuzuHia5WC/QTEeCzFMr0/IkBvPj8a70bv3p+cHp/tf/hwdvRKvuFTVTdAgB37yWeJ"
+    b"fwgBU3NjPJVQeNAIEtZBvRi360nEn4ZOyBwvyAgkCl9yZqFXQt8k5ez97FgIffbJFf1yjohTyEaf"
+    b"8/Ro1BxzPdIjFicUWMksPdZFRiNZBl49tOYsucDFzLF27kZ9mHxSXlUkb3TYQzWYHeFEgyi++haW"
+    b"kt+5E70hxtFh3jV3xQJxF05MhGsFbSuK+dggW+RfHaDKeIqwahCxEH00eWoz1KwXHNcRIhk6iqKs"
+    b"PfIW6Y89oPaf830O55Zxk+ghVp50PUcminEF5CvtYwrdrcFyEJ87jbVFjzjOuIcGqBN/EdKwejzc"
+    b"ecP8btkRU6YelLZN2IEIS0WcVR/44MvAqwYzYeTmNtW7JIpeuAlPms9Wi66mgO/8vU9GZgO8eb3T"
+    b"k09Vua9bd7QgXv4SbXiDiIvZW34FCWVx5Vkc8YXOhldWfZdo73rwu8KglclCDJhJBh7kyPi3vB4N"
+    b"3qzST1ZoKFH0SJ7Clu/W/ikAmqThkSENLWANn4qRVOyxZnZ2Uxbk71ip2Wmqjo9VU6VVj1R3xZ17"
+    b"r5VzNxqonVrpUA5Q8Cch9cct2xO3dMxXr8WGZtTyCOlqItHqAnNXoDVwJ2o+2ovBOheLmiRnpfeY"
+    b"8T7wEV/cP/8B35bHe23YwjA6Pd5/d/Lh/fHp2avD/Vdvjt4dOi9XDZzgr/8fllIZte1yoW1Nr6fL"
+    b"itQbehnfA0rKUj+dx0+C7rc8exx6aDq4dm8PXx3tr1i3AHsNM1a0bXlsVF90sTDv0quizhJivYne"
+    b"/5PTH95tFrP8VqrQzRCu6D7Gom66Sq/DtxJWQaK6Hp4MPgPVGrgvDAUTL4ZfPTu9Xgh/oNmm/NIV"
+    b"MOiF/LSskHp+C/ieDl3Tfj1tRxz84/hRywY4rCmUKVxeLpPi28c1Yn/CcT7XKm24l0vedqNuC+wE"
+    b"y+wlAY7CCcGIYJpHrWE2oYpSQ29X8oNV/aCbRx1BN4Y9e6+utsc4hk4gWfK6DUJtIqrPI1tp9/qU"
+    b"259MO1tvC2V9V/A5Q+VcBS5qc6lV0bSlvZ741nbzLuqDiLhe2mH0GlT2s/0fTl93EvH1XSkKViw1"
+    b"BUmCqNp3wjjXcnLqE4jqqdRo1qq8wst73/urbTu8zqXbVoNMyLzrvsQOvJP3cZ+v4eBThnnteDKS"
+    b"mZvys8XtxPd4eiLQA0Sp66Rau+rmL05tmGO6fl2E7nWnuHIrUD7HgcmvyfOOeUfeAIaLmJbkZo1x"
+    b"AJSzBORBTG4GWN3vBfsmYzkubcBRxwtnCx6per+UGIZnWpcfNeqhYvuvx1mxqMw94pRHu6uaHcr3"
+    b"IHabEzc37AGzdqOvdozdhrJOYl4sIy5hnOxViRIUXkOeZLW1WiNZMUUXOQD2nKhi3K+Aoxet4kxP"
+    b"SvaCkzGV11URnpm4l5EiFRrF9Kzzvx6zxEoJeOpJAqQPc3gaoqeziNBt0UausPbxnErKCecGfmJ8"
+    b"Oj4RK4aV/jpK03FFKIPkiPQJGJK+5xtHZl6jYn4bZfUe/J9MNXiY6xJaTigse2Vuqwob2vROnUEW"
+    b"6aOYJdfZFV78i6mO59AIeVkIziEIIm/KVHw/JrQRl7K7+2r6NB96vK1Jme1IXr/9u0WZ6xfd5VAF"
+    b"hq/GQa6otqyapKnWgeLoPWNlyks1bkfKnsMgHP7Q7DjyrrlwNmlcwv0L0MDIVGUjUtQZgfM8SsmJ"
+    b"RzK2wEbUwAD52DUeiazgJlRFNaG9gAeIk46MIJvLYMMwS0/PMJCwc44RR3rnHhTyEfVelsXntMwx"
+    b"B14nSV8RCKXM4731vCAfynSekD9Nudd4CYQr5E8JJuJDCLNMVjM8OjjU4tS8LMaLEadQ0StpnSIY"
+    b"5cQ9HBiJ1sVsvzQUiEcP8fCCv0fZ6/syuaJMUE2T/6UqeojRVoooPCwcAIpm3hhjdEbKMAFmLKGh"
+    b"cxoch8rcNUa92+jBZEMk9c86wncp2OKFc4uEBsqpTeajPd8dgs5zPKm74nJxh7pA4T627gGIzzPk"
+    b"hCP+0bTOqJFzsesNUHX8e9NNa580uzvt4Q1q/mVBdatN13sw64jRdzCG960xS/dbbs22tz5l4zNe"
+    b"57umM7fCh6N4BQFTqG/LW1X8T2uAv63vRPW/CD0j4/hy/CV282KFk4HQbQJ+9kr0693hbUmZxf88"
+    b"fhztwx7mmEETVTHddKSWD90OWVXkZBzBZ5uVWc28J77iJm/XDrmXbdttfizlzPAd87Gmfw0DkLDR"
+    b"tSSVuK8viE3iSgbF8JfVZvFAigF53E1bkmY5MouGsSFxIQ2oLWAuYFnUyR8Vy5SPyGPGE5Axmdkq"
+    b"qeIlbOkQOcNMi7hGmFgl6K4VStAVM+adSbFywk/qGKsMxPoBXl69+wR7rV3VCfyy72e6XpqHhnyt"
+    b"CPrS4rCx17sHfl07fqcRXuKVNcSbJWNbfLf1vdfh0V3Psi7JTTjSze7VIJQe6R6I1h0Z146Gg3sj"
+    b"j4yWa8OcgA3bp47CNaTJY9hyLYb0sJi6FU2sGV0XVkUeIgcG0+paucfeHrcUXu7fKhK/XC9a660b"
+    b"A6exRxWHswdohgtT86Mgtp9uDVZT1w7lR6aaDSybSnDA0SnuQn/JT74435SPenVyXpFqds07U2b7"
+    b"9MUnkdRXvcljEvt6t5na8/+ulfnXy776T8quqpNt3ivLqjIOudmnV+WbdtIXO8rwOk3O0HYbbktG"
+    b"vTZMVw6kk/LWYKw0k1s2ZENnA1nD/TesG/cXQpVeRFb6Pjndf+PyFYFMgTRf2uzYzEyO15X5Vv80"
+    b"uVWXBy5SlQdMns0oWszxJgEB69s5exvLIV9r3NvYYG9oSEzORoBLfhIAqIKs9OWihqnfqxplMV9Z"
+    b"T+c6hwr3NPeFclroZsna4dnxNrq6QIvk6h7sbIn+WTxiAqVt3A+wv+9tyFyQ/wxbIUxlflEk5Ti+"
+    b"KbM6ta8BrzQNHoQMZLCAmTEOQker7YFnqwyCPTLJafscv4FDst2ozVRHwV3aRLfudku3xSqk8vf9"
+    b"vjvv9GU2vm3rf+/mh3Jer48AHSgAa3Kc3Ainm1p/RgJiPZQMG4VxDhVHkWOewJranNi9Fcm218UI"
+    b"BxF068bkKK+ADmSafGTdH2BYK4SWgKTXlSiUdASRJXS5cZPNxsVNgJbgmkyAGAM5MYOBGq3wbFld"
+    b"UFp6rw73at8M+L/D4UrO"
 )).decode("utf-8")
 # END GENERATED BROWSER ASSETS
 
@@ -4564,6 +5901,11 @@ VIEWER_HTML = """<!doctype html>
       <button id="pip-toggle" class="alt" type="button" disabled>Picture in Picture</button>
       <button id="stop-runtime" class="warn" data-action="stop">Stop</button>
     </div>
+    <div class="rewind">
+      <input id="rewind-commit" type="text" inputmode="text" autocomplete="off"
+             maxlength="64" placeholder="Git checkpoint commit">
+      <button id="rewind-state" class="alt" type="button">Hot-load checkpoint</button>
+    </div>
     <p id="pip-status" class="note" role="status" aria-live="polite">Picture in Picture is available while the livestream is active.</p>
   </section>
   <section class="card">
@@ -4629,6 +5971,9 @@ button:focus-visible, a:focus-visible { outline: 3px solid #ffdf4d; outline-offs
 button:disabled { cursor: not-allowed; opacity: .45; }
 button.alt { background: #59677f; }
 button.warn { background: #bd3d45; }
+input { background: #10141f; color: #eef3ff; border: 1px solid #59677f; border-radius: 6px; padding: 10px; }
+.rewind { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.rewind input { flex: 1 1 260px; }
 .dpad { display: grid; grid-template-columns: repeat(3, 55px); justify-content: center; }
 .clips a { color: #8fc5ff; display: block; margin: 6px 0; }
 .controls { margin-top: 10px; }
@@ -4672,11 +6017,11 @@ function refreshFrame() {
   frame.src = '/frame.png?t=' + Date.now();
 }
 
-async function control(action, button) {
+async function control(action, button, commit) {
   const response = await fetch('/api/control', {
     method: 'POST',
     headers: {'content-type': 'application/json'},
-    body: JSON.stringify({action, button})
+    body: JSON.stringify({action, button, commit})
   });
   if (!response.ok) throw new Error(`control failed: ${response.status}`);
 }
@@ -4694,6 +6039,14 @@ document.querySelectorAll('[data-action]').forEach(
     }
   })
 );
+document.getElementById('rewind-state').addEventListener('click', async () => {
+  const commit = document.getElementById('rewind-commit').value.trim();
+  try {
+    await control('rewind', null, commit);
+  } catch (error) {
+    document.getElementById('status').textContent = 'Rewind failed: ' + error;
+  }
+});
 document.querySelectorAll('[data-button]').forEach(
   element => element.addEventListener('click', () => {
     press(element.dataset.button).catch(error => {
@@ -4839,11 +6192,19 @@ function validDashboardSnapshot(value) {
     typeof value.completed !== 'boolean'
   ) return false;
   if (!hasExactKeys(value.badges, ['earned', 'count', 'total'])) return false;
-  const badgeNames = [
+  const redBadgeNames = [
     'Boulder', 'Cascade', 'Thunder', 'Rainbow',
     'Soul', 'Marsh', 'Volcano', 'Earth'
   ];
+  const goldBadgeNames = [
+    'Zephyr', 'Hive', 'Plain', 'Fog',
+    'Mineral', 'Storm', 'Glacier', 'Rising',
+    ...redBadgeNames
+  ];
+  const badgeNames =
+    value.badges.total === 16 ? goldBadgeNames : redBadgeNames;
   if (
+    ![8, 16].includes(value.badges.total) ||
     !Array.isArray(value.badges.earned) ||
     value.badges.earned.some(name => !badgeNames.includes(name)) ||
     new Set(value.badges.earned).size !== value.badges.earned.length ||
@@ -4851,16 +6212,17 @@ function validDashboardSnapshot(value) {
       value.badges.count === null ||
       value.badges.count === value.badges.earned.length
     ) ||
-    (value.badges.count === null && value.badges.earned.length !== 0) ||
-    value.badges.total !== 8
+    (value.badges.count === null && value.badges.earned.length !== 0)
   ) return false;
   if (!hasExactKeys(value.pokedex, ['caught', 'seen', 'total'])) return false;
+  const pokedexTotal = value.pokedex.total;
   if (
+    ![151, 251].includes(pokedexTotal) ||
+    (value.badges.total === 16) !== (pokedexTotal === 251) ||
     !(value.pokedex.caught === null ||
-      boundedInteger(value.pokedex.caught, 0, 151)) ||
+      boundedInteger(value.pokedex.caught, 0, pokedexTotal)) ||
     !(value.pokedex.seen === null ||
-      boundedInteger(value.pokedex.seen, 0, 151)) ||
-    value.pokedex.total !== 151
+      boundedInteger(value.pokedex.seen, 0, pokedexTotal))
   ) return false;
   if (!(value.party === null || (
     Array.isArray(value.party) && value.party.length <= 6
@@ -4893,7 +6255,11 @@ function validDashboardSnapshot(value) {
       ['hours', 'minutes', 'seconds', 'frames', 'maxed']
     )) return false;
     if (
-      !boundedInteger(value.play_time.hours, 0, 255) ||
+      !boundedInteger(
+        value.play_time.hours,
+        0,
+        pokedexTotal === 251 ? 999 : 255
+      ) ||
       !boundedInteger(value.play_time.minutes, 0, 59) ||
       !boundedInteger(value.play_time.seconds, 0, 59) ||
       !boundedInteger(value.play_time.frames, 0, 59) ||
@@ -6929,6 +8295,31 @@ def atomic_write_json(path: Path, value: dict[str, Any]) -> None:
     os.replace(temporary, path)
     os.chmod(path, 0o600)
     fsync_directory(path.parent)
+
+
+def truncate_regular_file_if_oversized(path: Path, max_bytes: int) -> bool:
+    if max_bytes < 0:
+        raise ValueError("max_bytes must be non-negative")
+    flags = os.O_WRONLY | getattr(os, "O_NOFOLLOW", 0)
+    try:
+        descriptor = os.open(path, flags)
+    except FileNotFoundError:
+        return False
+    try:
+        metadata = os.fstat(descriptor)
+        if not stat.S_ISREG(metadata.st_mode):
+            raise OSError(f"Refusing to truncate non-regular file: {path}")
+        if metadata.st_size <= max_bytes:
+            return False
+        os.ftruncate(descriptor, 0)
+        os.fsync(descriptor)
+        return True
+    finally:
+        os.close(descriptor)
+
+
+def storage_capacity_error(error: OSError) -> bool:
+    return error.errno in {errno.ENOSPC, getattr(errno, "EDQUOT", -1)}
 
 
 def append_private_jsonl(path: Path, value: dict[str, Any]) -> None:
@@ -9007,7 +10398,7 @@ class CopilotWebResearcher:
             mode="empty",
             base_directory=str(research_dir / "copilot"),
             working_directory=str(research_dir),
-            log_level="error",
+            log_level="none",
             session_idle_timeout_seconds=0,
         )
         session = None
@@ -9101,6 +10492,452 @@ def file_sha256(path: Path) -> str:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+class GitCheckpointArchive:
+    """Publish ROM-bound PyBoy states without touching Git's worktree or index."""
+
+    STATE_NAME = "checkpoint.state"
+    MANIFEST_NAME = "manifest.json"
+    AGENT_NAME = "pokemon_agent.py"
+
+    def __init__(
+        self,
+        repository: Path,
+        runtime_dir: Path,
+        *,
+        game_id: str,
+        rom_sha256: str,
+        agent_path: Path,
+        run_id: str,
+    ):
+        git = shutil.which("git")
+        if not git:
+            raise RuntimeError("Git checkpoint archiving requires git")
+        self.git = git
+        self.repository = repository.expanduser().resolve()
+        self.runtime_dir = runtime_dir.expanduser().resolve()
+        self.game_id = game_id
+        self.rom_sha256 = rom_sha256
+        self.agent_path = agent_path.resolve()
+        self.run_id = run_id
+        if not self.repository.is_dir() or self.repository.is_symlink():
+            raise RuntimeError("Git checkpoint repository must be a real directory")
+        if (
+            self.repository == self.runtime_dir
+            or self.repository in self.runtime_dir.parents
+            or self.runtime_dir in self.repository.parents
+        ):
+            raise RuntimeError(
+                "Git checkpoint repository and private runtime must not overlap"
+            )
+        top_level = self._bootstrap_git(
+            ["-C", str(self.repository), "rev-parse", "--show-toplevel"]
+        ).decode("utf-8").strip()
+        if Path(top_level).resolve() != self.repository:
+            raise RuntimeError("Git checkpoint repository must be its top level")
+        git_dir = self._bootstrap_git(
+            ["-C", str(self.repository), "rev-parse", "--absolute-git-dir"]
+        ).decode("utf-8").strip()
+        self.git_dir = Path(git_dir).resolve()
+        object_format = self._git(["rev-parse", "--show-object-format"]).decode(
+            "ascii"
+        ).strip()
+        if object_format not in {"sha1", "sha256"}:
+            raise RuntimeError("Unsupported Git object format")
+        self.object_id_length = 40 if object_format == "sha1" else 64
+
+        config_path = self.runtime_dir / GIT_CHECKPOINT_CONFIG_NAME
+        existing = read_json(config_path)
+        adventure_id = existing.get("adventure_id")
+        if not (
+            existing.get("schema_version") == GIT_CHECKPOINT_SCHEMA_VERSION
+            and existing.get("repository") == str(self.repository)
+            and existing.get("game_id") == self.game_id
+            and existing.get("rom_sha256") == self.rom_sha256
+            and isinstance(adventure_id, str)
+            and re.fullmatch(r"[a-f0-9]{16}", adventure_id)
+        ):
+            adventure_id = secrets.token_hex(8)
+        self.adventure_id = adventure_id
+        self.ref = (
+            f"{GIT_CHECKPOINT_REF_PREFIX}/{self.game_id}/"
+            f"{self.rom_sha256[:16]}/{self.adventure_id}"
+        )
+        self._git(["check-ref-format", self.ref])
+        atomic_write_json(
+            config_path,
+            {
+                "schema_version": GIT_CHECKPOINT_SCHEMA_VERSION,
+                "repository": str(self.repository),
+                "game_id": self.game_id,
+                "rom_sha256": self.rom_sha256,
+                "adventure_id": self.adventure_id,
+                "ref": self.ref,
+                "updated_at": utc_now(),
+            },
+        )
+        self.lock = threading.Lock()
+
+    @staticmethod
+    def _clean_git_environment() -> dict[str, str]:
+        environment = {
+            key: value
+            for key, value in os.environ.items()
+            if not key.startswith("GIT_")
+        }
+        environment.update({"LANG": "C", "LC_ALL": "C"})
+        return environment
+
+    def _bootstrap_git(
+        self,
+        arguments: list[str],
+        *,
+        payload: Optional[bytes] = None,
+        check: bool = True,
+        environment: Optional[dict[str, str]] = None,
+    ) -> bytes:
+        try:
+            result = subprocess.run(
+                [self.git, *arguments],
+                input=payload,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                timeout=GIT_CHECKPOINT_TIMEOUT_SECONDS,
+                check=False,
+                env=environment or self._clean_git_environment(),
+            )
+        except (OSError, subprocess.TimeoutExpired) as error:
+            raise RuntimeError("Git checkpoint command failed to execute") from error
+        if check and result.returncode:
+            detail = result.stderr.decode("utf-8", "replace").strip()
+            raise RuntimeError(
+                "Git checkpoint command failed"
+                + (f": {detail[-500:]}" if detail else "")
+            )
+        return result.stdout
+
+    def _git(
+        self,
+        arguments: list[str],
+        *,
+        payload: Optional[bytes] = None,
+        check: bool = True,
+        environment: Optional[dict[str, str]] = None,
+    ) -> bytes:
+        return self._bootstrap_git(
+            [f"--git-dir={self.git_dir}", *arguments],
+            payload=payload,
+            check=check,
+            environment=environment,
+        )
+
+    def _git_status(self, arguments: list[str]) -> int:
+        try:
+            result = subprocess.run(
+                [self.git, f"--git-dir={self.git_dir}", *arguments],
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                timeout=GIT_CHECKPOINT_TIMEOUT_SECONDS,
+                check=False,
+                env=self._clean_git_environment(),
+            )
+        except (OSError, subprocess.TimeoutExpired) as error:
+            raise RuntimeError("Git checkpoint command failed to execute") from error
+        return int(result.returncode)
+
+    def _valid_object_id(self, value: str) -> bool:
+        return bool(
+            re.fullmatch(
+                rf"[a-f0-9]{{{self.object_id_length}}}",
+                value,
+            )
+        )
+
+    def _object_id(self, output: bytes) -> str:
+        value = output.decode("ascii").strip()
+        if not self._valid_object_id(value):
+            raise RuntimeError("Git returned an invalid object ID")
+        return value
+
+    def _ref_tip(self) -> Optional[str]:
+        output = self._git(
+            ["rev-parse", "--verify", "--quiet", self.ref],
+            check=False,
+        )
+        value = output.decode("ascii", "ignore").strip()
+        if not value:
+            return None
+        if not self._valid_object_id(value):
+            raise RuntimeError("Git checkpoint ref has an invalid target")
+        return value
+
+    @staticmethod
+    def _checkpoint_summary(game_state: Any) -> dict[str, Any]:
+        state = game_state if isinstance(game_state, dict) else {}
+        coordinates = state.get("coordinates")
+        party = state.get("party")
+        badges = state.get("badges")
+        return {
+            "location": str(state.get("location") or "")[:80] or None,
+            "map_id": (
+                state.get("map_id")
+                if isinstance(state.get("map_id"), int)
+                and not isinstance(state.get("map_id"), bool)
+                and 0 <= state["map_id"] <= 0xFFFF
+                else None
+            ),
+            "coordinates": (
+                {
+                    axis: coordinates.get(axis)
+                    for axis in ("x", "y")
+                }
+                if (
+                    isinstance(coordinates, dict)
+                    and all(
+                        isinstance(coordinates.get(axis), int)
+                        and not isinstance(coordinates.get(axis), bool)
+                        and 0 <= coordinates[axis] <= 255
+                        for axis in ("x", "y")
+                    )
+                )
+                else None
+            ),
+            "badges": (
+                [str(badge)[:24] for badge in badges[:16]]
+                if isinstance(badges, list)
+                else []
+            ),
+            "party": (
+                [
+                    {
+                        "species_id": member.get("species_id"),
+                        "level": member.get("level"),
+                        "hp": member.get("hp"),
+                        "max_hp": member.get("max_hp"),
+                    }
+                    for member in party[:6]
+                    if isinstance(member, dict)
+                ]
+                if isinstance(party, list)
+                else []
+            ),
+        }
+
+    @staticmethod
+    def _read_private_state(path: Path) -> bytes:
+        flags = os.O_RDONLY
+        if hasattr(os, "O_NOFOLLOW"):
+            flags |= os.O_NOFOLLOW
+        descriptor = os.open(path, flags)
+        try:
+            metadata = os.fstat(descriptor)
+            if not stat.S_ISREG(metadata.st_mode):
+                raise ValueError("Checkpoint state must be a regular file")
+            if not 1 <= metadata.st_size <= GIT_CHECKPOINT_MAX_STATE_BYTES:
+                raise ValueError("Checkpoint state has an invalid size")
+            chunks = []
+            remaining = metadata.st_size
+            while remaining:
+                chunk = os.read(descriptor, min(1024 * 1024, remaining))
+                if not chunk:
+                    raise OSError("Checkpoint state read was incomplete")
+                chunks.append(chunk)
+                remaining -= len(chunk)
+            return b"".join(chunks)
+        finally:
+            os.close(descriptor)
+
+    def _hash_blob(self, payload: bytes) -> str:
+        return self._object_id(
+            self._git(["hash-object", "-w", "--stdin"], payload=payload)
+        )
+
+    def _tree(self, entries: dict[str, str]) -> str:
+        records = []
+        for name in sorted(entries):
+            object_id = entries[name]
+            if name not in {
+                self.AGENT_NAME,
+                self.MANIFEST_NAME,
+                self.STATE_NAME,
+            } or not self._valid_object_id(object_id):
+                raise RuntimeError("Invalid Git checkpoint tree entry")
+            records.append(
+                f"100644 blob {object_id}\t{name}".encode("ascii") + b"\0"
+            )
+        return self._object_id(
+            self._git(["mktree", "-z"], payload=b"".join(records))
+        )
+
+    def publish(
+        self,
+        state_path: Path,
+        local_manifest: dict[str, Any],
+    ) -> dict[str, str]:
+        with self.lock:
+            state_bytes = self._read_private_state(state_path)
+            state_sha256 = hashlib.sha256(state_bytes).hexdigest()
+            if (
+                local_manifest.get("schema_version") != 1
+                or local_manifest.get("rom_sha256") != self.rom_sha256
+                or local_manifest.get("sha256") != state_sha256
+                or local_manifest.get("bytes") != len(state_bytes)
+            ):
+                raise ValueError("Local checkpoint manifest failed validation")
+            checkpoint_id = state_path.stem
+            if not re.fullmatch(
+                r"state-\d{8}-\d{6}-\d{6}",
+                checkpoint_id,
+            ):
+                raise ValueError("Checkpoint ID is invalid")
+            state_blob = self._hash_blob(state_bytes)
+            agent_bytes = self.agent_path.read_bytes()
+            agent_sha256 = hashlib.sha256(agent_bytes).hexdigest()
+            agent_blob = self._hash_blob(agent_bytes)
+            archive_manifest = {
+                "schema_version": GIT_CHECKPOINT_SCHEMA_VERSION,
+                "checkpoint_id": checkpoint_id,
+                "created_at": local_manifest.get("created_at"),
+                "kind": checkpoint_kind(local_manifest.get("kind")),
+                "game_id": self.game_id,
+                "rom_sha256": self.rom_sha256,
+                "state_sha256": state_sha256,
+                "state_bytes": len(state_bytes),
+                "state_blob": state_blob,
+                "agent_sha256": agent_sha256,
+                "agent_blob": agent_blob,
+                "run_id": self.run_id,
+                "game_state": self._checkpoint_summary(
+                    local_manifest.get("game_state")
+                ),
+            }
+            manifest_bytes = (
+                json.dumps(
+                    archive_manifest,
+                    indent=2,
+                    sort_keys=True,
+                )
+                + "\n"
+            ).encode("utf-8")
+            manifest_blob = self._hash_blob(manifest_bytes)
+            tree = self._tree(
+                {
+                    self.AGENT_NAME: agent_blob,
+                    self.MANIFEST_NAME: manifest_blob,
+                    self.STATE_NAME: state_blob,
+                }
+            )
+            commit_environment = self._clean_git_environment()
+            commit_environment.update(
+                {
+                    "GIT_AUTHOR_NAME": "Rappter Plays Pokemon",
+                    "GIT_AUTHOR_EMAIL": "noreply@local",
+                    "GIT_COMMITTER_NAME": "Rappter Plays Pokemon",
+                    "GIT_COMMITTER_EMAIL": "noreply@local",
+                    "GIT_AUTHOR_DATE": str(local_manifest.get("created_at")),
+                    "GIT_COMMITTER_DATE": str(local_manifest.get("created_at")),
+                }
+            )
+            message = (
+                f"Pokemon {self.game_id.title()} checkpoint {checkpoint_id}\n\n"
+                f"State-SHA256: {state_sha256}\n"
+                f"ROM-SHA256: {self.rom_sha256}\n"
+            ).encode("utf-8")
+            null_id = "0" * self.object_id_length
+            for _ in range(3):
+                parent = self._ref_tip()
+                arguments = ["commit-tree", tree]
+                if parent:
+                    arguments.extend(["-p", parent])
+                commit = self._object_id(
+                    self._git(
+                        arguments,
+                        payload=message,
+                        environment=commit_environment,
+                    )
+                )
+                update = self._git(
+                    [
+                        "update-ref",
+                        self.ref,
+                        commit,
+                        parent or null_id,
+                    ],
+                    check=False,
+                )
+                if self._ref_tip() == commit:
+                    return {
+                        "commit": commit,
+                        "ref": self.ref,
+                        "state_blob": state_blob,
+                    }
+                del update
+            raise RuntimeError("Git checkpoint ref changed concurrently")
+
+    def _tree_blob(self, commit: str, name: str) -> str:
+        output = self._git(["ls-tree", commit, "--", name]).decode(
+            "utf-8",
+            "replace",
+        )
+        match = re.fullmatch(
+            rf"100644 blob ([a-f0-9]{{{self.object_id_length}}})\t"
+            + re.escape(name)
+            + r"\n?",
+            output,
+        )
+        if not match:
+            raise ValueError("Git checkpoint tree is malformed")
+        return match.group(1)
+
+    def load(self, commitish: str) -> tuple[str, dict[str, Any], bytes]:
+        if not re.fullmatch(r"[a-fA-F0-9]{7,64}", commitish):
+            raise ValueError("Checkpoint commit must be a hexadecimal object ID")
+        resolved = self._object_id(
+            self._git(
+                [
+                    "rev-parse",
+                    "--verify",
+                    f"{commitish}^{{commit}}",
+                ]
+            )
+        )
+        if self._git_status(
+            ["merge-base", "--is-ancestor", resolved, self.ref]
+        ):
+            raise ValueError("Checkpoint commit is not in this adventure")
+        manifest_blob = self._tree_blob(resolved, self.MANIFEST_NAME)
+        state_blob = self._tree_blob(resolved, self.STATE_NAME)
+        manifest_size = int(
+            self._git(["cat-file", "-s", manifest_blob]).decode("ascii")
+        )
+        if not 1 <= manifest_size <= 64 * 1024:
+            raise ValueError("Git checkpoint manifest is oversized")
+        manifest_bytes = self._git(["cat-file", "blob", manifest_blob])
+        try:
+            manifest = json.loads(manifest_bytes.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError) as error:
+            raise ValueError("Git checkpoint manifest is invalid") from error
+        state_size = int(
+            self._git(["cat-file", "-s", state_blob]).decode("ascii")
+        )
+        if not 1 <= state_size <= GIT_CHECKPOINT_MAX_STATE_BYTES:
+            raise ValueError("Git checkpoint state is oversized")
+        state_bytes = self._git(["cat-file", "blob", state_blob])
+        if (
+            not isinstance(manifest, dict)
+            or manifest.get("schema_version")
+            != GIT_CHECKPOINT_SCHEMA_VERSION
+            or manifest.get("game_id") != self.game_id
+            or manifest.get("rom_sha256") != self.rom_sha256
+            or manifest.get("state_blob") != state_blob
+            or manifest.get("state_bytes") != len(state_bytes)
+            or manifest.get("state_sha256")
+            != hashlib.sha256(state_bytes).hexdigest()
+        ):
+            raise ValueError("Git checkpoint failed ROM or state validation")
+        return resolved, manifest, state_bytes
 
 
 class KiteBroadcaster:
@@ -10147,10 +11984,13 @@ def _dashboard_party(value: Any) -> Optional[list[dict[str, Any]]]:
     return party
 
 
-def _dashboard_play_time(value: Any) -> Optional[dict[str, Any]]:
+def _dashboard_play_time(
+    value: Any,
+    max_hours: int = 255,
+) -> Optional[dict[str, Any]]:
     if not isinstance(value, dict):
         return None
-    hours = _bounded_dashboard_int(value.get("hours"), 0, 255)
+    hours = _bounded_dashboard_int(value.get("hours"), 0, max_hours)
     minutes = _bounded_dashboard_int(value.get("minutes"), 0, 59)
     seconds = _bounded_dashboard_int(value.get("seconds"), 0, 59)
     frames = _bounded_dashboard_int(value.get("frames"), 0, 59)
@@ -10184,6 +12024,13 @@ def project_dashboard_snapshot(
         if isinstance(status.get("game_state"), dict)
         else {}
     )
+    game_id = (
+        status.get("game_id")
+        if status.get("game_id") in {"red", "gold"}
+        else game_state.get("game_id")
+    )
+    badge_names = GOLD_BADGE_NAMES if game_id == "gold" else BADGE_NAMES
+    pokedex_total = 251 if game_id == "gold" else 151
 
     raw_badges = game_state.get("badges")
     badge_set = (
@@ -10191,12 +12038,12 @@ def project_dashboard_snapshot(
         if isinstance(raw_badges, list)
         else set()
     )
-    earned_badges = [badge for badge in BADGE_NAMES if badge in badge_set]
+    earned_badges = [badge for badge in badge_names if badge in badge_set]
 
     raw_pokedex = game_state.get("pokedex")
     pokedex = raw_pokedex if isinstance(raw_pokedex, dict) else {}
-    caught = _bounded_dashboard_int(pokedex.get("caught"), 0, 151)
-    seen = _bounded_dashboard_int(pokedex.get("seen"), 0, 151)
+    caught = _bounded_dashboard_int(pokedex.get("caught"), 0, pokedex_total)
+    seen = _bounded_dashboard_int(pokedex.get("seen"), 0, pokedex_total)
     raw_started_at, started_at = _dashboard_timestamp(status.get("started_at"))
     del raw_started_at
     session_elapsed_seconds: Optional[int] = None
@@ -10229,9 +12076,19 @@ def project_dashboard_snapshot(
     if not isinstance(paused, bool):
         paused = mode == "paused"
 
-    badges_available = (
+    badges_available = bool(
         isinstance(raw_badges, list)
-        and game_state.get("badge_bits", 0) is not None
+        and (
+            (
+                game_id == "gold"
+                and game_state.get("johto_badge_bits") is not None
+                and game_state.get("kanto_badge_bits") is not None
+            )
+            or (
+                game_id != "gold"
+                and game_state.get("badge_bits", 0) is not None
+            )
+        )
     )
     raw_party = game_state.get("party")
     party_available = (
@@ -10246,23 +12103,27 @@ def project_dashboard_snapshot(
         "badges": {
             "earned": earned_badges if badges_available else [],
             "count": len(earned_badges) if badges_available else None,
-            "total": len(BADGE_NAMES),
+            "total": len(badge_names),
         },
         "pokedex": {
             "caught": caught,
             "seen": seen,
-            "total": 151,
+            "total": pokedex_total,
         },
         "party": _dashboard_party(raw_party) if party_available else None,
         "completed": bool(
             status.get("completed") is True
             or game_state.get("hall_of_fame") is True
+            or game_state.get("red_defeated") is True
         ),
         "player": {
             "mode": mode,
             "paused": paused,
         },
-        "play_time": _dashboard_play_time(game_state.get("play_time")),
+        "play_time": _dashboard_play_time(
+            game_state.get("play_time"),
+            999 if game_id == "gold" else 255,
+        ),
         "session_elapsed_seconds": session_elapsed_seconds,
         "checkpoint": sanitize_checkpoint_summary(
             status.get("last_checkpoint"),
@@ -10506,6 +12367,7 @@ class PokemonAgent(BasicAgent):
                             "pause",
                             "resume",
                             "checkpoint",
+                            "rewind",
                             "press",
                             "view",
                             "host",
@@ -10527,6 +12389,19 @@ class PokemonAgent(BasicAgent):
                         "type": "string",
                         "enum": list(VALID_BUTTONS),
                         "description": "Button for the press action",
+                    },
+                    "commit": {
+                        "type": "string",
+                        "description": (
+                            "Git checkpoint commit ID for the rewind action"
+                        ),
+                    },
+                    "state_repo": {
+                        "type": "string",
+                        "description": (
+                            "Explicit Git repository root for isolated "
+                            "checkpoint commits"
+                        ),
                     },
                     "hold": {
                         "type": "boolean",
@@ -10831,6 +12706,7 @@ class PokemonAgent(BasicAgent):
             "pause",
             "resume",
             "checkpoint",
+            "rewind",
             "stop",
             "press",
         }:
@@ -10860,7 +12736,24 @@ class PokemonAgent(BasicAgent):
                         "message": f"button must be one of: {', '.join(VALID_BUTTONS)}",
                     }
                 )
-            command = {"action": action, "button": button or None}
+            commit = str(kwargs.get("commit") or "").lower()
+            if action == "rewind" and not re.fullmatch(
+                r"[a-f0-9]{7,64}",
+                commit,
+            ):
+                return json.dumps(
+                    {
+                        "status": "error",
+                        "message": (
+                            "rewind requires a hexadecimal checkpoint commit"
+                        ),
+                    }
+                )
+            command = {
+                "action": action,
+                "button": button or None,
+                "commit": commit or None,
+            }
             if action == "pause":
                 if kwargs.get("hold") is True:
                     # Only an explicitly requested hold persists until an
@@ -11044,6 +12937,12 @@ class PokemonAgent(BasicAgent):
             reasoning_effort = str(
                 kwargs.get("reasoning_effort", DEFAULT_REASONING_EFFORT)
             )
+            state_repo_value = kwargs.get("state_repo")
+            state_repo = (
+                Path(str(state_repo_value)).expanduser().resolve()
+                if state_repo_value
+                else None
+            )
         except (TypeError, ValueError) as error:
             return json.dumps(
                 {
@@ -11077,6 +12976,18 @@ class PokemonAgent(BasicAgent):
 
         runtime_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
         os.chmod(runtime_dir, 0o700)
+        try:
+            truncate_regular_file_if_oversized(
+                runtime_dir / "player.log",
+                PLAYER_LOG_MAX_BYTES,
+            )
+        except OSError as error:
+            return json.dumps(
+                {
+                    "status": "error",
+                    "message": f"Cannot cap Pokemon player log: {error}",
+                }
+            )
         atomic_write_json(
             runtime_dir / "runtime-owner.json",
             {
@@ -11143,6 +13054,8 @@ class PokemonAgent(BasicAgent):
             "--bridge-startup-timeout",
             str(bridge_startup_timeout),
         ]
+        if state_repo is not None:
+            command.extend(["--state-repo", str(state_repo)])
         if livestream_enabled:
             command.extend(
                 [
@@ -11286,14 +13199,21 @@ class PokemonMemoryReader:
         value = self._read_optional(address)
         return default if value is None else value
 
-    def _bitfield_count(self, start: int) -> Optional[int]:
-        values = [self._read_optional(start + offset) for offset in range(19)]
+    def _bitfield_count(
+        self,
+        start: int,
+        total: int = 151,
+    ) -> Optional[int]:
+        values = [
+            self._read_optional(start + offset)
+            for offset in range((total + 7) // 8)
+        ]
         if any(value is None for value in values):
             return None
         bitfield = [int(value) for value in values if value is not None]
         return sum(
             1
-            for index in range(151)
+            for index in range(total)
             if bitfield[index // 8] & (1 << (index % 8))
         )
 
@@ -11475,11 +13395,11 @@ class PokemonMemoryReader:
                 output.append("-")
         return "".join(output).strip()
 
-    def _screen_text(self) -> str:
+    def _decode_screen_text(self, start: int, end: int) -> str:
         lines: list[str] = []
         current: list[str] = []
         spaces = 0
-        for address in range(0xC3A0, 0xC507):
+        for address in range(start, end):
             value = self._read(address)
             character = ""
             if 0x80 <= value <= 0x99:
@@ -11519,6 +13439,9 @@ class PokemonMemoryReader:
             lines.append("".join(current).strip())
         deduplicated = list(dict.fromkeys(line for line in lines if len(line) > 1))
         return " | ".join(deduplicated[-8:])[:600]
+
+    def _screen_text(self) -> str:
+        return self._decode_screen_text(0xC3A0, 0xC507)
 
     def warps(self) -> list[dict[str, Any]]:
         """The current map's warp table, straight from RAM.
@@ -11675,8 +13598,46 @@ class PokemonGoldMemoryReader(PokemonMemoryReader):
     def _screen_text_gold(self) -> str:
         if self._read(0xD15F) == 0 and self._read(0xD116) == 0:
             return ""
-        text = self._screen_text()
+        text = self._decode_screen_text(0xC4A0, 0xC608)
+        compact = text.replace(" ", "").replace("|", "")
+        if len(compact) >= 32 and set(compact) <= {"8", "9"}:
+            return ""
         return "" if len(text) > 512 else text
+
+    def pokedex_counts(self) -> dict[str, Optional[int]]:
+        return {
+            "caught": self._bitfield_count(0xDBE4, 251),
+            "seen": self._bitfield_count(0xDC04, 251),
+        }
+
+    def play_time(self) -> Optional[dict[str, Any]]:
+        values = [
+            self._read_optional(address)
+            for address in range(0xD1EA, 0xD1F0)
+        ]
+        if any(value is None for value in values):
+            return None
+        cap, hours_high, hours_low, minutes, seconds, frames = values
+        hours = (int(hours_high) << 8) | int(hours_low)
+        if (
+            cap is None
+            or cap & ~0x01
+            or not 0 <= hours <= 999
+            or minutes is None
+            or not 0 <= minutes <= 59
+            or seconds is None
+            or not 0 <= seconds <= 59
+            or frames is None
+            or not 0 <= frames <= 59
+        ):
+            return None
+        return {
+            "hours": hours,
+            "minutes": minutes,
+            "seconds": seconds,
+            "frames": frames,
+            "maxed": bool(cap & 0x01),
+        }
 
     def key_items(self) -> dict[str, Optional[bool]]:
         count = self._read_optional(0xD5E1)
@@ -11696,6 +13657,43 @@ class PokemonGoldMemoryReader(PokemonMemoryReader):
             name: item_id in owned
             for name, item_id in GOLD_KEY_ITEMS.items()
         }
+
+    def _route35_ivan_blocking(self) -> bool:
+        if (self._read(0xDA00), self._read(0xDA01)) != (0x0A, 0x02):
+            return False
+        for slot in range(1, 13):
+            base = 0xD1FD + slot * 0x28
+            if (
+                self._read(base) != 0
+                and self._read(base + 1) == 2
+                and self._read(base + 0x10) == 10
+                and self._read(base + 0x11) == 23
+            ):
+                return True
+        return False
+
+    def _cianwood_gym_boulders(self) -> list[dict[str, int]]:
+        if (self._read(0xDA00), self._read(0xDA01)) != (0x16, 0x05):
+            return []
+        boulders = set()
+        for slot in range(13):
+            base = 0xD1FD + slot * 0x28
+            if self._read(base) == 0 or not self._read(base + 0x06) & 0x40:
+                continue
+            x = self._read(base + 0x10) - 4
+            y = self._read(base + 0x11) - 4
+            if 2 <= x <= 7 and 3 <= y <= 8:
+                boulders.add((x, y))
+        return [
+            {"x": x, "y": y}
+            for x, y in sorted(boulders, key=lambda value: (value[1], value[0]))
+        ]
+
+    def _rocket_grunt18_blocking(self) -> bool:
+        if (self._read(0xDA00), self._read(0xDA01)) != (0x03, 0x2A):
+            return False
+        grunt = 0xD445 + 13 * 0x10
+        return self._read(grunt + 2) == 5 and self._read(grunt + 3) == 8
 
     def snapshot(self) -> dict[str, Any]:
         position = self.position()
@@ -11758,18 +13756,89 @@ class PokemonGoldMemoryReader(PokemonMemoryReader):
         )
         story_events = {
             "got_hm_flash": self._event_flag_gold(0x0014),
+            "got_hm_cut": self._event_flag_gold(0x0010),
+            "got_hm_fly": self._event_flag_gold(0x0011),
             "got_starter": self._event_flag_gold(0x001A),
             "got_mystery_egg": self._event_flag_gold(0x001E),
             "gave_mystery_egg_to_elm": self._event_flag_gold(0x001F),
             "beat_sage_chow": self._event_flag_gold(0x0411),
             "beat_bird_keeper_rod": self._event_flag_gold(0x03FB),
             "beat_bird_keeper_abe": self._event_flag_gold(0x03FC),
-            "cleared_slowpoke_well": self._event_flag_gold(0x002A),
-            "beat_hiker_daniel": self._event_flag_gold(0x0533),
-            "beat_pokemaniac_larry": self._event_flag_gold(0x04E2),
+            "cleared_slowpoke_well": self._event_flag_gold(0x002B),
+            "herded_farfetchd": self._event_flag_gold(0x0029),
+            "beat_hiker_daniel": self._event_flag_gold(0x0535),
+            "beat_pokemaniac_larry": self._event_flag_gold(0x04E4),
+            "beat_firebreather_ray": self._event_flag_gold(0x044C),
+            "kurt_left_for_well": self._event_flag_gold(0x06FA),
+            "beat_bug_catcher_benny": self._event_flag_gold(0x053C),
             "sprout_1f_parlyz_heal_collected": self._event_flag_gold(
                 0x0647
             ),
+            "farfetchd_position": (
+                None
+                if self._event_flag_gold(0x0010)
+                else (
+                    10
+                    if self._event_flag_gold(0x0029)
+                    else next(
+                        (
+                            index
+                            for index, event_id in enumerate(
+                                GOLD_FARFETCHD_EVENT_IDS,
+                                start=1,
+                            )
+                            if self._event_flag_gold(event_id) is False
+                        ),
+                        None,
+                    )
+                )
+            ),
+            "beat_beauty_victoria": self._event_flag_gold(0x04AD),
+            "beat_beauty_samantha": self._event_flag_gold(0x04AE),
+            "beat_lass_carrie": self._event_flag_gold(0x0515),
+            "beat_lass_bridget": self._event_flag_gold(0x0516),
+            "beat_whitney": self._event_flag_gold(0x04BF),
+            "made_whitney_cry": self._event_flag_gold(0x0028),
+            "fought_sudowoodo": self._event_flag_gold(0x002A),
+            "got_hm_surf": self._event_flag_gold(0x0012),
+            "beat_camper_ivan": self._event_flag_gold(0x041C),
+            "released_the_beasts": self._event_flag_gold(0x007B),
+            "beat_morty": self._event_flag_gold(0x04C0),
+            "beat_kimono_naoko": self._event_flag_gold(0x04DF),
+            "beat_kimono_sayo": self._event_flag_gold(0x04E0),
+            "beat_kimono_zuki": self._event_flag_gold(0x04E1),
+            "beat_kimono_kuni": self._event_flag_gold(0x04E2),
+            "beat_kimono_miki": self._event_flag_gold(0x04E3),
+            "got_tm_rock_smash": self._event_flag_gold(0x004B),
+            "got_hm_strength": self._event_flag_gold(0x0013),
+            "jasmine_explained_sickness": self._event_flag_gold(0x0037),
+            "jasmine_returned_to_gym": self._event_flag_gold(0x0020),
+            "cleared_radio_tower": self._event_flag_gold(0x0021),
+            "cleared_rocket_hideout": self._event_flag_gold(0x0022),
+            "used_radio_tower_card_key": self._event_flag_gold(0x0025),
+            "used_basement_key": self._event_flag_gold(0x0049),
+            "received_card_key": self._event_flag_gold(0x004A),
+            "refused_to_help_lance": self._event_flag_gold(0x0026),
+            "decided_to_help_lance": self._event_flag_gold(0x0060),
+            "got_secret_potion": self._event_flag_gold(0x0023),
+            "beat_jasmine": self._event_flag_gold(0x04C1),
+            "beat_chuck": self._event_flag_gold(0x04C2),
+            "beat_pryce": self._event_flag_gold(0x04C3),
+            "beat_clair": self._event_flag_gold(0x04C4),
+            "got_hm_whirlpool": self._event_flag_gold(0x0015),
+            "got_hm_waterfall": self._event_flag_gold(0x0688),
+            "beat_rocket_gruntm18": self._event_flag_gold(0x0502),
+            "met_rival_rocket_base": self._event_flag_gold(0x06C0),
+            "beat_rival_underground": self._read(0xD6E9) == 1,
+            "beat_rocket_commander": self._event_flag_gold(0x0574),
+            "learned_hail_giovanni": self._event_flag_gold(0x02FF),
+            "opened_rocket_transmitter_door": self._event_flag_gold(0x0300),
+            "learned_slowpoketail": self._event_flag_gold(0x0301),
+            "learned_raticate_tail": self._event_flag_gold(0x0302),
+            "opened_giovanni_office": self._event_flag_gold(0x0303),
+            "rocket_electrode_1": self._event_flag_gold(0x06E0),
+            "rocket_electrode_2": self._event_flag_gold(0x06E1),
+            "rocket_electrode_3": self._event_flag_gold(0x06E2),
         }
         location = GOLD_MAP_NAMES.get(
             (group, number),
@@ -11799,17 +13868,74 @@ class PokemonGoldMemoryReader(PokemonMemoryReader):
             "kanto_badge_bits": kanto_badges,
             "party_count": party_count,
             "party": party,
-            "pokedex": {"caught": None, "seen": None, "total": 251},
+            "pokedex": (
+                {**self.pokedex_counts(), "total": 251}
+                if position is not None
+                else {"caught": None, "seen": None, "total": 251}
+            ),
             "key_items": self.key_items() if position is not None else {},
             "story_events": story_events,
             "warps": [],
-            "play_time": None,
+            "play_time": self.play_time() if position is not None else None,
             "screen_text": self._screen_text_gold(),
             "in_battle": bool(
                 position is not None and self._read(0xD116) != 0
             ),
             "enemy_species_id": (
                 self._read(0xD0EF) if position is not None else 0
+            ),
+            "battle_species_id": (
+                self._read(0xCB0C) if position is not None else 0
+            ),
+            "lead_moves": (
+                [self._read(0xDA2C + index) for index in range(4)]
+                if position is not None and (party_count or 0) > 0
+                else []
+            ),
+            "disabled_move_id": (
+                self._read(0xCBD3) if position is not None else 0
+            ),
+            "lead_status": (
+                self._read(0xDA4A) if position is not None else 0
+            ),
+            "script_mode": (
+                self._read(0xD15E) if position is not None else 0
+            ),
+            "script_running": (
+                self._read(0xD15F) if position is not None else 0
+            ),
+            "menu_cursor_y": (
+                self._read(0xCEE0) if position is not None else None
+            ),
+            "route35_ivan_blocking": (
+                self._route35_ivan_blocking()
+                if position is not None
+                else False
+            ),
+            "strength_active": bool(
+                position is not None and self._read(0xD93F) & 0x01
+            ),
+            "underground_switch_position": (
+                self._read(0xD6A8) if position is not None else None
+            ),
+            "ice_path_boulders_dropped": {
+                name: self._event_flag_gold(event_id)
+                for name, event_id in {
+                    "one": 0x0709,
+                    "two": 0x070A,
+                    "three": 0x070B,
+                    "four": 0x070C,
+                }.items()
+            },
+            "cianwood_gym_boulders": (
+                self._cianwood_gym_boulders()
+                if position is not None
+                else []
+            ),
+            "rocket_grunt18_blocking": (
+                self._rocket_grunt18_blocking()
+                if position is not None
+                else False
             ),
             "hall_of_fame": (group, number) == (0x10, 0x08),
             "hall_of_fame_completed": elite_four_completed,
@@ -13644,6 +15770,8 @@ def gold_route_guidance(game_state: dict[str, Any]) -> Optional[str]:
     )
     story_events = game_state.get("story_events")
     story_events = story_events if isinstance(story_events, dict) else {}
+    key_items = game_state.get("key_items")
+    key_items = key_items if isinstance(key_items, dict) else {}
     returning_egg = bool(
         story_events.get("got_mystery_egg") is True
         and story_events.get("gave_mystery_egg_to_elm") is not True
@@ -13653,6 +15781,33 @@ def gold_route_guidance(game_state: dict[str, Any]) -> Optional[str]:
         "Authoritative Pokemon Gold route. "
         f"Current map {group}:{number}, coordinates {position}. "
     )
+    party_species = {
+        member.get("species_id")
+        for member in (party or [])
+        if isinstance(member, dict)
+    }
+    radio_takeover_maps = {
+        (0x0B, 0x02),
+        (0x03, 0x11),
+        (0x03, 0x12),
+        (0x03, 0x13),
+        (0x03, 0x14),
+        (0x03, 0x15),
+        (0x03, 0x2D),
+        (0x03, 0x2E),
+        (0x03, 0x30),
+    }
+    if (
+        "Glacier" in (game_state.get("badges") or [])
+        and story_events.get("cleared_radio_tower") is not True
+        and story_events.get("got_hm_fly") is True
+        and party_species & GOLD_FLY_SPECIES
+        and (group, number) not in radio_takeover_maps
+    ):
+        return prefix + (
+            "Use the party's Fly user now and select Goldenrod, then resume "
+            "the Radio Tower takeover."
+        )
     if (group, number) in {(0x03, 0x01), (0x03, 0x02), (0x03, 0x03)} and lead_needs_center:
         return prefix + (
             "CRITICAL: Totodile is below one-third HP and no usable healing "
@@ -13812,9 +15967,676 @@ def gold_route_guidance(game_state: dict[str, Any]) -> Optional[str]:
             "story_events.cleared_slowpoke_well becomes true."
         )
     if (group, number) == (0x08, 0x05):
+        badges = game_state.get("badges")
+        badges = badges if isinstance(badges, list) else []
+        if "Hive" in badges:
+            return prefix + (
+                "Bugsy is defeated. Follow the verified outer aisle to the "
+                "south exit at (4,15)/(5,15); do not approach Bugsy again."
+            )
+        if story_events.get("beat_bug_catcher_benny") is True:
+            return prefix + (
+                "All Gym trainers are clear. Stand at (6,7), face LEFT "
+                "toward Bugsy at (5,7), press A, and defeat him for the "
+                "Hive Badge."
+            )
         return prefix + (
             "Complete Azalea Gym's required trainers and spider platforms, "
             "then defeat Bugsy for the Hive Badge."
+        )
+    if (group, number) == (0x0B, 0x14):
+        return prefix + "Pass through the gate into Ilex Forest."
+    if (group, number) == (0x03, 0x2C):
+        if story_events.get("herded_farfetchd") is not True:
+            position = story_events.get("farfetchd_position")
+            interaction = GOLD_ILEX_FARFETCHD_INTERACTIONS.get(position)
+            if interaction is not None:
+                approach, facing = interaction
+                return prefix + (
+                    f"Farfetch'd is at verified position {position}. Follow "
+                    f"the verified route to {approach}, face {facing.upper()}, "
+                    "and press A until the bird moves. The facing is required; "
+                    "approaching from another side can reverse the puzzle."
+                )
+            return prefix + (
+                "Locate the active Farfetch'd before continuing through the "
+                "forest. Do not leave the forest."
+            )
+        if story_events.get("got_hm_cut") is not True:
+            return prefix + (
+                "Farfetch'd is returned. Follow the verified route to (5,29), "
+                "face UP toward the Charcoal Master at (5,28), and keep "
+                "pressing A until story_events.got_hm_cut becomes true."
+            )
+        return prefix + (
+            "HM01 Cut is learned by Croconaw. Follow the verified route to "
+            "(8,26), face UP, and use Cut on the tree at (8,25). Then follow "
+            "the verified northern route and leave through the Route 34 gate "
+            "at (1,5)."
+        )
+    if (group, number) == (0x0B, 0x15):
+        return prefix + "Pass through the gate north onto Route 34."
+    if (group, number) == (0x0B, 0x01):
+        return prefix + "Travel NORTH on Route 34 into Goldenrod City."
+    if (group, number) == (0x0B, 0x02):
+        if (
+            "Glacier" in (game_state.get("badges") or [])
+            and story_events.get("cleared_radio_tower") is not True
+        ):
+            if (
+                (
+                    key_items.get("basement_key") is True
+                    or story_events.get("used_basement_key") is True
+                )
+                and key_items.get("card_key") is not True
+            ):
+                return prefix + (
+                    "The Basement Key is owned. Enter Goldenrod Underground "
+                    "from the north entrance at (9,5) and rescue the real "
+                    "Director."
+                )
+            return prefix + (
+                "Team Rocket occupies the Radio Tower. Enter it at (5,15) "
+                "and defeat every floor's Rockets."
+            )
+        badges = game_state.get("badges")
+        badges = badges if isinstance(badges, list) else []
+        if "Plain" in badges:
+            if key_items.get("squirt_bottle") is True:
+                return prefix + (
+                    "The SquirtBottle is owned. Leave Goldenrod north through "
+                    "the Route 35 gate at (19,1)."
+                )
+            return prefix + (
+                "The Plain Badge is complete. Heal at (15,27), then enter the "
+                "Flower Shop at (33,5) and obtain the SquirtBottle before "
+                "leaving Goldenrod north."
+            )
+        return prefix + (
+            "Heal at the Pokemon Center entrance (15,27), then enter "
+            "Goldenrod Gym at (24,7) and defeat Whitney for the Plain Badge."
+        )
+    if (
+        group == 0x03
+        and number in {0x11, 0x12, 0x13, 0x14, 0x15}
+        and story_events.get("cleared_radio_tower") is not True
+    ):
+        if key_items.get("basement_key") is not True:
+            return prefix + (
+                "Climb Radio Tower floor by floor, defeat every Rocket, and "
+                "beat the fake Director on 5F to receive the Basement Key."
+            )
+        if (
+            key_items.get("card_key") is not True
+            and story_events.get("used_basement_key") is not True
+        ):
+            return prefix + (
+                "The Basement Key is owned. Exit Radio Tower and enter "
+                "Goldenrod Underground from the north entrance at (9,5); "
+                "rescue the real Director to obtain the Card Key."
+            )
+        if key_items.get("card_key") is not True:
+            return prefix + (
+                "The Basement Key door is open. Continue through the "
+                "Underground switch maze and rescue the real Director."
+            )
+        return prefix + (
+            "The Card Key is owned. Return up Radio Tower, unlock the 3F "
+            "shutter, and defeat the executives on 5F."
+        )
+    if (
+        group == 0x03
+        and number in {0x2D, 0x2E, 0x30}
+        and story_events.get("cleared_radio_tower") is not True
+    ):
+        if key_items.get("card_key") is not True:
+            if (
+                number == 0x2D
+                and story_events.get("used_basement_key") is not True
+            ):
+                return prefix + (
+                    "Stay on row 7 after the first corridor trainer, defeat "
+                    "the east-facing trainer, continue EAST to (18,7), face "
+                    "UP, and use the Basement Key on the door at (18,6)."
+                )
+            return prefix + (
+                "Defeat the rival and Rockets, solve the three underground "
+                "switches, then rescue the real Director for the Card Key."
+            )
+        return prefix + (
+            "The Card Key is owned. Exit the warehouse and return to Radio "
+            "Tower 3F."
+        )
+    if (group, number) == (0x0B, 0x03):
+        if "Plain" in (game_state.get("badges") or []):
+            return prefix + (
+                "The Plain Badge is complete. Follow the verified return maze "
+                "to the south exit at (2,17)/(3,17)."
+            )
+        if story_events.get("beat_beauty_victoria") is not True:
+            return prefix + (
+                "Take the verified west aisle to Beauty Victoria at (0,2) "
+                "and defeat her."
+            )
+        if story_events.get("beat_lass_carrie") is not True:
+            return prefix + (
+                "Victoria is clear. Follow the verified outer loop into Lass "
+                "Carrie's RIGHT-facing sight line at (13,13) and defeat her."
+            )
+        if story_events.get("beat_lass_bridget") is not True:
+            return prefix + (
+                "Carrie is clear. Follow the verified inner route to (10,6), "
+                "face LEFT toward Lass Bridget at (9,6), and defeat her."
+            )
+        if story_events.get("beat_whitney") is not True:
+            return prefix + (
+                "The required trainers are clear. Follow the verified inner "
+                "route to (8,4), face UP toward Whitney at (8,3), press A, "
+                "and defeat her."
+            )
+        if story_events.get("made_whitney_cry") is True:
+            return prefix + (
+                "Whitney is defeated but still crying. Finish her dialogue, "
+                "step DOWN onto (8,5) so Bridget explains what happened, and "
+                "finish that dialogue."
+            )
+        return prefix + (
+            "Return to (8,4), face UP, and speak to Whitney again until the "
+            "Plain Badge is awarded; do not leave without it."
+        )
+    if (group, number) == (0x0B, 0x0A):
+        return prefix + (
+            "This is the wrong PP tutorial house. Follow the verified route "
+            "to (2,7)/(3,7), exit, then enter the Flower Shop at Goldenrod "
+            "City (33,5)."
+        )
+    if (group, number) == (0x0B, 0x08):
+        if key_items.get("squirt_bottle") is not True:
+            return prefix + (
+                "Follow the verified route to (2,5), face UP toward the "
+                "teacher at (2,4), and keep pressing A until the SquirtBottle "
+                "appears in key_items."
+            )
+        return prefix + (
+            "The SquirtBottle is owned. Leave through (2,7)/(3,7), heal if "
+            "needed, then travel north through the Route 35 gate at (19,1)."
+        )
+    if (group, number) == (0x0A, 0x0E):
+        return prefix + (
+            "Follow the verified north aisle and pass through the gate onto "
+            "Route 35."
+        )
+    if (group, number) == (0x0A, 0x02):
+        if (
+            "Glacier" in (game_state.get("badges") or [])
+            and story_events.get("cleared_radio_tower") is not True
+        ):
+            return prefix + "Travel SOUTH on Route 35 into Goldenrod."
+        return prefix + (
+            "Follow the verified S-curve: north on x=9 to (9,19), west to "
+            "(5,19), north to (5,11), west to x=4, then north and west into "
+            "the National Park gate at (3,5). Do not turn east at (9,19)."
+        )
+    if (group, number) == (0x03, 0x0F):
+        if (
+            "Glacier" in (game_state.get("badges") or [])
+            and story_events.get("cleared_radio_tower") is not True
+        ):
+            return prefix + (
+                "Cross SOUTHWEST through National Park to the Route 35 gate."
+            )
+        return prefix + (
+            "Follow the verified northeast path to the Route 36 gate at "
+            "(33,18)/(33,19)."
+        )
+    if (group, number) == (0x0A, 0x11):
+        return prefix + "Pass east through the gate onto Route 36."
+    if (group, number) == (0x0A, 0x03):
+        if (
+            "Glacier" in (game_state.get("badges") or [])
+            and story_events.get("cleared_radio_tower") is not True
+        ):
+            return prefix + (
+                "Travel WEST through Route 36 toward National Park, then "
+                "continue south to Goldenrod."
+            )
+        if story_events.get("fought_sudowoodo") is not True:
+            return prefix + (
+                "Reach the blocking Sudowoodo at (35,9). Stand at (35,10), "
+                "face UP, press A, answer YES to use the SquirtBottle, and "
+                "defeat the level-20 Sudowoodo."
+            )
+        if story_events.get("got_tm_rock_smash") is not True:
+            return prefix + (
+                "Sudowoodo is cleared. Speak with the Rock Smash giver at "
+                "(44,9) and receive TM08 before leaving Route 36."
+            )
+        return prefix + (
+            "Sudowoodo is cleared. Travel NORTH through Route 36's connection "
+            "to Route 37."
+        )
+    if (group, number) == (0x0A, 0x04):
+        if (
+            "Glacier" in (game_state.get("badges") or [])
+            and story_events.get("cleared_radio_tower") is not True
+        ):
+            return prefix + "Travel SOUTH on Route 37 into Route 36."
+        if story_events.get("got_tm_rock_smash") is not True:
+            return prefix + (
+                "Rock Smash is still missing. Travel SOUTH back to Route 36 "
+                "and speak with the giver at (44,9)."
+            )
+        return prefix + "Travel NORTH on Route 37 into Ecruteak City."
+    if (group, number) == (0x04, 0x09):
+        if lead_needs_center:
+            return prefix + (
+                "CRITICAL: Croconaw is below one-third HP. Enter the Pokemon "
+                "Center at (23,27) and heal before any Burned Tower battle."
+            )
+        if story_events.get("got_hm_surf") is not True:
+            return prefix + (
+                "Heal at the Pokemon Center entrance (23,27), then enter the "
+                "Dance Theater at (23,21). Defeat all five Kimono Girls and "
+                "speak with the gentleman to receive HM03 Surf."
+            )
+        if "Fog" not in (game_state.get("badges") or []):
+            return prefix + (
+                "In Pokemon Gold, the legendary-beast release is optional. "
+                "Heal, then enter Ecruteak Gym at (6,27) and defeat Morty for "
+                "the Fog Badge."
+            )
+        if 57 not in (game_state.get("lead_moves") or []):
+            return prefix + (
+                "The Fog Badge is complete. Teach HM03 SURF to Feraligatr, "
+                "replacing WATER GUN, before leaving Ecruteak."
+            )
+        if (
+            "Glacier" in (game_state.get("badges") or [])
+            and story_events.get("cleared_radio_tower") is not True
+        ):
+            return prefix + (
+                "Return SOUTH through Route 37 and Route 36, then continue "
+                "through National Park and Route 35 to Goldenrod Radio Tower."
+            )
+        if "Mineral" in (game_state.get("badges") or []):
+            return prefix + (
+                "Travel EAST through the Route 42 gate at Ecruteak's east "
+                "edge, then continue to Mahogany."
+            )
+        return prefix + (
+            "Surf is learned. Leave Ecruteak west through the Route 38 gate "
+            "at (0,18)/(0,19), then continue to Olivine City."
+        )
+    if (group, number) == (0x02, 0x04):
+        return prefix + "Pass EAST through the gate onto Route 42."
+    if (group, number) == (0x02, 0x05):
+        if (
+            "Glacier" in (game_state.get("badges") or [])
+            and story_events.get("cleared_radio_tower") is not True
+        ):
+            party_species = {
+                member.get("species_id")
+                for member in (game_state.get("party") or [])
+                if isinstance(member, dict)
+            }
+            if not party_species & GOLD_FLY_SPECIES:
+                return prefix + (
+                    "Route 42's west ledge is one-way and this party has no "
+                    "Fly user. Zubat encounters confirm nighttime, when "
+                    "Spearow is absent. Return EAST through Mahogany to "
+                    "Route 43 grass, catch NOCTOWL (species 164) with a Poke "
+                    "Ball without attacking, then teach it HM02 Fly."
+                )
+            return prefix + (
+                "A Fly-compatible Pokemon is in the party. Teach it HM02 Fly "
+                "from the Pack, then use Fly to return directly to Goldenrod "
+                "for the Radio Tower."
+            )
+        return prefix + (
+            "Travel EAST across Route 42, using Surf where required, until "
+            "Mahogany Town."
+        )
+    if (group, number) == (0x02, 0x07):
+        if story_events.get("cleared_rocket_hideout") is not True:
+            if key_items.get("red_scale") is not True:
+                return prefix + (
+                    "Travel NORTH through the Route 43 gate to Lake of Rage "
+                    "and defeat the red Gyarados to obtain the Red Scale."
+                )
+            if story_events.get("decided_to_help_lance") is True:
+                return prefix + (
+                    "Lance is waiting below Mahogany. Enter the suspicious "
+                    "shop and follow him into the Rocket Hideout."
+                )
+            return prefix + (
+                "The Red Scale is owned. Speak with Lance at Lake of Rage, "
+                "return to Mahogany, and enter the Rocket Hideout beneath "
+                "the suspicious shop."
+            )
+        if "Glacier" not in (game_state.get("badges") or []):
+            return prefix + (
+                "The Rocket Hideout is cleared. Enter Mahogany Gym and "
+                "defeat Pryce for the Glacier Badge."
+            )
+        if story_events.get("cleared_radio_tower") is not True:
+            party_species = {
+                member.get("species_id")
+                for member in (game_state.get("party") or [])
+                if isinstance(member, dict)
+            }
+            if not party_species & GOLD_FLY_SPECIES:
+                return prefix + (
+                    "The party still lacks a Fly user. Travel NORTH to Route "
+                    "43 grass and catch nighttime NOCTOWL (species 164), then "
+                    "teach it HM02 Fly."
+                )
+            return prefix + (
+                "Teach HM02 Fly to the captured Flying Pokemon and use Fly "
+                "to return to Goldenrod for the Radio Tower."
+            )
+    if (group, number) in {(0x09, 0x03), (0x09, 0x04)}:
+        if (
+            story_events.get("decided_to_help_lance") is True
+            and story_events.get("cleared_rocket_hideout") is not True
+        ):
+            return prefix + "Pass SOUTH through the gate toward Mahogany."
+        return prefix + "Pass NORTH through the gate onto Route 43."
+    if (group, number) == (0x09, 0x05):
+        if (
+            "Glacier" in (game_state.get("badges") or [])
+            and story_events.get("cleared_rocket_hideout") is True
+            and story_events.get("cleared_radio_tower") is not True
+        ):
+            party_species = {
+                member.get("species_id")
+                for member in (game_state.get("party") or [])
+                if isinstance(member, dict)
+            }
+            if not party_species & GOLD_FLY_SPECIES:
+                return prefix + (
+                    "Walk in Route 43 grass until nighttime NOCTOWL "
+                    "(species 164) appears; throw a Poke Ball without "
+                    "attacking it."
+                )
+            return prefix + (
+                "Teach HM02 Fly to the captured Flying Pokemon, then Fly to "
+                "Goldenrod."
+            )
+        if (
+            story_events.get("decided_to_help_lance") is True
+            and story_events.get("cleared_rocket_hideout") is not True
+        ):
+            return prefix + (
+                "Return SOUTH on Route 43 to Mahogany and enter the "
+                "suspicious shop."
+            )
+        return prefix + "Travel NORTH on Route 43 to Lake of Rage."
+    if (group, number) == (0x09, 0x06):
+        if key_items.get("red_scale") is not True:
+            return prefix + (
+                "Surf to the red Gyarados, defeat it, and obtain the Red "
+                "Scale; then speak with Lance on the shore."
+            )
+        if story_events.get("decided_to_help_lance") is True:
+            return prefix + (
+                "Lance accepted your help. Return SOUTH through Route 43 to "
+                "Mahogany and enter the suspicious shop."
+            )
+        return prefix + (
+            "The Red Scale is owned. Speak with Lance at (21,28) from "
+            "(21,27), agree to help, then return SOUTH to Mahogany and enter "
+            "the Rocket Hideout."
+        )
+    if (group, number) == (0x03, 0x2B):
+        if story_events.get("learned_raticate_tail") is not True:
+            return prefix + (
+                "Defeat and re-talk to the password Grunt at (5,15) until "
+                "RATICATE TAIL is learned."
+            )
+        if story_events.get("learned_slowpoketail") is not True:
+            return prefix + (
+                "RATICATE TAIL is known. Reach the female password Grunt at "
+                "(21,7), defeat and re-talk to her until SLOWPOKETAIL is "
+                "learned."
+            )
+        if story_events.get("opened_giovanni_office") is not True:
+            return prefix + (
+                "Both passwords are known. Take B3F's UPPER-RIGHT staircase "
+                "at (27,2), cross B2F to its UPPER-LEFT staircase at (3,2), "
+                "then descend into the commander's room, open the door at "
+                "(10,9)/(11,9) from (10,10)/(11,10), and defeat the "
+                "executive."
+            )
+        if story_events.get("beat_rocket_commander") is not True:
+            return prefix + (
+                "The office is open. Enter through (10,9)/(11,9) and defeat "
+                "the Rocket commander."
+            )
+        if story_events.get("learned_hail_giovanni") is not True:
+            return prefix + (
+                "The executive is defeated. Speak with Murkrow at (7,2) "
+                "until HAIL GIOVANNI is learned."
+            )
+        return prefix + (
+            "HAIL GIOVANNI is known. Return to B2F and open the transmitter "
+            "room."
+        )
+    if (group, number) in {
+        (0x03, 0x28),
+        (0x03, 0x29),
+        (0x03, 0x2A),
+    }:
+        if story_events.get("cleared_rocket_hideout") is True:
+            return prefix + (
+                "The hideout is cleared. Return to B1F, exit through the "
+                "Mahogany shop, and challenge Pryce."
+            )
+        return prefix + (
+            "Clear the Team Rocket base with Lance, obtain both passwords, "
+            "defeat the executives, and stop the Electrode broadcast."
+        )
+    if (group, number) == (0x02, 0x02):
+        if story_events.get("beat_pryce") is True:
+            return prefix + (
+                "The Glacier Badge is complete. Exit the Gym and return to "
+                "Goldenrod Radio Tower."
+            )
+        return prefix + (
+            "Complete Mahogany Gym's ice path and defeat Pryce for the "
+            "Glacier Badge."
+        )
+    if (group, number) == (0x02, 0x06):
+        return prefix + "Travel EAST on Route 44 to Ice Path."
+    if (group, number) in {
+        (0x03, 0x35),
+        (0x03, 0x36),
+        (0x03, 0x37),
+        (0x03, 0x38),
+        (0x03, 0x39),
+    }:
+        return prefix + (
+            "Traverse Ice Path toward Blackthorn, collecting HM07 Waterfall "
+            "before exiting."
+        )
+    if (group, number) == (0x05, 0x0A):
+        return prefix + (
+            "Challenge Clair in Blackthorn Gym, then complete Dragon's Den "
+            "to receive the Rising Badge."
+        )
+    if (group, number) == (0x01, 0x09):
+        if "Mineral" in (game_state.get("badges") or []):
+            return prefix + "Pass EAST through the gate into Ecruteak."
+        return prefix + "Pass west through the gate onto Route 38."
+    if (group, number) == (0x01, 0x0C):
+        if "Mineral" in (game_state.get("badges") or []):
+            return prefix + (
+                "Travel EAST on Route 38 through the gate back to Ecruteak."
+            )
+        return prefix + "Travel WEST on Route 38 into Route 39."
+    if (group, number) == (0x01, 0x0D):
+        if "Mineral" in (game_state.get("badges") or []):
+            return prefix + "Travel NORTH on Route 39 into Route 38."
+        return prefix + "Travel SOUTH on Route 39 into Olivine City."
+    if (group, number) == (0x01, 0x0E):
+        if story_events.get("got_hm_strength") is not True:
+            return prefix + (
+                "Heal at (13,21), then enter Olivine Cafe at (7,21), speak "
+                "with the sailor at (4,3), and receive HM04 Strength."
+            )
+        if story_events.get("jasmine_explained_sickness") is not True:
+            return prefix + (
+                "HM04 Strength is owned. Enter the Lighthouse at (29,27), "
+                "climb to 6F, and speak with Jasmine beside Amphy at (8,8)."
+            )
+        if story_events.get("got_secret_potion") is not True:
+            return prefix + (
+                "Jasmine requested medicine. Travel southwest to Route 40, "
+                "Surf through Route 41 to Cianwood, and obtain the "
+                "SecretPotion from the Pharmacy."
+            )
+        if "Mineral" not in (game_state.get("badges") or []):
+            if story_events.get("jasmine_returned_to_gym") is True:
+                return prefix + (
+                    "Amphy is healed and Jasmine returned. Enter Olivine Gym "
+                    "at (10,11) and defeat her for the Mineral Badge."
+                )
+            return prefix + (
+                "The SecretPotion is owned. Return to Lighthouse 6F and give "
+                "it to Jasmine, then challenge her at Olivine Gym (10,11)."
+            )
+        if "Glacier" not in (game_state.get("badges") or []):
+            return prefix + (
+                "The Mineral Badge is complete. Leave Olivine NORTH through "
+                "Route 39, travel EAST through Route 38 and Ecruteak, then "
+                "take Route 42 to Mahogany."
+            )
+    if (group, number) == (0x01, 0x07):
+        if story_events.get("got_hm_strength") is not True:
+            return prefix + (
+                "Speak with the sailor at (4,3) until HM04 Strength is received."
+            )
+        return prefix + "HM04 Strength is owned. Exit through (2,7)/(3,7)."
+    if (group, number) in {
+        (0x03, 0x22),
+        (0x03, 0x23),
+        (0x03, 0x24),
+        (0x03, 0x25),
+        (0x03, 0x26),
+    }:
+        return prefix + "Climb the required Lighthouse stair and ladder chain to 6F."
+    if (group, number) == (0x03, 0x27):
+        if story_events.get("got_secret_potion") is True:
+            return prefix + (
+                "Give the SecretPotion to Jasmine at (8,8) and finish the "
+                "healing dialogue."
+            )
+        return prefix + (
+            "Speak with Jasmine at (8,8) until she explains Amphy's sickness "
+            "and requests medicine from Cianwood."
+        )
+    if (group, number) == (0x16, 0x01):
+        if (
+            story_events.get("got_secret_potion") is True
+            and story_events.get("beat_chuck") is True
+            and story_events.get("jasmine_returned_to_gym") is not True
+        ):
+            return prefix + (
+                "Return NORTH through Route 40, land on the east shore, and "
+                "continue EAST into Olivine to deliver the SecretPotion."
+            )
+        return prefix + "Travel SOUTH on Route 40 and Surf toward Route 41."
+    if (group, number) == (0x16, 0x02):
+        if (
+            story_events.get("got_secret_potion") is True
+            and story_events.get("beat_chuck") is True
+            and story_events.get("jasmine_returned_to_gym") is not True
+        ):
+            return prefix + (
+                "Surf EAST along the open north channel to x=36, then turn "
+                "NORTH into Route 40."
+            )
+        return prefix + "Surf WEST through Route 41 to Cianwood City."
+    if (group, number) == (0x16, 0x03):
+        if story_events.get("got_secret_potion") is not True:
+            return prefix + (
+                "Enter the Cianwood Pharmacy at (15,47), receive the "
+                "SecretPotion, "
+                "then defeat Chuck at Cianwood Gym before returning east."
+            )
+        if "Storm" not in (game_state.get("badges") or []):
+            return prefix + (
+                "The SecretPotion is owned. Heal, then defeat Chuck at "
+                "Cianwood Gym for the Storm Badge."
+            )
+        if story_events.get("got_hm_fly") is not True:
+            return prefix + (
+                "The Storm Badge is complete. Speak with Chuck's wife at "
+                "(10,46) until HM02 Fly is received."
+            )
+        return prefix + (
+            "HM02 Fly is owned. Surf EAST through Route 41 and Route 40 to "
+            "return the SecretPotion to Jasmine in Olivine."
+        )
+    if (group, number) == (0x16, 0x07):
+        if story_events.get("got_secret_potion") is not True:
+            return prefix + (
+                "Stand at (2,4), face UP, and speak with the pharmacist until "
+                "the SecretPotion appears in key_items."
+            )
+        return prefix + (
+            "The SecretPotion is owned. Exit through (2,7)/(3,7), heal, and "
+            "challenge Chuck at Cianwood Gym."
+        )
+    if (group, number) == (0x16, 0x05):
+        if story_events.get("beat_chuck") is True:
+            return prefix + (
+                "The Storm Badge is complete. Exit through (4,17)/(5,17), "
+                "then speak with Chuck's wife at (10,46) for HM02 Fly."
+            )
+        return prefix + (
+            "Use Strength to solve the boulder lane, reach Chuck at (4,1), "
+            "and defeat him for the Storm Badge."
+        )
+    if (group, number) == (0x04, 0x05):
+        kimono_events = (
+            ("Naoko", "beat_kimono_naoko", (0, 2)),
+            ("Sayo", "beat_kimono_sayo", (2, 1)),
+            ("Zuki", "beat_kimono_zuki", (6, 2)),
+            ("Kuni", "beat_kimono_kuni", (9, 1)),
+            ("Miki", "beat_kimono_miki", (11, 2)),
+        )
+        remaining = [
+            f"{name} at {target}"
+            for name, event, target in kimono_events
+            if story_events.get(event) is not True
+        ]
+        if remaining:
+            return prefix + (
+                "Defeat every Kimono Girl. Remaining targets: "
+                + ", ".join(remaining)
+                + "."
+            )
+        if story_events.get("got_hm_surf") is not True:
+            return prefix + (
+                "All five Kimono Girls are defeated. Speak with the gentleman "
+                "at (7,10) until HM03 Surf is received."
+            )
+        return prefix + "HM03 Surf is owned. Exit through (5,13)."
+    if (group, number) == (0x03, 0x0D):
+        return prefix + (
+            "The rival is defeated and the beasts are optional in Pokemon "
+            "Gold. Exit through (9,15)/(10,15) and challenge Morty."
+        )
+    if (group, number) == (0x03, 0x0E):
+        return prefix + (
+            "The beasts are optional in Pokemon Gold. Return to 1F, exit the "
+            "tower, heal if needed, and challenge Morty."
+        )
+    if (group, number) == (0x04, 0x07):
+        return prefix + (
+            "Use the verified invisible-floor route: right to x=6, north to "
+            "row 9, west to x=3, north to row 7, east to x=6, then north to "
+            "(6,2) and left to (5,2). Face UP and challenge Morty."
         )
     if (group, number) == (0x03, 0x01):
         if (
@@ -14206,6 +17028,21 @@ def trusted_gold_route_action(game_state: dict[str, Any]) -> Optional[str]:
         and party[0]["max_hp"] > 0
         and party[0]["hp"] * 3 < party[0]["max_hp"]
     )
+    lead_needs_heal = bool(
+        isinstance(party, list)
+        and party
+        and isinstance(party[0], dict)
+        and isinstance(party[0].get("hp"), int)
+        and isinstance(party[0].get("max_hp"), int)
+        and party[0]["max_hp"] > 0
+        and party[0]["hp"] < party[0]["max_hp"]
+    )
+    party_species = {
+        member.get("species_id")
+        for member in (party or [])
+        if isinstance(member, dict)
+    }
+    has_fly_species = bool(party_species & GOLD_FLY_SPECIES)
     returning_egg = bool(
         story_events.get("got_mystery_egg") is True
         and story_events.get("gave_mystery_egg_to_elm") is not True
@@ -14214,6 +17051,843 @@ def trusted_gold_route_action(game_state: dict[str, Any]) -> Optional[str]:
         game_state.get("map_group"),
         game_state.get("map_number"),
     )
+    key_items = game_state.get("key_items")
+    key_items = key_items if isinstance(key_items, dict) else {}
+    needs_lighthouse_visit = (
+        story_events.get("jasmine_explained_sickness") is not True
+        or (
+            key_items.get("secret_potion") is True
+            and story_events.get("jasmine_returned_to_gym") is not True
+        )
+    )
+    if not needs_lighthouse_visit:
+        lighthouse_exit_routes = {
+            (0x03, 0x22): GOLD_LIGHTHOUSE_1F_EXIT_ACTIONS,
+            (0x03, 0x23): GOLD_LIGHTHOUSE_2F_EXIT_ACTIONS,
+            (0x03, 0x24): GOLD_LIGHTHOUSE_3F_EXIT_ACTIONS,
+            (0x03, 0x25): GOLD_LIGHTHOUSE_4F_EXIT_ACTIONS,
+            (0x03, 0x26): GOLD_LIGHTHOUSE_5F_EXIT_ACTIONS,
+            (0x03, 0x27): GOLD_LIGHTHOUSE_6F_EXIT_ACTIONS,
+        }
+        lighthouse_exit_action = lighthouse_exit_routes.get(
+            current_map, {}
+        ).get(position)
+        if lighthouse_exit_action is not None:
+            return lighthouse_exit_action
+    if (
+        current_map == (0x01, 0x0E)
+        and story_events.get("jasmine_explained_sickness") is True
+        and story_events.get("got_secret_potion") is not True
+    ):
+        cianwood_action = GOLD_OLIVINE_CIANWOOD_ACTIONS.get(position)
+        if cianwood_action is not None:
+            return cianwood_action
+    if (
+        current_map == (0x01, 0x0E)
+        and key_items.get("secret_potion") is True
+        and story_events.get("jasmine_returned_to_gym") is not True
+    ):
+        lighthouse_return_action = (
+            GOLD_OLIVINE_LIGHTHOUSE_RETURN_ACTIONS.get(position)
+        )
+        if lighthouse_return_action is not None:
+            return lighthouse_return_action
+    if (
+        current_map == (0x01, 0x05)
+        and key_items.get("secret_potion") is True
+        and story_events.get("jasmine_returned_to_gym") is not True
+        and position in {(2, 7), (3, 7)}
+    ):
+        return "down"
+    if (
+        current_map == (0x01, 0x0E)
+        and story_events.get("jasmine_returned_to_gym") is True
+        and "Mineral" not in (game_state.get("badges") or [])
+    ):
+        gym_action = GOLD_OLIVINE_GYM_ACTIONS.get(position)
+        if gym_action is not None:
+            return gym_action
+    if (
+        current_map == (0x01, 0x0D)
+        and "Mineral" in (game_state.get("badges") or [])
+        and "Glacier" not in (game_state.get("badges") or [])
+    ):
+        route39_action = GOLD_ROUTE39_ECRUTEAK_ACTIONS.get(position)
+        if route39_action is not None:
+            return route39_action
+    if (
+        current_map == (0x01, 0x09)
+        and "Mineral" in (game_state.get("badges") or [])
+        and "Glacier" not in (game_state.get("badges") or [])
+    ):
+        gate_action = GOLD_ROUTE38_GATE_ECRUTEAK_ACTIONS.get(position)
+        if gate_action is not None:
+            return gate_action
+    if (
+        current_map == (0x04, 0x09)
+        and "Mineral" in (game_state.get("badges") or [])
+        and "Glacier" not in (game_state.get("badges") or [])
+    ):
+        route42_action = GOLD_ECRUTEAK_ROUTE42_ACTIONS.get(position)
+        if route42_action is not None:
+            return route42_action
+    if (
+        current_map == (0x02, 0x05)
+        and "Mineral" in (game_state.get("badges") or [])
+        and story_events.get("cleared_rocket_hideout") is not True
+    ):
+        route42_action = GOLD_ROUTE42_EAST_ACTIONS.get(position)
+        if route42_action is not None:
+            return route42_action
+    if (
+        current_map == (0x02, 0x05)
+        and "Glacier" in (game_state.get("badges") or [])
+        and story_events.get("cleared_radio_tower") is not True
+    ):
+        route42_west_action = GOLD_ROUTE42_WEST_ACTIONS.get(position)
+        if route42_west_action is not None:
+            return route42_west_action
+    if (
+        current_map == (0x02, 0x05)
+        and "Glacier" in (game_state.get("badges") or [])
+        and story_events.get("cleared_radio_tower") is not True
+        and not has_fly_species
+    ):
+        noctowl_action = GOLD_ROUTE42_NOCTOWL_ACTIONS.get(position)
+        if noctowl_action is not None:
+            return noctowl_action
+    if (
+        current_map == (0x02, 0x07)
+        and story_events.get("cleared_rocket_hideout") is not True
+        and key_items.get("red_scale") is not True
+    ):
+        lake_action = GOLD_MAHOGANY_LAKE_ACTIONS.get(position)
+        if lake_action is not None:
+            return lake_action
+    if (
+        current_map == (0x09, 0x06)
+        and story_events.get("cleared_rocket_hideout") is not True
+        and story_events.get("decided_to_help_lance") is not True
+        and key_items.get("red_scale") is True
+    ):
+        lance_action = GOLD_LAKE_LANCE_ACTIONS.get(position)
+        if lance_action is not None:
+            return lance_action
+    if (
+        current_map == (0x09, 0x05)
+        and story_events.get("decided_to_help_lance") is True
+        and story_events.get("cleared_rocket_hideout") is not True
+    ):
+        mahogany_action = GOLD_ROUTE43_MAHOGANY_ACTIONS.get(position)
+        if mahogany_action is not None:
+            return mahogany_action
+    if (
+        current_map == (0x02, 0x07)
+        and story_events.get("decided_to_help_lance") is True
+        and story_events.get("cleared_rocket_hideout") is not True
+    ):
+        hideout_action = GOLD_MAHOGANY_HIDEOUT_ACTIONS.get(position)
+        if hideout_action is not None:
+            return hideout_action
+    if (
+        current_map == (0x02, 0x07)
+        and story_events.get("cleared_rocket_hideout") is True
+        and "Glacier" not in (game_state.get("badges") or [])
+    ):
+        mahogany_gym_action = GOLD_MAHOGANY_GYM_ACTIONS.get(position)
+        if mahogany_gym_action is not None:
+            return mahogany_gym_action
+    if (
+        current_map == (0x02, 0x07)
+        and "Glacier" in (game_state.get("badges") or [])
+        and story_events.get("cleared_radio_tower") is not True
+        and not has_fly_species
+    ):
+        noctowl_route_action = GOLD_MAHOGANY_LAKE_ACTIONS.get(position)
+        if noctowl_route_action is not None:
+            return noctowl_route_action
+    if (
+        current_map == (0x02, 0x02)
+        and story_events.get("beat_pryce") is not True
+    ):
+        pryce_action = GOLD_MAHOGANY_GYM_PRYCE_ACTIONS.get(position)
+        if pryce_action is not None:
+            return pryce_action
+    if (
+        current_map == (0x02, 0x07)
+        and "Glacier" in (game_state.get("badges") or [])
+        and story_events.get("cleared_radio_tower") is not True
+    ):
+        route42_return_action = GOLD_MAHOGANY_ROUTE42_RETURN_ACTIONS.get(
+            position
+        )
+        if route42_return_action is not None:
+            return route42_return_action
+    if (
+        current_map == (0x03, 0x28)
+        and story_events.get("decided_to_help_lance") is True
+        and story_events.get("cleared_rocket_hideout") is not True
+    ):
+        stairs_action = GOLD_MAHOGANY_MART_STAIRS_ACTIONS.get(position)
+        if stairs_action is not None:
+            return stairs_action
+    if (
+        current_map == (0x03, 0x28)
+        and story_events.get("cleared_rocket_hideout") is True
+    ):
+        mart_exit_action = GOLD_MAHOGANY_MART_EXIT_ACTIONS.get(position)
+        if mart_exit_action is not None:
+            return mart_exit_action
+    if (
+        current_map == (0x03, 0x29)
+        and story_events.get("cleared_rocket_hideout") is not True
+    ):
+        b1f_action = GOLD_ROCKET_B1F_STAIRS_ACTIONS.get(position)
+        if b1f_action is not None:
+            return b1f_action
+    if (
+        current_map == (0x03, 0x2A)
+        and story_events.get("cleared_rocket_hideout") is not True
+        and story_events.get("learned_hail_giovanni") is not True
+        and not (
+            story_events.get("learned_raticate_tail") is True
+            and story_events.get("learned_slowpoketail") is True
+        )
+    ):
+        b2f_action = GOLD_ROCKET_B2F_PASSWORD_STAIRS_ACTIONS.get(position)
+        if b2f_action is not None:
+            return b2f_action
+    if (
+        current_map == (0x03, 0x2B)
+        and story_events.get("learned_raticate_tail") is True
+        and (
+            story_events.get("learned_slowpoketail") is not True
+            or story_events.get("opened_giovanni_office") is not True
+        )
+    ):
+        component_exit_action = (
+            GOLD_ROCKET_B3F_SECOND_PASSWORD_EXIT_ACTIONS.get(position)
+        )
+        if component_exit_action is not None:
+            return component_exit_action
+    if (
+        current_map == (0x03, 0x2A)
+        and story_events.get("learned_raticate_tail") is True
+        and story_events.get("learned_slowpoketail") is True
+        and story_events.get("opened_giovanni_office") is not True
+    ):
+        crossing_actions = (
+            GOLD_ROCKET_B2F_GRUNT_RESET_ACTIONS
+            if game_state.get("rocket_grunt18_blocking") is True
+            else GOLD_ROCKET_B2F_OFFICE_CROSSING_ACTIONS
+        )
+        crossing_action = crossing_actions.get(position)
+        if crossing_action is not None:
+            return crossing_action
+    if (
+        current_map == (0x03, 0x2B)
+        and story_events.get("learned_raticate_tail") is True
+        and story_events.get("learned_slowpoketail") is True
+        and story_events.get("opened_giovanni_office") is not True
+    ):
+        commander_action = GOLD_ROCKET_B3F_COMMANDER_APPROACH_ACTIONS.get(
+            position
+        )
+        if commander_action is not None:
+            return commander_action
+    if (
+        current_map == (0x03, 0x2B)
+        and story_events.get("met_rival_rocket_base") is True
+        and story_events.get("opened_giovanni_office") is not True
+    ):
+        office_door_action = GOLD_ROCKET_B3F_OFFICE_DOOR_ACTIONS.get(
+            position
+        )
+        if office_door_action is not None:
+            return office_door_action
+    if (
+        current_map == (0x03, 0x2B)
+        and story_events.get("opened_giovanni_office") is True
+        and story_events.get("beat_rocket_commander") is not True
+    ):
+        boss_action = GOLD_ROCKET_B3F_BOSS_ACTIONS.get(position)
+        if boss_action is not None:
+            return boss_action
+    if (
+        current_map == (0x03, 0x2B)
+        and story_events.get("beat_rocket_commander") is True
+        and story_events.get("learned_hail_giovanni") is not True
+    ):
+        murkrow_action = GOLD_ROCKET_B3F_MURKROW_ACTIONS.get(position)
+        if murkrow_action is not None:
+            return murkrow_action
+    if (
+        current_map == (0x03, 0x2B)
+        and story_events.get("learned_hail_giovanni") is True
+        and story_events.get("opened_rocket_transmitter_door") is not True
+    ):
+        transmitter_return_action = (
+            GOLD_ROCKET_B3F_TRANSMITTER_SIDE_ACTIONS.get(position)
+        )
+        if transmitter_return_action is not None:
+            return transmitter_return_action
+    if (
+        current_map == (0x03, 0x2A)
+        and story_events.get("learned_hail_giovanni") is True
+        and story_events.get("opened_rocket_transmitter_door") is not True
+    ):
+        transmitter_side_action = (
+            GOLD_ROCKET_B2F_TRANSMITTER_SIDE_ACTIONS.get(position)
+        )
+        if transmitter_side_action is not None:
+            return transmitter_side_action
+    if (
+        current_map == (0x03, 0x2A)
+        and story_events.get("learned_hail_giovanni") is True
+        and story_events.get("opened_rocket_transmitter_door") is not True
+    ):
+        transmitter_door_action = (
+            GOLD_ROCKET_B2F_TRANSMITTER_DOOR_ACTIONS.get(position)
+        )
+        if transmitter_door_action is not None:
+            return transmitter_door_action
+    if (
+        current_map == (0x03, 0x2A)
+        and story_events.get("opened_rocket_transmitter_door") is True
+        and story_events.get("cleared_rocket_hideout") is not True
+    ):
+        if story_events.get("rocket_electrode_3") is not True:
+            electrode_entry_action = GOLD_ROCKET_ELECTRODE_ENTRY_ACTIONS.get(
+                position
+            )
+            if electrode_entry_action is not None:
+                return electrode_entry_action
+        elif story_events.get("rocket_electrode_2") is not True:
+            electrode_2_action = GOLD_ROCKET_ELECTRODE_2_ACTIONS.get(
+                position
+            )
+            if electrode_2_action is not None:
+                return electrode_2_action
+        elif story_events.get("rocket_electrode_1") is not True:
+            electrode_1_action = GOLD_ROCKET_ELECTRODE_1_ACTIONS.get(
+                position
+            )
+            if electrode_1_action is not None:
+                return electrode_1_action
+    if (
+        current_map == (0x03, 0x2A)
+        and story_events.get("cleared_rocket_hideout") is True
+    ):
+        rocket_exit_action = GOLD_ROCKET_B2F_EXIT_ACTIONS.get(position)
+        if rocket_exit_action is not None:
+            return rocket_exit_action
+    if (
+        current_map == (0x03, 0x29)
+        and story_events.get("cleared_rocket_hideout") is True
+    ):
+        b1f_exit_action = GOLD_ROCKET_B1F_EXIT_ACTIONS.get(position)
+        if b1f_exit_action is not None:
+            return b1f_exit_action
+    if (
+        current_map == (0x16, 0x03)
+        and story_events.get("got_secret_potion") is not True
+    ):
+        pharmacy_action = GOLD_CIANWOOD_PHARMACY_ACTIONS.get(position)
+        if pharmacy_action is not None:
+            return pharmacy_action
+    if current_map == (0x16, 0x07):
+        pharmacy_actions = (
+            GOLD_CIANWOOD_PHARMACY_EXIT_ACTIONS
+            if story_events.get("got_secret_potion") is True
+            else GOLD_CIANWOOD_PHARMACY_INTERIOR_ACTIONS
+        )
+        pharmacy_action = pharmacy_actions.get(position)
+        if pharmacy_action is not None:
+            return pharmacy_action
+    if (
+        current_map == (0x16, 0x03)
+        and story_events.get("got_secret_potion") is True
+        and story_events.get("beat_chuck") is not True
+    ):
+        cianwood_actions = (
+            GOLD_CIANWOOD_HEAL_ACTIONS
+            if lead_needs_heal
+            else GOLD_CIANWOOD_GYM_ACTIONS
+        )
+        cianwood_action = cianwood_actions.get(position)
+        if cianwood_action is not None:
+            return cianwood_action
+    if current_map == (0x16, 0x06):
+        center_actions = (
+            GOLD_CIANWOOD_CENTER_HEAL_ACTIONS
+            if lead_needs_heal
+            else GOLD_CIANWOOD_CENTER_EXIT_ACTIONS
+        )
+        center_action = center_actions.get(position)
+        if center_action is not None:
+            return center_action
+    if (
+        current_map == (0x16, 0x05)
+        and story_events.get("beat_chuck") is not True
+        and game_state.get("strength_active") is True
+    ):
+        raw_boulders = game_state.get("cianwood_gym_boulders")
+        boulders = (
+            frozenset(
+                (item.get("x"), item.get("y"))
+                for item in raw_boulders
+                if isinstance(item, dict)
+                and isinstance(item.get("x"), int)
+                and isinstance(item.get("y"), int)
+            )
+            if isinstance(raw_boulders, list)
+            else frozenset()
+        )
+        initial = frozenset({(3, 7), (4, 7), (5, 7)})
+        left_lifted = frozenset({(3, 6), (4, 7), (5, 7)})
+        right_lifted = frozenset({(3, 7), (4, 7), (5, 6)})
+        sides_lifted = frozenset({(3, 6), (4, 7), (5, 6)})
+        center_open = frozenset({(3, 6), (5, 7), (5, 6)})
+        if not boulders and 9 <= position[1] <= 17:
+            if position[0] < 4:
+                return "right"
+            if position[0] > 4:
+                return "left"
+            return "up"
+        if boulders == initial:
+            puzzle_actions = {
+                **{(4, y): "up" for y in range(9, 18)},
+                (5, 8): "left",
+                (4, 8): "left",
+                (3, 8): "up",
+            }
+            puzzle_action = puzzle_actions.get(position)
+            if puzzle_action is not None:
+                return puzzle_action
+        elif boulders == left_lifted:
+            puzzle_action = (
+                "up"
+                if position == (3, 8)
+                and game_state.get("facing_direction") == 4
+                else {
+                    (3, 8): "right",
+                    (3, 7): "down",
+                    (4, 8): "right",
+                    (5, 8): "up",
+                }.get(position)
+            )
+            if puzzle_action is not None:
+                return puzzle_action
+        elif boulders == right_lifted:
+            puzzle_action = {
+                (5, 7): "down",
+                (5, 8): "left",
+                (4, 8): "left",
+                (3, 8): "up",
+            }.get(position)
+            if puzzle_action is not None:
+                return puzzle_action
+        elif boulders == sides_lifted:
+            puzzle_action = (
+                "up"
+                if position == (5, 8)
+                and game_state.get("facing_direction") == 4
+                else {
+                    (5, 8): "left",
+                    (5, 7): "down",
+                    (4, 8): "left",
+                    (3, 8): "up",
+                    (3, 7): "right",
+                }.get(position)
+            )
+            if puzzle_action is not None:
+                return puzzle_action
+        elif boulders == center_open:
+            puzzle_action = {
+                (3, 7): "right",
+                **{(4, y): "up" for y in range(5, 8)},
+                (4, 4): "left",
+                (3, 4): "up",
+                (3, 3): "up",
+                (3, 2): "right",
+            }.get(position)
+            if puzzle_action is not None:
+                return puzzle_action
+    if (
+        current_map == (0x16, 0x05)
+        and story_events.get("beat_chuck") is True
+    ):
+        gym_exit_action = GOLD_CIANWOOD_GYM_EXIT_ACTIONS.get(position)
+        if gym_exit_action is not None:
+            return gym_exit_action
+    if (
+        current_map == (0x16, 0x03)
+        and story_events.get("beat_chuck") is True
+        and story_events.get("got_hm_fly") is not True
+    ):
+        fly_action = GOLD_CIANWOOD_FLY_ACTIONS.get(position)
+        if fly_action is not None:
+            return fly_action
+    if game_state.get("lead_status") == 8:
+        poison_action = GOLD_BURNED_TOWER_POISON_HEAL_ACTIONS.get(
+            (current_map[0], current_map[1], position[0], position[1])
+        )
+        if poison_action is not None:
+            return poison_action
+    if (
+        current_map == (0x08, 0x05)
+        and "Hive" in (game_state.get("badges") or [])
+    ):
+        return GOLD_AZALEA_GYM_EXIT_ACTIONS.get(position)
+    if current_map == (0x03, 0x2C):
+        farfetchd_position = story_events.get("farfetchd_position")
+        if story_events.get("herded_farfetchd") is True:
+            farfetchd_position = 10
+        if (
+            story_events.get("got_hm_cut") is not True
+            and isinstance(farfetchd_position, int)
+        ):
+            route = GOLD_ILEX_FARFETCHD_ACTIONS.get(farfetchd_position)
+            if route is not None:
+                route_action = route.get(position)
+                if route_action is not None:
+                    return route_action
+        if story_events.get("got_hm_cut") is True:
+            cut_exit_action = GOLD_ILEX_CUT_EXIT_ACTIONS.get(position)
+            if cut_exit_action is not None:
+                return cut_exit_action
+    if current_map == (0x0B, 0x03):
+        if "Plain" in (game_state.get("badges") or []):
+            exit_action = GOLD_GOLDENROD_EXIT_ACTIONS.get(position)
+            if exit_action is not None:
+                return exit_action
+        elif story_events.get("beat_beauty_victoria") is True:
+            if story_events.get("beat_lass_carrie") is not True:
+                carrie_action = GOLD_GOLDENROD_CARRIE_ACTIONS.get(position)
+                if carrie_action is not None:
+                    return carrie_action
+            elif story_events.get("beat_lass_bridget") is not True:
+                bridget_action = GOLD_GOLDENROD_BRIDGET_ACTIONS.get(position)
+                if bridget_action is not None:
+                    return bridget_action
+            elif story_events.get("beat_whitney") is not True:
+                whitney_action = GOLD_GOLDENROD_WHITNEY_ACTIONS.get(position)
+                if whitney_action is None:
+                    whitney_action = GOLD_GOLDENROD_WHITNEY_RETRY_ACTIONS.get(
+                        position
+                    )
+                if whitney_action is not None:
+                    return whitney_action
+        elif position in {(0, 5), (0, 4), (0, 3)}:
+            return "up"
+        if story_events.get("beat_whitney") is True:
+            if (
+                story_events.get("made_whitney_cry") is True
+                and position == (8, 4)
+            ):
+                return "down"
+            if (
+                story_events.get("made_whitney_cry") is False
+                and "Plain" not in (game_state.get("badges") or [])
+                and position == (8, 5)
+            ):
+                return "up"
+    if current_map == (0x0B, 0x02):
+        if (
+            "Glacier" in (game_state.get("badges") or [])
+            and story_events.get("cleared_radio_tower") is not True
+            and not (
+                (
+                    key_items.get("basement_key") is True
+                    or story_events.get("used_basement_key") is True
+                )
+                and key_items.get("card_key") is not True
+            )
+        ):
+            radio_action = GOLD_GOLDENROD_RADIO_ACTIONS.get(position)
+            if radio_action is not None:
+                return radio_action
+        if (
+            (
+                key_items.get("basement_key") is True
+                or story_events.get("used_basement_key") is True
+            )
+            and key_items.get("card_key") is not True
+        ):
+            underground_action = GOLD_GOLDENROD_UNDERGROUND_ACTIONS.get(
+                position
+            )
+            if underground_action is not None:
+                return underground_action
+        key_items = game_state.get("key_items")
+        key_items = key_items if isinstance(key_items, dict) else {}
+        if (
+            "Plain" in (game_state.get("badges") or [])
+            and key_items.get("squirt_bottle") is not True
+        ):
+            flower_city_action = GOLD_GOLDENROD_FLOWER_CITY_ACTIONS.get(
+                position
+            )
+            if flower_city_action is not None:
+                return flower_city_action
+        if key_items.get("squirt_bottle") is True:
+            route35_action = GOLD_GOLDENROD_ROUTE35_ACTIONS.get(position)
+            if route35_action is not None:
+                return route35_action
+    if (
+        current_map == (0x03, 0x2E)
+        and key_items.get("basement_key") is True
+        and key_items.get("card_key") is not True
+        and story_events.get("used_basement_key") is not True
+    ):
+        north_entry_action = GOLD_UNDERGROUND_NORTH_ENTRY_ACTIONS.get(
+            position
+        )
+        if north_entry_action is not None:
+            return north_entry_action
+    if (
+        current_map == (0x03, 0x2D)
+        and key_items.get("basement_key") is True
+        and key_items.get("card_key") is not True
+        and story_events.get("used_basement_key") is not True
+    ):
+        x, y = position
+        if x <= 7:
+            if y < 7:
+                if x < 3:
+                    return "right"
+                if x > 3:
+                    return "left"
+                return "down"
+            if y > 7:
+                return "up"
+            return "right"
+        if y < 7:
+            return "down"
+        if y > 7:
+            return "up"
+        if x < 18:
+            return "right"
+        if position == (18, 7):
+            return (
+                "a"
+                if game_state.get("facing_direction") == 4
+                else "up"
+            )
+    if (
+        current_map == (0x03, 0x2D)
+        and story_events.get("used_basement_key") is True
+        and key_items.get("card_key") is not True
+        and position[0] == 22
+        and 28 <= position[1] <= 31
+    ):
+        return "up"
+    if (
+        current_map == (0x03, 0x2E)
+        and story_events.get("used_basement_key") is True
+        and story_events.get("beat_rival_underground") is not True
+        and key_items.get("card_key") is not True
+    ):
+        rival_entry_action = GOLD_UNDERGROUND_RIVAL_ENTRY_ACTIONS.get(
+            position
+        )
+        if rival_entry_action is not None:
+            return rival_entry_action
+    if (
+        current_map == (0x03, 0x11)
+        and story_events.get("cleared_radio_tower") is not True
+        and key_items.get("basement_key") is not True
+    ):
+        tower_action = GOLD_RADIO_TOWER_1F_ACTIONS.get(position)
+        if tower_action is not None:
+            return tower_action
+    if (
+        current_map == (0x03, 0x12)
+        and story_events.get("cleared_radio_tower") is not True
+        and key_items.get("basement_key") is not True
+    ):
+        tower_2f_action = GOLD_RADIO_TOWER_2F_ACTIONS.get(position)
+        if tower_2f_action is not None:
+            return tower_2f_action
+    if (
+        current_map == (0x03, 0x13)
+        and story_events.get("cleared_radio_tower") is not True
+        and key_items.get("basement_key") is not True
+    ):
+        tower_3f_action = GOLD_RADIO_TOWER_3F_ACTIONS.get(position)
+        if tower_3f_action is not None:
+            return tower_3f_action
+    if (
+        current_map == (0x03, 0x14)
+        and story_events.get("cleared_radio_tower") is not True
+        and key_items.get("basement_key") is not True
+    ):
+        tower_4f_action = GOLD_RADIO_TOWER_4F_ACTIONS.get(position)
+        if tower_4f_action is not None:
+            return tower_4f_action
+    if (
+        current_map == (0x03, 0x15)
+        and key_items.get("basement_key") is True
+        and key_items.get("card_key") is not True
+    ):
+        tower_5f_exit_action = GOLD_RADIO_TOWER_5F_EXIT_ACTIONS.get(position)
+        if tower_5f_exit_action is not None:
+            return tower_5f_exit_action
+    if (
+        current_map == (0x03, 0x14)
+        and key_items.get("basement_key") is True
+        and key_items.get("card_key") is not True
+    ):
+        tower_4f_exit_action = GOLD_RADIO_TOWER_4F_EXIT_ACTIONS.get(position)
+        if tower_4f_exit_action is not None:
+            return tower_4f_exit_action
+    if (
+        current_map == (0x03, 0x13)
+        and key_items.get("basement_key") is True
+        and key_items.get("card_key") is not True
+    ):
+        tower_3f_exit_action = GOLD_RADIO_TOWER_3F_EXIT_ACTIONS.get(position)
+        if tower_3f_exit_action is not None:
+            return tower_3f_exit_action
+    if (
+        current_map == (0x03, 0x12)
+        and key_items.get("basement_key") is True
+        and key_items.get("card_key") is not True
+    ):
+        tower_2f_exit_action = GOLD_RADIO_TOWER_2F_EXIT_ACTIONS.get(position)
+        if tower_2f_exit_action is not None:
+            return tower_2f_exit_action
+    if (
+        current_map == (0x03, 0x11)
+        and key_items.get("basement_key") is True
+        and key_items.get("card_key") is not True
+    ):
+        tower_1f_exit_action = GOLD_RADIO_TOWER_1F_EXIT_ACTIONS.get(position)
+        if tower_1f_exit_action is not None:
+            return tower_1f_exit_action
+    if (
+        current_map == (0x03, 0x2E)
+        and key_items.get("basement_key") is True
+        and key_items.get("card_key") is not True
+    ):
+        lower_exit_action = GOLD_UNDERGROUND_LOWER_EXIT_ACTIONS.get(position)
+        if lower_exit_action is not None:
+            return lower_exit_action
+    if current_map == (0x0A, 0x0E):
+        gate_action = GOLD_ROUTE35_GATE_ACTIONS.get(position)
+        if gate_action is not None:
+            return gate_action
+    if current_map == (0x0A, 0x02):
+        route35_action = GOLD_ROUTE35_NATIONAL_PARK_ACTIONS.get(position)
+        if route35_action is not None:
+            return route35_action
+    if current_map == (0x03, 0x0F):
+        park_action = GOLD_NATIONAL_PARK_ROUTE36_ACTIONS.get(position)
+        if park_action is not None:
+            return park_action
+    if (
+        current_map == (0x0A, 0x03)
+        and story_events.get("fought_sudowoodo") is not True
+    ):
+        sudowoodo_action = GOLD_ROUTE36_SUDOWOODO_ACTIONS.get(position)
+        if sudowoodo_action is not None:
+            return sudowoodo_action
+    if (
+        current_map == (0x0A, 0x03)
+        and story_events.get("fought_sudowoodo") is True
+        and story_events.get("got_tm_rock_smash") is not True
+    ):
+        rock_smash_action = GOLD_ROUTE36_ROCK_SMASH_ACTIONS.get(position)
+        if rock_smash_action is not None:
+            return rock_smash_action
+    if current_map == (0x04, 0x05):
+        kimono_routes = (
+            ("beat_kimono_miki", GOLD_KIMONO_MIKI_ACTIONS),
+            ("beat_kimono_kuni", GOLD_KIMONO_KUNI_ACTIONS),
+            ("beat_kimono_zuki", GOLD_KIMONO_ZUKI_ACTIONS),
+            ("beat_kimono_sayo", GOLD_KIMONO_SAYO_ACTIONS),
+            ("beat_kimono_naoko", GOLD_KIMONO_NAOKO_ACTIONS),
+        )
+        for event, route in kimono_routes:
+            if story_events.get(event) is not True:
+                kimono_action = route.get(position)
+                if kimono_action is not None:
+                    return kimono_action
+                break
+        else:
+            if story_events.get("got_hm_surf") is not True:
+                surf_action = GOLD_DANCE_THEATER_SURF_ACTIONS.get(position)
+                if surf_action is not None:
+                    return surf_action
+            else:
+                exit_action = GOLD_DANCE_THEATER_EXIT_ACTIONS.get(position)
+                if exit_action is not None:
+                    return exit_action
+    if current_map == (0x04, 0x09) and lead_needs_center:
+        heal_action = GOLD_ECRUTEAK_HEAL_ACTIONS.get(position)
+        if heal_action is not None:
+            return heal_action
+    if (
+        current_map == (0x03, 0x0D)
+        and "Fog" not in (game_state.get("badges") or [])
+    ):
+        if position in {(9, 15), (10, 15)}:
+            return "down"
+    if (
+        current_map in {(0x03, 0x0D), (0x03, 0x0E)}
+        and "Fog" not in (game_state.get("badges") or [])
+    ):
+        tower_exit_action = GOLD_BURNED_TOWER_EXIT_ACTIONS.get(
+            (current_map[0], current_map[1], position[0], position[1])
+        )
+        if tower_exit_action is not None:
+            return tower_exit_action
+    if (
+        current_map == (0x04, 0x07)
+        and "Fog" not in (game_state.get("badges") or [])
+    ):
+        gym_action = GOLD_ECRUTEAK_GYM_ACTIONS.get(position)
+        if gym_action is not None:
+            return gym_action
+    if needs_lighthouse_visit and current_map == (0x03, 0x22):
+        lighthouse_action = GOLD_LIGHTHOUSE_1F_ACTIONS.get(position)
+        if lighthouse_action is not None:
+            return lighthouse_action
+    if needs_lighthouse_visit and current_map == (0x03, 0x23):
+        lighthouse_action = GOLD_LIGHTHOUSE_2F_ACTIONS.get(position)
+        if lighthouse_action is not None:
+            return lighthouse_action
+    if needs_lighthouse_visit and current_map == (0x03, 0x24):
+        lighthouse_action = GOLD_LIGHTHOUSE_3F_ACTIONS.get(position)
+        if lighthouse_action is not None:
+            return lighthouse_action
+    if needs_lighthouse_visit and current_map == (0x03, 0x25):
+        lighthouse_action = GOLD_LIGHTHOUSE_4F_ACTIONS.get(position)
+        if lighthouse_action is not None:
+            return lighthouse_action
+    if needs_lighthouse_visit and current_map == (0x03, 0x26):
+        lighthouse_action = GOLD_LIGHTHOUSE_5F_ACTIONS.get(position)
+        if lighthouse_action is not None:
+            return lighthouse_action
+    if needs_lighthouse_visit and current_map == (0x03, 0x27):
+        lighthouse_action = GOLD_LIGHTHOUSE_6F_ACTIONS.get(position)
+        if lighthouse_action is not None:
+            return lighthouse_action
+    if current_map == (0x0B, 0x0A):
+        pp_exit_action = GOLD_GOLDENROD_PP_EXIT_ACTIONS.get(position)
+        if pp_exit_action is not None:
+            return pp_exit_action
+    if current_map == (0x0B, 0x08):
+        key_items = game_state.get("key_items")
+        key_items = key_items if isinstance(key_items, dict) else {}
+        flower_actions = (
+            GOLD_GOLDENROD_FLOWER_EXIT_ACTIONS
+            if key_items.get("squirt_bottle") is True
+            else GOLD_GOLDENROD_FLOWER_ACTIONS
+        )
+        flower_action = flower_actions.get(position)
+        if flower_action is not None:
+            return flower_action
     if lead_needs_center:
         heal_action = GOLD_SPROUT_HEAL_EXIT_ACTIONS.get(
             (current_map[0], current_map[1], position[0], position[1])
@@ -14301,6 +17975,48 @@ def trusted_gold_route_action(game_state: dict[str, Any]) -> Optional[str]:
         larry_action = GOLD_UNION_CAVE_LARRY_ACTIONS.get(position)
         if larry_action is not None:
             return larry_action
+    if (
+        current_map == (0x03, 0x1D)
+        and story_events.get("beat_pokemaniac_larry") is True
+        and story_events.get("beat_firebreather_ray") is not True
+    ):
+        ray_action = GOLD_UNION_CAVE_RAY_ACTIONS.get(position)
+        if ray_action is not None:
+            return ray_action
+    if (
+        current_map == (0x03, 0x1D)
+        and story_events.get("beat_firebreather_ray") is True
+    ):
+        exit_action = GOLD_UNION_CAVE_RAY_ACTIONS.get(position)
+        if exit_action is not None:
+            return exit_action
+    if (
+        current_map == (0x08, 0x07)
+        and story_events.get("cleared_slowpoke_well") is not True
+        and story_events.get("kurt_left_for_well") is not True
+    ):
+        kurt_action = GOLD_AZALEA_KURT_ACTIONS.get(position)
+        if kurt_action is not None:
+            return kurt_action
+    if (
+        current_map == (0x03, 0x20)
+        and story_events.get("cleared_slowpoke_well") is not True
+    ):
+        well_action = GOLD_SLOWPOKE_WELL_WEST_ACTIONS.get(position)
+        if well_action is not None:
+            return well_action
+    if (
+        current_map == (0x08, 0x05)
+        and "Hive" not in (game_state.get("badges") or [])
+    ):
+        if story_events.get("beat_bug_catcher_benny") is not True:
+            benny_action = GOLD_AZALEA_GYM_BENNY_ACTIONS.get(position)
+            if benny_action is not None:
+                return benny_action
+        else:
+            bugsy_action = GOLD_AZALEA_GYM_BUGSY_ACTIONS.get(position)
+            if bugsy_action is not None:
+                return bugsy_action
     if current_map == (0x0A, 0x07):
         if story_events.get("beat_bird_keeper_rod") is not True:
             if position in {(4, 8), (5, 8), (6, 8), (7, 8)}:
@@ -14495,6 +18211,631 @@ def trusted_cerulean_cave_flee_buttons(
         return ["right", "a"]
     if cursor == 3:
         return ["a"]
+    return None
+
+
+def trusted_gold_bugsy_battle_buttons(
+    game_state: dict[str, Any],
+) -> Optional[list[str]]:
+    """Keep the Bugsy rematch on an attack-only path."""
+    if (
+        game_state.get("game_id") != "gold"
+        or (game_state.get("map_group"), game_state.get("map_number"))
+        != (0x08, 0x05)
+        or game_state.get("in_battle") is not True
+        or "Hive" in (game_state.get("badges") or [])
+    ):
+        return None
+    screen_text = str(game_state.get("screen_text") or "")
+    if "FIGHT" in screen_text and "PACK" in screen_text and "RUN" in screen_text:
+        return ["up", "left", "a"]
+    if all(
+        move in screen_text
+        for move in ("SCRATCH", "LEER", "BITE", "WATER GUN")
+    ):
+        cursor = game_state.get("menu_cursor_y")
+        if not isinstance(cursor, int):
+            return None
+        if cursor < 4:
+            return ["down"]
+        if cursor > 4:
+            return ["up"]
+        return ["a"]
+    return ["a"]
+
+
+def trusted_gold_ilex_buttons(
+    game_state: dict[str, Any],
+) -> Optional[list[str]]:
+    """Interact at emulator-verified Farfetch'd and HM01 approach tiles."""
+    if (
+        game_state.get("game_id") != "gold"
+        or (game_state.get("map_group"), game_state.get("map_number"))
+        != (0x03, 0x2C)
+        or game_state.get("in_battle") is not False
+    ):
+        return None
+    coordinates = game_state.get("coordinates")
+    story_events = game_state.get("story_events")
+    if not isinstance(coordinates, dict) or not isinstance(story_events, dict):
+        return None
+    if story_events.get("got_hm_cut") is True:
+        if (coordinates.get("x"), coordinates.get("y")) != (8, 26):
+            return None
+        if game_state.get("screen_text"):
+            return ["a"]
+        return ["up", "a"]
+    farfetchd_position = story_events.get("farfetchd_position")
+    if story_events.get("herded_farfetchd") is True:
+        farfetchd_position = 10
+    if not isinstance(farfetchd_position, int):
+        return None
+    interaction = GOLD_ILEX_FARFETCHD_INTERACTIONS.get(farfetchd_position)
+    if interaction is None:
+        return None
+    approach, facing = interaction
+    if game_state.get("screen_text"):
+        return ["a"]
+    if (coordinates.get("x"), coordinates.get("y")) == approach:
+        return [facing, "a"]
+    return None
+
+
+def _trusted_gold_water_gun_buttons(
+    game_state: dict[str, Any],
+    preferred_move_id: int = 44,
+) -> Optional[list[str]]:
+    screen_text = str(game_state.get("screen_text") or "")
+    if "FIGHT" in screen_text and "PACK" in screen_text and "RUN" in screen_text:
+        return ["up", "left", "a"]
+    if all(
+        move in screen_text
+        for move in ("CUT", "LEER", "BITE", "WATER GUN")
+    ):
+        cursor = game_state.get("menu_cursor_y")
+        if not isinstance(cursor, int):
+            return None
+        if preferred_move_id not in {44, 55}:
+            return None
+        target_move_id = preferred_move_id
+        if game_state.get("disabled_move_id") == target_move_id:
+            target_move_id = 55 if target_move_id == 44 else 44
+        target = 3 if target_move_id == 44 else 4
+        if cursor < target:
+            return ["down"]
+        if cursor > target:
+            return ["up"]
+        return ["a"]
+    return ["a"]
+
+
+def trusted_gold_goldenrod_buttons(
+    game_state: dict[str, Any],
+) -> Optional[list[str]]:
+    """Handle verified Goldenrod trainer, Whitney, and badge interactions."""
+    if (
+        game_state.get("game_id") != "gold"
+        or (game_state.get("map_group"), game_state.get("map_number"))
+        != (0x0B, 0x03)
+    ):
+        return None
+    story_events = game_state.get("story_events")
+    coordinates = game_state.get("coordinates")
+    if not isinstance(story_events, dict) or not isinstance(coordinates, dict):
+        return None
+    if game_state.get("in_battle") is True:
+        if "Plain" in (game_state.get("badges") or []):
+            return None
+        return _trusted_gold_water_gun_buttons(game_state)
+    if game_state.get("in_battle") is not False:
+        return None
+    position = (coordinates.get("x"), coordinates.get("y"))
+    screen_text = game_state.get("screen_text")
+    if story_events.get("beat_lass_carrie") is not True:
+        if position == (13, 13) and screen_text:
+            return ["a"]
+        return None
+    if story_events.get("beat_lass_bridget") is not True:
+        if position == (10, 6):
+            return ["a"] if screen_text else ["left", "a"]
+        return None
+    if story_events.get("beat_whitney") is not True:
+        if position == (8, 4):
+            return ["a"] if screen_text else ["up", "a"]
+        return None
+    if story_events.get("made_whitney_cry") is True:
+        if position in {(8, 4), (8, 5)} and screen_text:
+            return ["a"]
+        return None
+    if "Plain" not in (game_state.get("badges") or []):
+        if position == (8, 4):
+            return ["a"] if screen_text else ["up", "a"]
+    return None
+
+
+def trusted_gold_squirtbottle_buttons(
+    game_state: dict[str, Any],
+) -> Optional[list[str]]:
+    """Receive the SquirtBottle from the verified Flower Shop teacher."""
+    if (
+        game_state.get("game_id") != "gold"
+        or (game_state.get("map_group"), game_state.get("map_number"))
+        != (0x0B, 0x08)
+        or game_state.get("in_battle") is not False
+    ):
+        return None
+    key_items = game_state.get("key_items")
+    coordinates = game_state.get("coordinates")
+    if (
+        not isinstance(key_items, dict)
+        or key_items.get("squirt_bottle") is True
+        or not isinstance(coordinates, dict)
+    ):
+        return None
+    if game_state.get("screen_text"):
+        return ["a"]
+    if (coordinates.get("x"), coordinates.get("y")) == (2, 5):
+        return ["up", "a"]
+    return None
+
+
+def trusted_gold_route35_recovery_buttons(
+    game_state: dict[str, Any],
+) -> Optional[list[str]]:
+    """Legitimately reload Route 35 when Ivan seals its one-way corridor."""
+    if (
+        game_state.get("game_id") != "gold"
+        or (game_state.get("map_group"), game_state.get("map_number"))
+        != (0x0A, 0x02)
+        or game_state.get("route35_ivan_blocking") is not True
+    ):
+        return None
+    screen_text = str(game_state.get("screen_text") or "")
+    if game_state.get("in_battle") is True:
+        if "FIGHT" in screen_text and "PACK" in screen_text and "RUN" in screen_text:
+            return ["up", "left", "a"]
+        if all(
+            move in screen_text
+            for move in ("CUT", "LEER", "BITE", "WATER GUN")
+        ):
+            cursor = game_state.get("menu_cursor_y")
+            if not isinstance(cursor, int):
+                return None
+            if cursor < 2:
+                return ["down"]
+            if cursor > 2:
+                return ["up"]
+            return ["a"]
+        return ["a"]
+    coordinates = game_state.get("coordinates")
+    if (
+        game_state.get("in_battle") is False
+        and isinstance(coordinates, dict)
+        and (coordinates.get("x"), coordinates.get("y")) == (7, 19)
+    ):
+        return ["a"] if screen_text else ["down", "a"]
+    return None
+
+
+def trusted_gold_sudowoodo_buttons(
+    game_state: dict[str, Any],
+) -> Optional[list[str]]:
+    """Start and finish the verified SquirtBottle encounter."""
+    if (
+        game_state.get("game_id") != "gold"
+        or (game_state.get("map_group"), game_state.get("map_number"))
+        != (0x0A, 0x03)
+    ):
+        return None
+    story_events = game_state.get("story_events")
+    coordinates = game_state.get("coordinates")
+    if (
+        not isinstance(story_events, dict)
+        or story_events.get("fought_sudowoodo") is True
+        or not isinstance(coordinates, dict)
+    ):
+        return None
+    if game_state.get("in_battle") is True:
+        if game_state.get("enemy_species_id") != 185:
+            return None
+        return _trusted_gold_water_gun_buttons(game_state, 55)
+    if game_state.get("in_battle") is not False:
+        return None
+    if (coordinates.get("x"), coordinates.get("y")) != (35, 10):
+        return None
+    if game_state.get("screen_text"):
+        return ["a"]
+    return ["up", "a"]
+
+
+def trusted_gold_dance_theater_buttons(
+    game_state: dict[str, Any],
+) -> Optional[list[str]]:
+    """Clear the five Kimono Girls and receive HM03 Surf."""
+    if (
+        game_state.get("game_id") != "gold"
+        or (game_state.get("map_group"), game_state.get("map_number"))
+        != (0x04, 0x05)
+    ):
+        return None
+    story_events = game_state.get("story_events")
+    coordinates = game_state.get("coordinates")
+    if not isinstance(story_events, dict) or not isinstance(coordinates, dict):
+        return None
+    if game_state.get("in_battle") is True:
+        preferred_move_id = (
+            55
+            if game_state.get("enemy_species_id") in {136, 197}
+            else 44
+        )
+        return _trusted_gold_water_gun_buttons(
+            game_state,
+            preferred_move_id,
+        )
+    if game_state.get("in_battle") is not False:
+        return None
+    position = (coordinates.get("x"), coordinates.get("y"))
+    interactions = (
+        ("beat_kimono_miki", (10, 2), "right"),
+        ("beat_kimono_kuni", (10, 1), "left"),
+        ("beat_kimono_zuki", (7, 2), "left"),
+        ("beat_kimono_sayo", (3, 1), "left"),
+        ("beat_kimono_naoko", (1, 2), "left"),
+    )
+    for event, approach, facing in interactions:
+        if story_events.get(event) is not True:
+            if position == approach:
+                return (
+                    ["a"]
+                    if game_state.get("screen_text")
+                    else [facing, "a"]
+                )
+            return None
+    if story_events.get("got_hm_surf") is True:
+        return None
+    if position == (6, 10):
+        return (
+            ["a"]
+            if game_state.get("screen_text")
+            else ["right", "a"]
+        )
+    return None
+
+
+def trusted_gold_poison_recovery_buttons(
+    game_state: dict[str, Any],
+) -> Optional[list[str]]:
+    """Dismiss hidden phone text before the poison-safe Center route."""
+    if (
+        game_state.get("game_id") != "gold"
+        or game_state.get("lead_status") != 8
+        or (game_state.get("map_group"), game_state.get("map_number"))
+        not in {(0x03, 0x0D), (0x04, 0x09)}
+    ):
+        return None
+    if game_state.get("in_battle") is not False:
+        return None
+    if game_state.get("script_mode") or game_state.get("script_running"):
+        return ["a"]
+    return None
+
+
+def trusted_gold_rock_smash_gift_buttons(
+    game_state: dict[str, Any],
+) -> Optional[list[str]]:
+    """Receive the required Rock Smash TM from Route 36."""
+    if (
+        game_state.get("game_id") != "gold"
+        or (game_state.get("map_group"), game_state.get("map_number"))
+        != (0x0A, 0x03)
+        or game_state.get("in_battle") is not False
+    ):
+        return None
+    story_events = game_state.get("story_events")
+    coordinates = game_state.get("coordinates")
+    if (
+        not isinstance(story_events, dict)
+        or story_events.get("fought_sudowoodo") is not True
+        or story_events.get("got_tm_rock_smash") is True
+        or not isinstance(coordinates, dict)
+    ):
+        return None
+    if game_state.get("script_mode") or game_state.get("script_running"):
+        return ["a"]
+    if (coordinates.get("x"), coordinates.get("y")) == (43, 9):
+        return ["a"] if game_state.get("screen_text") else ["right", "a"]
+    return None
+
+
+def trusted_gold_morty_buttons(
+    game_state: dict[str, Any],
+) -> Optional[list[str]]:
+    """Start Morty's battle from the verified invisible-floor endpoint."""
+    if (
+        game_state.get("game_id") != "gold"
+        or (game_state.get("map_group"), game_state.get("map_number"))
+        != (0x04, 0x07)
+        or "Fog" in (game_state.get("badges") or [])
+        or game_state.get("in_battle") is not False
+    ):
+        return None
+    coordinates = game_state.get("coordinates")
+    if not isinstance(coordinates, dict):
+        return None
+    if (coordinates.get("x"), coordinates.get("y")) != (5, 2):
+        return None
+    return ["a"] if game_state.get("screen_text") else ["up", "a"]
+
+
+def trusted_gold_hidden_phone_buttons(
+    game_state: dict[str, Any],
+) -> Optional[list[str]]:
+    """Dismiss incoming calls that Gold's legacy text scraper cannot read."""
+    if (
+        game_state.get("game_id") == "gold"
+        and game_state.get("in_battle") is False
+        and not game_state.get("screen_text")
+        and game_state.get("script_mode") == 1
+        and game_state.get("script_running") == 0
+    ):
+        return ["a"]
+    return None
+
+
+def trusted_gold_lighthouse_buttons(
+    game_state: dict[str, Any],
+) -> Optional[list[str]]:
+    """Cross Lighthouse stairs and ledges that miss isolated short taps."""
+    coordinates = game_state.get("coordinates")
+    story_events = game_state.get("story_events")
+    key_items = game_state.get("key_items")
+    if (
+        game_state.get("game_id") != "gold"
+        or game_state.get("map_group") != 0x03
+        or game_state.get("in_battle") is not False
+        or game_state.get("screen_text")
+        or not isinstance(coordinates, dict)
+        or not isinstance(story_events, dict)
+    ):
+        return None
+    key_items = key_items if isinstance(key_items, dict) else {}
+    needs_lighthouse_visit = (
+        story_events.get("jasmine_explained_sickness") is not True
+        or (
+            key_items.get("secret_potion") is True
+            and story_events.get("jasmine_returned_to_gym") is not True
+        )
+    )
+    position = (coordinates.get("x"), coordinates.get("y"))
+    if not needs_lighthouse_visit:
+        exit_macros = {
+            (0x22, 11, 15): ["down"] * 6,
+            (0x23, 17, 9): ["down"] * 6,
+            (0x24, 5, 5): ["up"] * 6,
+            (0x25, 17, 7): ["down"] * 6,
+            (0x26, 17, 4): ["down"] * 6,
+            (0x27, 8, 9): ["right"] * 6,
+            (0x27, 17, 9): ["up"] * 6,
+        }
+        return exit_macros.get(
+            (game_state.get("map_number"), position[0], position[1])
+        )
+    macros = {
+        (0x23, 10, 3): ["up"] * 3,
+        (0x24, 12, 3): ["right"] * 3,
+        (0x24, 9, 4): ["down"] * 3,
+        (0x25, 15, 3): ["left"] * 6,
+        (0x25, 13, 3): ["left"] * 6,
+        (0x25, 9, 5): ["down"] * 6,
+        (0x26, 3, 4): ["down"] * 6,
+        (0x26, 9, 14): ["down"] * 6,
+    }
+    buttons = macros.get(
+        (game_state.get("map_number"), position[0], position[1])
+    )
+    if buttons is not None:
+        return buttons
+    if (
+        game_state.get("map_number") == 0x27
+        and position == (8, 9)
+    ):
+        return ["up", "a"]
+    return None
+
+
+def trusted_gold_cianwood_buttons(
+    game_state: dict[str, Any],
+) -> Optional[list[str]]:
+    """Receive the required medicine once the pharmacist is in front."""
+    coordinates = game_state.get("coordinates")
+    story_events = game_state.get("story_events")
+    if (
+        game_state.get("game_id") == "gold"
+        and (game_state.get("map_group"), game_state.get("map_number"))
+        == (0x16, 0x07)
+        and game_state.get("in_battle") is False
+        and not game_state.get("screen_text")
+        and isinstance(coordinates, dict)
+        and isinstance(story_events, dict)
+        and story_events.get("got_secret_potion") is not True
+        and (coordinates.get("x"), coordinates.get("y")) == (2, 4)
+    ):
+        return ["up", "a"]
+    party = game_state.get("party")
+    lead_needs_heal = bool(
+        isinstance(party, list)
+        and party
+        and isinstance(party[0], dict)
+        and isinstance(party[0].get("hp"), int)
+        and isinstance(party[0].get("max_hp"), int)
+        and party[0]["max_hp"] > 0
+        and party[0]["hp"] < party[0]["max_hp"]
+    )
+    if (
+        game_state.get("game_id") == "gold"
+        and (game_state.get("map_group"), game_state.get("map_number"))
+        == (0x16, 0x06)
+        and game_state.get("in_battle") is False
+        and not game_state.get("screen_text")
+        and isinstance(coordinates, dict)
+        and lead_needs_heal
+        and (coordinates.get("x"), coordinates.get("y")) == (3, 3)
+    ):
+        return ["up", "a"]
+    if (
+        game_state.get("game_id") == "gold"
+        and (game_state.get("map_group"), game_state.get("map_number"))
+        == (0x16, 0x05)
+        and game_state.get("in_battle") is False
+        and not game_state.get("screen_text")
+        and isinstance(coordinates, dict)
+        and isinstance(story_events, dict)
+        and story_events.get("beat_chuck") is not True
+        and (coordinates.get("x"), coordinates.get("y")) == (4, 2)
+    ):
+        return ["up", "a"]
+    if (
+        game_state.get("game_id") == "gold"
+        and (game_state.get("map_group"), game_state.get("map_number"))
+        == (0x16, 0x03)
+        and game_state.get("in_battle") is False
+        and not game_state.get("screen_text")
+        and isinstance(coordinates, dict)
+        and isinstance(story_events, dict)
+        and story_events.get("beat_chuck") is True
+        and story_events.get("got_hm_fly") is not True
+        and (coordinates.get("x"), coordinates.get("y")) == (9, 46)
+    ):
+        return ["right", "a"]
+    return None
+
+
+def trusted_gold_lake_buttons(
+    game_state: dict[str, Any],
+) -> Optional[list[str]]:
+    """Cross the last shoreline tile and speak with Lance."""
+    coordinates = game_state.get("coordinates")
+    story_events = game_state.get("story_events")
+    key_items = game_state.get("key_items")
+    if (
+        game_state.get("game_id") != "gold"
+        or (game_state.get("map_group"), game_state.get("map_number"))
+        != (0x09, 0x06)
+        or game_state.get("in_battle") is not False
+        or not isinstance(coordinates, dict)
+        or not isinstance(story_events, dict)
+        or not isinstance(key_items, dict)
+        or key_items.get("red_scale") is not True
+        or story_events.get("cleared_rocket_hideout") is True
+        or story_events.get("decided_to_help_lance") is True
+    ):
+        return None
+    if game_state.get("screen_text"):
+        screen_text = str(game_state["screen_text"]).upper()
+        if "YES" in screen_text and "NO" in screen_text:
+            return ["up", "a"]
+        return ["a"]
+    position = (coordinates.get("x"), coordinates.get("y"))
+    if position == (22, 28):
+        return ["left", "a"]
+    return None
+
+
+def trusted_gold_rocket_buttons(
+    game_state: dict[str, Any],
+) -> Optional[list[str]]:
+    """Open the Rocket commander's door from its interaction tile."""
+    coordinates = game_state.get("coordinates")
+    story_events = game_state.get("story_events")
+    if (
+        game_state.get("game_id") == "gold"
+        and (game_state.get("map_group"), game_state.get("map_number"))
+        == (0x03, 0x2B)
+        and game_state.get("in_battle") is False
+        and not game_state.get("screen_text")
+        and isinstance(coordinates, dict)
+        and isinstance(story_events, dict)
+        and story_events.get("met_rival_rocket_base") is True
+        and story_events.get("opened_giovanni_office") is not True
+        and (coordinates.get("x"), coordinates.get("y"))
+        in {(10, 10), (11, 10)}
+    ):
+        return ["up", "a"]
+    if (
+        game_state.get("game_id") == "gold"
+        and (game_state.get("map_group"), game_state.get("map_number"))
+        == (0x03, 0x2B)
+        and game_state.get("in_battle") is False
+        and not game_state.get("screen_text")
+        and isinstance(coordinates, dict)
+        and isinstance(story_events, dict)
+        and story_events.get("beat_rocket_commander") is True
+        and story_events.get("learned_hail_giovanni") is not True
+        and (coordinates.get("x"), coordinates.get("y")) == (7, 3)
+    ):
+        return ["up", "a"]
+    if (
+        game_state.get("game_id") == "gold"
+        and (game_state.get("map_group"), game_state.get("map_number"))
+        == (0x03, 0x2B)
+        and game_state.get("in_battle") is False
+        and not game_state.get("screen_text")
+        and isinstance(coordinates, dict)
+        and isinstance(story_events, dict)
+        and story_events.get("learned_hail_giovanni") is True
+        and story_events.get("opened_rocket_transmitter_door") is not True
+        and (coordinates.get("x"), coordinates.get("y")) == (3, 3)
+    ):
+        return ["up"] * 6
+    if (
+        game_state.get("game_id") == "gold"
+        and (game_state.get("map_group"), game_state.get("map_number"))
+        == (0x03, 0x2A)
+        and game_state.get("in_battle") is False
+        and not game_state.get("screen_text")
+        and isinstance(coordinates, dict)
+        and isinstance(story_events, dict)
+        and story_events.get("learned_hail_giovanni") is True
+        and story_events.get("opened_rocket_transmitter_door") is not True
+        and (coordinates.get("x"), coordinates.get("y"))
+        in {(14, 13), (15, 13)}
+    ):
+        return ["up", "a"]
+    if (
+        game_state.get("game_id") == "gold"
+        and (game_state.get("map_group"), game_state.get("map_number"))
+        == (0x03, 0x2A)
+        and game_state.get("in_battle") is False
+        and not game_state.get("screen_text")
+        and isinstance(coordinates, dict)
+        and isinstance(story_events, dict)
+        and story_events.get("opened_rocket_transmitter_door") is True
+        and story_events.get("cleared_rocket_hideout") is not True
+    ):
+        position = (coordinates.get("x"), coordinates.get("y"))
+        target_y = (
+            9
+            if story_events.get("rocket_electrode_3") is not True
+            else (
+                7
+                if story_events.get("rocket_electrode_2") is not True
+                else 5
+            )
+        )
+        if position == (8, target_y):
+            return ["left", "a"]
+    if (
+        game_state.get("game_id") == "gold"
+        and (game_state.get("map_group"), game_state.get("map_number"))
+        == (0x03, 0x28)
+        and game_state.get("in_battle") is False
+        and not game_state.get("screen_text")
+        and isinstance(coordinates, dict)
+        and isinstance(story_events, dict)
+        and story_events.get("cleared_rocket_hideout") is True
+        and (coordinates.get("x"), coordinates.get("y")) == (7, 3)
+    ):
+        return ["left"] * 3
     return None
 
 
@@ -14906,7 +19247,7 @@ class CopilotBrain:
             mode="empty",
             base_directory=str(copilot_home),
             working_directory=str(self.runtime_dir),
-            log_level="error",
+            log_level="none",
             session_idle_timeout_seconds=0,
         )
         await self.client.start()
@@ -15552,12 +19893,14 @@ class ViewerServer:
         controls: "queue.Queue[dict[str, Any]]",
         livestream: Optional[dict[str, Any]] = None,
         manual_return: Optional[dict[str, str]] = None,
+        allow_port_fallback: bool = False,
     ):
         self.runtime_dir = runtime_dir
         self.port = port
         self.controls = controls
         self.livestream = livestream or {"enabled": False}
         self.manual_return = dict(manual_return or {})
+        self.allow_port_fallback = allow_port_fallback
         try:
             manual_return_valid = not self.manual_return or (
                 set(self.manual_return) == {"generation", "token"}
@@ -16317,6 +20660,7 @@ class ViewerServer:
                     "pause",
                     "resume",
                     "checkpoint",
+                    "rewind",
                     "stop",
                     "press",
                 }:
@@ -16325,9 +20669,23 @@ class ViewerServer:
                 if action == "press" and button not in VALID_BUTTONS:
                     self._json(400, {"status": "error", "message": "Invalid button"})
                     return
+                commit = str(value.get("commit") or "").lower()
+                if action == "rewind" and not re.fullmatch(
+                    r"[a-f0-9]{7,64}",
+                    commit,
+                ):
+                    self._json(
+                        400,
+                        {
+                            "status": "error",
+                            "message": "Invalid checkpoint commit",
+                        },
+                    )
+                    return
                 command: dict[str, Any] = {
                     "action": action,
                     "button": button or None,
+                    "commit": commit or None,
                 }
                 if action == "pause":
                     # The dashboard pause button is an explicit operator
@@ -16349,9 +20707,21 @@ class ViewerServer:
         try:
             self.server = LoopbackServer(("127.0.0.1", self.port), Handler)
         except OSError as error:
-            raise StartupConfigurationError(
-                f"Cannot bind authenticated viewer to 127.0.0.1:{self.port}: {error}"
-            ) from error
+            if (
+                error.errno == errno.EADDRINUSE
+                and self.allow_port_fallback
+                and self.port != 0
+            ):
+                LOGGER.warning(
+                    "Viewer port %s is busy; binding an available loopback port",
+                    self.port,
+                )
+                self.server = LoopbackServer(("127.0.0.1", 0), Handler)
+            else:
+                raise StartupConfigurationError(
+                    "Cannot bind authenticated viewer to "
+                    f"127.0.0.1:{self.port}: {error}"
+                ) from error
         try:
             self.port = int(self.server.server_address[1])
             atomic_write_json(
@@ -16624,6 +20994,32 @@ class PokemonRunner:
             "mewtwo_caught": False,
             "clips": [],
         }
+        self.git_checkpoint_archive: Optional[GitCheckpointArchive] = None
+        state_repo = getattr(args, "state_repo", None)
+        if state_repo:
+            try:
+                self.git_checkpoint_archive = GitCheckpointArchive(
+                    Path(state_repo),
+                    self.runtime_dir,
+                    game_id=self.game_id,
+                    rom_sha256=self.rom_sha256,
+                    agent_path=Path(__file__),
+                    run_id=self.run_id,
+                )
+            except (OSError, RuntimeError, ValueError) as error:
+                raise StartupConfigurationError(
+                    f"Git checkpoint archive is invalid: {error}"
+                ) from error
+            self.status.update(
+                {
+                    "git_checkpoint_enabled": True,
+                    "git_checkpoint_ref": self.git_checkpoint_archive.ref,
+                    "git_checkpoint_commit": None,
+                    "git_checkpoint_error": None,
+                }
+            )
+        else:
+            self.status["git_checkpoint_enabled"] = False
         self.livestream_enabled = bool(getattr(args, "livestream", False))
         self.livestream_host = str(
             getattr(args, "livestream_host", DEFAULT_LIVESTREAM_HOST)
@@ -16790,6 +21186,7 @@ class PokemonRunner:
                 )
                 else None
             ),
+            allow_port_fallback=bool(getattr(args, "supervised", False)),
         )
         self.last_badges = 0
         self.last_decision_requested = 0.0
@@ -17098,12 +21495,7 @@ class PokemonRunner:
             }
         )
         atomic_write_json(self.status_path, self.status)
-        if (
-            self.livestream_enabled
-            and self.livestream_host == "kite"
-            and self.stream_generation
-            and not self.stop_event.is_set()
-        ):
+        if not self.stop_event.is_set():
             try:
                 snapshot = project_dashboard_snapshot(self.status)
                 self.kite_telemetry_sequence += 1
@@ -17111,7 +21503,10 @@ class PokemonRunner:
                     self.runtime_dir / "kite-telemetry.json",
                     {
                         "schema_version": KITE_STRING_SCHEMA_VERSION,
-                        "generation": self.stream_generation,
+                        "generation": (
+                            self.stream_generation
+                            or f"local-{self.run_id}"
+                        ),
                         "sequence": self.kite_telemetry_sequence,
                         "snapshot": snapshot,
                         "updated_at": utc_now(),
@@ -17142,6 +21537,12 @@ class PokemonRunner:
 
     def _verified_generated_state(self, path: Path) -> bool:
         if not GENERATED_STATE_RE.fullmatch(path.name):
+            return False
+        try:
+            metadata = path.lstat()
+        except OSError:
+            return False
+        if path.is_symlink() or not stat.S_ISREG(metadata.st_mode):
             return False
         manifest = read_json(path.with_suffix(".json"))
         metadata_valid = bool(
@@ -17256,9 +21657,19 @@ class PokemonRunner:
         state.unlink(missing_ok=True)
         state.with_suffix(".json").unlink(missing_ok=True)
 
+    def _git_checkpoint_published(self, state: Path) -> bool:
+        archive = getattr(self, "git_checkpoint_archive", None)
+        if archive is None:
+            return True
+        manifest = read_json(state.with_suffix(".json"))
+        return bool(
+            manifest.get("git_ref") == archive.ref
+            and isinstance(manifest.get("git_commit"), str)
+        )
+
     def _generated_artifact_bytes(self) -> int:
         total = 0
-        generated_paths: list[Path] = []
+        generated_paths: list[Path] = [self.runtime_dir / "player.log"]
         for clip in self.recorder.clips_dir.glob("clip-*.mp4"):
             if self._verified_generated_clip(clip):
                 generated_paths.extend([clip, clip.with_suffix(".json")])
@@ -17294,6 +21705,16 @@ class PokemonRunner:
             (partial.parent / f".{log_name}.ffmpeg.log").unlink(missing_ok=True)
 
     def _enforce_retention(self) -> None:
+        try:
+            if truncate_regular_file_if_oversized(
+                self.runtime_dir / "player.log",
+                PLAYER_LOG_MAX_BYTES,
+            ):
+                self.status["player_log_truncated_at"] = utc_now()
+            self.status["player_log_error"] = None
+        except OSError as error:
+            self.status["player_log_error"] = str(error)
+            LOGGER.warning("Could not cap player.log: %s", error)
         self._prune_stale_partials()
         clips = sorted(
             (
@@ -17328,7 +21749,11 @@ class PokemonRunner:
                 (
                     state
                     for state in states
-                    if state != newest_state and not self._milestone_artifact(state)
+                    if (
+                        state != newest_state
+                        and not self._milestone_artifact(state)
+                        and self._git_checkpoint_published(state)
+                    )
                 ),
                 None,
             )
@@ -17345,7 +21770,14 @@ class PokemonRunner:
             candidates = [
                 path
                 for path in [*clips, *states]
-                if path != newest_state and not self._milestone_artifact(path)
+                if (
+                    path != newest_state
+                    and not self._milestone_artifact(path)
+                    and (
+                        path.suffix == ".mp4"
+                        or self._git_checkpoint_published(path)
+                    )
+                )
             ]
             if not candidates:
                 break
@@ -17583,10 +22015,86 @@ class PokemonRunner:
                 "timestamp": manifest.get("created_at"),
                 "sha256": manifest.get("sha256"),
                 "location": game_state.get("location"),
+                "git_commit": manifest.get("git_commit"),
             }
             self._restore_completed_state(game_state)
             return state_path
         return None
+
+    def _publish_checkpoint_to_git(
+        self,
+        state_path: Path,
+        manifest: dict[str, Any],
+    ) -> dict[str, Any]:
+        archive = getattr(self, "git_checkpoint_archive", None)
+        if archive is None:
+            return manifest
+        result = archive.publish(state_path, manifest)
+        updated = {
+            **manifest,
+            "git_commit": result["commit"],
+            "git_ref": result["ref"],
+            "git_state_blob": result["state_blob"],
+        }
+        atomic_write_json(state_path.with_suffix(".json"), updated)
+        self.status.update(
+            {
+                "git_checkpoint_commit": result["commit"],
+                "git_checkpoint_ref": result["ref"],
+                "git_checkpoint_error": None,
+            }
+        )
+        last_checkpoint = self.status.get("last_checkpoint")
+        if (
+            isinstance(last_checkpoint, dict)
+            and last_checkpoint.get("path") == str(state_path)
+        ):
+            last_checkpoint["git_commit"] = result["commit"]
+        return updated
+
+    def _publish_pending_git_checkpoints(self) -> None:
+        archive = getattr(self, "git_checkpoint_archive", None)
+        if archive is None:
+            return
+
+        def checkpoint_timestamp(path: Path) -> float:
+            created_at = read_json(path.with_suffix(".json")).get("created_at")
+            if isinstance(created_at, str):
+                try:
+                    parsed = datetime.fromisoformat(
+                        created_at.replace("Z", "+00:00")
+                    )
+                except ValueError:
+                    pass
+                else:
+                    if parsed.tzinfo is not None:
+                        return parsed.timestamp()
+            return path.stat().st_mtime
+
+        states = sorted(
+            self.states_dir.glob("state-*.state"),
+            key=checkpoint_timestamp,
+        )
+        for state_path in states:
+            if not self._verified_generated_state(state_path):
+                continue
+            manifest = read_json(state_path.with_suffix(".json"))
+            if (
+                manifest.get("git_ref") == archive.ref
+                and isinstance(manifest.get("git_commit"), str)
+            ):
+                self.status["git_checkpoint_commit"] = manifest["git_commit"]
+                continue
+            try:
+                self._publish_checkpoint_to_git(state_path, manifest)
+            except (OSError, RuntimeError, ValueError) as error:
+                self.status["git_checkpoint_error"] = str(error)[:500]
+                LOGGER.error(
+                    "Git checkpoint publication failed for %s: %s",
+                    state_path.name,
+                    error,
+                )
+                break
 
     def _save_checkpoint(self, reason: str, allow_stopped: bool = False) -> Path:
         self.player.release_and_flush(
@@ -17640,6 +22148,19 @@ class PokemonRunner:
         }
         atomic_write_json(state_path.with_suffix(".json"), manifest)
         pending_path.unlink(missing_ok=True)
+        if getattr(self, "git_checkpoint_archive", None) is not None:
+            try:
+                manifest = self._publish_checkpoint_to_git(
+                    state_path,
+                    manifest,
+                )
+            except (OSError, RuntimeError, ValueError) as error:
+                self.status["git_checkpoint_error"] = str(error)[:500]
+                LOGGER.error(
+                    "Git checkpoint publication failed for %s: %s",
+                    state_path.name,
+                    error,
+                )
         self.status["last_checkpoint"] = {
             "path": str(state_path),
             "reason": reason,
@@ -17647,6 +22168,7 @@ class PokemonRunner:
             "timestamp": manifest["created_at"],
             "sha256": manifest["sha256"],
             "location": game_state.get("location"),
+            "git_commit": manifest.get("git_commit"),
         }
         return state_path
 
@@ -18310,6 +22832,60 @@ class PokemonRunner:
         if self.control_mode == "paused":
             self._set_control_mode(self.resume_mode)
 
+    def _hotload_git_checkpoint(self, commitish: str) -> str:
+        archive = getattr(self, "git_checkpoint_archive", None)
+        if archive is None:
+            raise RuntimeError("Git checkpoint archiving is not enabled")
+        if file_sha256(self.rom) != self.rom_sha256:
+            raise RuntimeError("ROM changed since the Pokemon runtime started")
+        resolved, manifest, state_bytes = archive.load(commitish)
+        baseline = io.BytesIO()
+        self.pyboy.save_state(baseline)
+        baseline_bytes = baseline.getvalue()
+        try:
+            self.pyboy.load_state(io.BytesIO(state_bytes))
+            self.player.release_and_flush(self.pyboy)
+            game_state = self.memory_reader_class(self.pyboy.memory).snapshot()
+            if (
+                game_state.get("game_id") != self.game_id
+                or game_state.get("map_id") is None
+            ):
+                raise ValueError("Loaded Git checkpoint has invalid game state")
+        except (EOFError, OSError, RuntimeError, ValueError) as error:
+            self.pyboy.load_state(io.BytesIO(baseline_bytes))
+            self.player.release_and_flush(self.pyboy)
+            raise RuntimeError("PyBoy rejected the Git checkpoint") from error
+
+        self.emulator_pause_requested = self.control_mode != "paused"
+        self._set_control_mode(self.control_mode)
+        self.committed_route = None
+        self.status["committed_route"] = None
+        self.navigation_memory.cancel_pending()
+        self.last_progress_marker = None
+        self.last_badges = len(game_state.get("badges", []))
+        self.last_decision_finished = 0
+        self.settle_candidate = None
+        self.settle_samples = 0
+        self.position_settled = False
+        self.status.update(
+            {
+                "loaded_state": f"git:{resolved}",
+                "game_state": game_state,
+                "last_rewind": {
+                    "commit": resolved,
+                    "checkpoint_id": manifest.get("checkpoint_id"),
+                    "timestamp": utc_now(),
+                },
+                "last_error": None,
+            }
+        )
+        self._restore_completed_state(game_state)
+        if not self._save_latest_frame(self.pyboy.screen.image.copy()):
+            LOGGER.warning(
+                "Git checkpoint loaded without refreshing latest.png"
+            )
+        return resolved
+
     def _process_controls(self) -> None:
         while True:
             try:
@@ -18327,6 +22903,30 @@ class PokemonRunner:
                 self._set_control_mode("ai")
             elif action == "checkpoint":
                 self._rotate_clip("manual checkpoint")
+            elif action == "rewind":
+                commit = str(command.get("commit") or "").lower()
+                try:
+                    self._rotate_clip("Before Git checkpoint rewind")
+                    resolved = self._hotload_git_checkpoint(commit)
+                except (OSError, RuntimeError, ValueError) as error:
+                    self.status["last_error"] = f"Git rewind failed: {error}"
+                    self.status["last_rejected_control"] = {
+                        "action": "rewind",
+                        "reason": str(error)[:200],
+                        "timestamp": utc_now(),
+                    }
+                else:
+                    self.status["last_rejected_control"] = None
+                    try:
+                        self._save_checkpoint(
+                            f"Loaded Git checkpoint {resolved[:12]}"
+                        )
+                    except (OSError, RuntimeError, ValueError) as error:
+                        self.status["last_error"] = (
+                            "Git rewind loaded, but checkpoint persistence "
+                            f"failed: {error}"
+                        )
+                        LOGGER.error("%s", self.status["last_error"])
             elif action == "press":
                 button = str(command.get("button", "")).lower()
                 if button in VALID_BUTTONS:
@@ -18340,18 +22940,54 @@ class PokemonRunner:
             elif action == "stop":
                 self.stop_event.set()
 
-    def _save_latest_frame(self, image: Any) -> None:
-        temporary = self.runtime_dir / ".latest.png.tmp"
-        image.save(temporary, format="PNG")
+    def _save_png(self, image: Any, destination: Path) -> bool:
+        temporary = destination.with_name(f".{destination.name}.tmp")
+        status = getattr(self, "status", None)
+        for attempt in range(2):
+            try:
+                image.save(temporary, format="PNG")
+                os.replace(temporary, destination)
+            except OSError as error:
+                temporary.unlink(missing_ok=True)
+                if not storage_capacity_error(error):
+                    raise
+                if isinstance(status, dict):
+                    status["storage_write_error"] = str(error)
+                    status["recording_suspended"] = True
+                if attempt == 0:
+                    try:
+                        self._enforce_retention()
+                    except OSError as cleanup_error:
+                        LOGGER.error(
+                            "Storage cleanup failed after %s: %s",
+                            error,
+                            cleanup_error,
+                        )
+                    continue
+                LOGGER.error(
+                    "Storage remains exhausted; skipped %s",
+                    destination.name,
+                )
+                return False
+            else:
+                if isinstance(status, dict):
+                    if attempt:
+                        status["storage_recovered_at"] = utc_now()
+                    status["storage_write_error"] = None
+                return True
+        return False
+
+    def _save_latest_frame(self, image: Any) -> bool:
         latest = self.runtime_dir / "latest.png"
-        os.replace(temporary, latest)
+        if not self._save_png(image, latest):
+            return False
         os.chmod(latest, 0o600)
         if not (
-            self.livestream_enabled
-            and self.livestream_host == "kite"
-            and self.stream_generation
+            getattr(self, "livestream_enabled", False)
+            and getattr(self, "livestream_host", None) == "kite"
+            and getattr(self, "stream_generation", None)
         ):
-            return
+            return True
         payload = latest.read_bytes()
         valid_png = bool(
             33 <= len(payload) <= MAX_KITE_FRAME_BYTES
@@ -18362,7 +22998,7 @@ class PokemonRunner:
         )
         if not valid_png:
             LOGGER.warning("Latest frame did not meet the kite PNG contract")
-            return
+            return False
         self.kite_frame_sequence += 1
         atomic_write_json(
             self.runtime_dir / "kite-frame.json",
@@ -18375,6 +23011,7 @@ class PokemonRunner:
                 "updated_at": utc_now(),
             },
         )
+        return True
 
     def _fresh_web_research(
         self,
@@ -18632,7 +23269,9 @@ class PokemonRunner:
             self.screens_dir
             / f"decision-{self.run_id}-{self.decision_sequence + 1:08d}.png"
         )
-        image.save(screenshot, format="PNG")
+        if not self._save_png(image, screenshot):
+            self.status["brain_status"] = "storage-pressure"
+            return
         position = navigation_position(game_state)
         self.navigation_memory.observe_warps(
             game_state.get("map_id"), game_state.get("warps")
@@ -18920,6 +23559,34 @@ class PokemonRunner:
                 or trusted_mewtwo_surf_buttons(current_game_state) is not None
                 or trusted_mewtwo_capture_buttons(current_game_state) is not None
                 or trusted_mewtwo_finalize_buttons(current_game_state) is not None
+                or trusted_gold_ilex_buttons(current_game_state) is not None
+                or trusted_gold_goldenrod_buttons(current_game_state) is not None
+                or trusted_gold_squirtbottle_buttons(current_game_state)
+                is not None
+                or trusted_gold_route35_recovery_buttons(current_game_state)
+                is not None
+                or trusted_gold_sudowoodo_buttons(current_game_state)
+                is not None
+                or trusted_gold_dance_theater_buttons(current_game_state)
+                is not None
+                or trusted_gold_poison_recovery_buttons(current_game_state)
+                is not None
+                or trusted_gold_rock_smash_gift_buttons(current_game_state)
+                is not None
+                or trusted_gold_morty_buttons(current_game_state)
+                is not None
+                or trusted_gold_hidden_phone_buttons(current_game_state)
+                is not None
+                or trusted_gold_lighthouse_buttons(current_game_state)
+                is not None
+                or trusted_gold_cianwood_buttons(current_game_state)
+                is not None
+                or trusted_gold_lake_buttons(current_game_state)
+                is not None
+                or trusted_gold_rocket_buttons(current_game_state)
+                is not None
+                or trusted_gold_bugsy_battle_buttons(current_game_state)
+                is not None
             )
         ):
             self.status["last_discarded_decision"] = {
@@ -19130,6 +23797,21 @@ class PokemonRunner:
             "trusted_mewtwo_capture",
             "trusted_mewtwo_finalize",
             "trusted_cerulean_cave_flee",
+            "trusted_gold_bugsy_battle",
+            "trusted_gold_ilex",
+            "trusted_gold_goldenrod",
+            "trusted_gold_squirtbottle",
+            "trusted_gold_route35_recovery",
+            "trusted_gold_sudowoodo",
+            "trusted_gold_dance_theater",
+            "trusted_gold_poison_recovery",
+            "trusted_gold_rock_smash_gift",
+            "trusted_gold_morty",
+            "trusted_gold_hidden_phone",
+            "trusted_gold_lighthouse",
+            "trusted_gold_cianwood",
+            "trusted_gold_lake",
+            "trusted_gold_rocket",
             "operator",
         }
         if source not in allowed_sources:
@@ -19423,9 +24105,10 @@ class PokemonRunner:
                 "down": (0, 1),
                 "left": (-1, 0),
                 "right": (1, 0),
-            }[direction]
+            }.get(direction)
             if (
-                route_switch_pending
+                direction_delta is not None
+                and route_switch_pending
                 and isinstance(boulder, dict)
                 and (
                     position[1] + direction_delta[0],
@@ -19471,6 +24154,51 @@ class PokemonRunner:
         if buttons is None:
             buttons = trusted_mewtwo_capture_buttons(game_state)
             source = "trusted_mewtwo_capture"
+        if buttons is None:
+            buttons = trusted_gold_ilex_buttons(game_state)
+            source = "trusted_gold_ilex"
+        if buttons is None:
+            buttons = trusted_gold_goldenrod_buttons(game_state)
+            source = "trusted_gold_goldenrod"
+        if buttons is None:
+            buttons = trusted_gold_squirtbottle_buttons(game_state)
+            source = "trusted_gold_squirtbottle"
+        if buttons is None:
+            buttons = trusted_gold_route35_recovery_buttons(game_state)
+            source = "trusted_gold_route35_recovery"
+        if buttons is None:
+            buttons = trusted_gold_sudowoodo_buttons(game_state)
+            source = "trusted_gold_sudowoodo"
+        if buttons is None:
+            buttons = trusted_gold_dance_theater_buttons(game_state)
+            source = "trusted_gold_dance_theater"
+        if buttons is None:
+            buttons = trusted_gold_poison_recovery_buttons(game_state)
+            source = "trusted_gold_poison_recovery"
+        if buttons is None:
+            buttons = trusted_gold_rock_smash_gift_buttons(game_state)
+            source = "trusted_gold_rock_smash_gift"
+        if buttons is None:
+            buttons = trusted_gold_morty_buttons(game_state)
+            source = "trusted_gold_morty"
+        if buttons is None:
+            buttons = trusted_gold_hidden_phone_buttons(game_state)
+            source = "trusted_gold_hidden_phone"
+        if buttons is None:
+            buttons = trusted_gold_lighthouse_buttons(game_state)
+            source = "trusted_gold_lighthouse"
+        if buttons is None:
+            buttons = trusted_gold_cianwood_buttons(game_state)
+            source = "trusted_gold_cianwood"
+        if buttons is None:
+            buttons = trusted_gold_lake_buttons(game_state)
+            source = "trusted_gold_lake"
+        if buttons is None:
+            buttons = trusted_gold_rocket_buttons(game_state)
+            source = "trusted_gold_rocket"
+        if buttons is None:
+            buttons = trusted_gold_bugsy_battle_buttons(game_state)
+            source = "trusted_gold_bugsy_battle"
         if buttons is None:
             buttons = trusted_cerulean_cave_flee_buttons(game_state)
             source = "trusted_cerulean_cave_flee"
@@ -20007,6 +24735,7 @@ class PokemonRunner:
                 raise RuntimeError("PyBoy stopped during startup")
 
         loaded_state = self._load_latest_state()
+        self._publish_pending_git_checkpoints()
         self.status["loaded_state"] = str(loaded_state) if loaded_state else None
         reader = self.memory_reader_class(self.pyboy.memory)
         initial_state = reader.snapshot()
@@ -20248,6 +24977,7 @@ def add_runtime_arguments(
 
     parser.add_argument("--rom", required=True)
     parser.add_argument("--runtime-dir", default=str(DEFAULT_RUNTIME_DIR), type=Path)
+    parser.add_argument("--state-repo", type=Path)
     parser.add_argument("--port", type=port_value, default=DEFAULT_PORT)
     parser.add_argument("--livestream", action="store_true")
     parser.add_argument(
@@ -20360,6 +25090,8 @@ def runtime_command(args: argparse.Namespace, *, open_viewer: bool) -> list[str]
         str(args.bridge_startup_timeout),
         "--supervised",
     ]
+    if args.state_repo:
+        command.extend(["--state-repo", str(args.state_repo)])
     if args.signaling:
         command.extend(["--signaling", str(args.signaling)])
     if args.youtube_chat_hints:

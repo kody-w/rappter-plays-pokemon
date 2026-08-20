@@ -1,7 +1,10 @@
 import asyncio
+import errno
+import hashlib
 import json
 import os
 import queue
+import subprocess
 import sys
 import threading
 import urllib.error
@@ -20,6 +23,7 @@ from openrappter.agents.pokemon_agent import (
     ActionPlayer,
     ClipRecorder,
     CopilotBrain,
+    GitCheckpointArchive,
     NavigationMemory,
     PokemonAgent,
     PokemonGoldMemoryReader,
@@ -63,7 +67,22 @@ from openrappter.agents.pokemon_agent import (
     supervisor_main,
     terminate_isolated_process_group,
     trusted_cerulean_cave_flee_buttons,
+    trusted_gold_bugsy_battle_buttons,
+    trusted_gold_cianwood_buttons,
+    trusted_gold_dance_theater_buttons,
+    trusted_gold_goldenrod_buttons,
+    trusted_gold_hidden_phone_buttons,
+    trusted_gold_ilex_buttons,
+    trusted_gold_lake_buttons,
+    trusted_gold_lighthouse_buttons,
+    trusted_gold_morty_buttons,
+    trusted_gold_poison_recovery_buttons,
+    trusted_gold_rock_smash_gift_buttons,
+    trusted_gold_rocket_buttons,
+    trusted_gold_route35_recovery_buttons,
     trusted_gold_route_action,
+    trusted_gold_squirtbottle_buttons,
+    trusted_gold_sudowoodo_buttons,
     trusted_mewtwo_capture_buttons,
     trusted_mewtwo_finalize_buttons,
     trusted_mewtwo_surf_buttons,
@@ -87,8 +106,176 @@ def test_agent_contract():
     assert agent.metadata["name"] == "Pokemon"
     assert agent.metadata["parameters"]["type"] == "object"
     assert "checkpoint" in agent.metadata["parameters"]["properties"]["action"]["enum"]
+    assert "rewind" in agent.metadata["parameters"]["properties"]["action"]["enum"]
     assert "manual" in agent.metadata["parameters"]["properties"]["action"]["enum"]
     assert "autonomy" in agent.metadata["parameters"]["properties"]["action"]["enum"]
+    assert "state_repo" in agent.metadata["parameters"]["properties"]
+
+
+def test_git_checkpoint_archive_preserves_worktree_and_round_trips_state(tmp_path):
+    repository = tmp_path / "repo"
+    repository.mkdir()
+    subprocess.run(
+        ["git", "init", "--quiet", str(repository)],
+        check=True,
+    )
+    dirty = repository / "dirty.txt"
+    dirty.write_text("working tree remains untouched\n")
+    before = subprocess.run(
+        ["git", "-C", str(repository), "status", "--porcelain=v1"],
+        check=True,
+        capture_output=True,
+    ).stdout
+    runtime = tmp_path / "runtime"
+    runtime.mkdir()
+    agent_path = tmp_path / "pokemon_agent.py"
+    agent_path.write_text("AGENT = 'test'\n")
+    archive = GitCheckpointArchive(
+        repository,
+        runtime,
+        game_id="gold",
+        rom_sha256="a" * 64,
+        agent_path=agent_path,
+        run_id="run-1",
+    )
+
+    commits = []
+    for sequence, payload in enumerate((b"state one", b"state two"), start=1):
+        state_path = (
+            runtime
+            / f"state-20260815-12000{sequence}-00000{sequence}.state"
+        )
+        state_path.write_bytes(payload)
+        manifest = {
+            "schema_version": 1,
+            "created_at": f"2026-08-15T12:00:0{sequence}+00:00",
+            "kind": "manual",
+            "rom_sha256": "a" * 64,
+            "sha256": hashlib.sha256(payload).hexdigest(),
+            "bytes": len(payload),
+            "game_state": {
+                "location": "Goldenrod Gym",
+                "map_id": 0x0B03,
+                "coordinates": {"x": 8, "y": 4},
+                "badges": ["Zephyr", "Hive"],
+                "party": [
+                    {
+                        "species_id": 159,
+                        "level": 25,
+                        "hp": 68,
+                        "max_hp": 73,
+                    }
+                ],
+            },
+        }
+        commits.append(archive.publish(state_path, manifest)["commit"])
+
+    after = subprocess.run(
+        ["git", "-C", str(repository), "status", "--porcelain=v1"],
+        check=True,
+        capture_output=True,
+    ).stdout
+    assert after == before
+    assert archive._ref_tip() == commits[-1]
+    parent = subprocess.run(
+        [
+            "git",
+            f"--git-dir={archive.git_dir}",
+            "rev-parse",
+            f"{commits[-1]}^",
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    assert parent == commits[0]
+    tree_names = subprocess.run(
+        [
+            "git",
+            f"--git-dir={archive.git_dir}",
+            "ls-tree",
+            "--name-only",
+            commits[-1],
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.splitlines()
+    assert tree_names == [
+        "checkpoint.state",
+        "manifest.json",
+        "pokemon_agent.py",
+    ]
+
+    resolved, manifest, state_bytes = archive.load(commits[-1][:12])
+
+    assert resolved == commits[-1]
+    assert state_bytes == b"state two"
+    assert manifest["rom_sha256"] == "a" * 64
+    assert manifest["state_sha256"] == hashlib.sha256(b"state two").hexdigest()
+    assert str(repository) not in json.dumps(manifest)
+    assert "working tree remains untouched" not in json.dumps(manifest)
+
+
+def test_git_checkpoint_backfill_orders_mixed_filenames_by_manifest_time(tmp_path):
+    repository = tmp_path / "repo"
+    repository.mkdir()
+    subprocess.run(["git", "init", "--quiet", str(repository)], check=True)
+    runtime = tmp_path / "runtime"
+    states = runtime / "states"
+    states.mkdir(parents=True)
+    agent_path = tmp_path / "pokemon_agent.py"
+    agent_path.write_text("AGENT = 'test'\n")
+    archive = GitCheckpointArchive(
+        repository,
+        runtime,
+        game_id="gold",
+        rom_sha256="b" * 64,
+        agent_path=agent_path,
+        run_id="run-2",
+    )
+    entries = [
+        (
+            "state-20260815-150000-000001.state",
+            "2026-08-15T12:00:00+00:00",
+            b"older",
+        ),
+        (
+            "state-20260815-120000-000001.state",
+            "2026-08-15T13:00:00+00:00",
+            b"newer",
+        ),
+    ]
+    for name, created_at, payload in entries:
+        state = states / name
+        state.write_bytes(payload)
+        state.with_suffix(".json").write_text(
+            json.dumps(
+                {
+                    "schema_version": 1,
+                    "created_at": created_at,
+                    "kind": "manual",
+                    "rom_sha256": "b" * 64,
+                    "sha256": hashlib.sha256(payload).hexdigest(),
+                    "bytes": len(payload),
+                    "game_state": {},
+                }
+            )
+        )
+    runner = PokemonRunner.__new__(PokemonRunner)
+    runner.states_dir = states
+    runner.git_checkpoint_archive = archive
+    runner.status = {
+        "rom_sha256": "b" * 64,
+        "last_checkpoint": {"path": str(states / entries[-1][0])},
+    }
+
+    runner._publish_pending_git_checkpoints()
+    _, manifest, payload = archive.load(archive._ref_tip())
+
+    assert manifest["checkpoint_id"] == Path(entries[-1][0]).stem
+    assert payload == b"newer"
+    assert runner.status["last_checkpoint"]["git_commit"] == archive._ref_tip()
 
 
 def test_execution_evidence_is_bounded_private_and_free_of_model_prose(tmp_path):
@@ -144,6 +331,27 @@ def test_execution_evidence_is_bounded_private_and_free_of_model_prose(tmp_path)
     evidence_keys = keys(record)
     for forbidden in ("objective", "observation", "reason", "screen_text"):
         assert forbidden not in evidence_keys
+
+    runner._record_execution_evidence(
+        source="trusted_gold_ilex",
+        buttons=["up", "a"],
+        game_state=state,
+    )
+    records = [
+        json.loads(line)
+        for line in evidence_file.read_text().splitlines()
+    ]
+    assert records[-1]["source"] == "trusted_gold_ilex"
+    runner._record_execution_evidence(
+        source="trusted_gold_goldenrod",
+        buttons=["up", "a"],
+        game_state=state,
+    )
+    records = [
+        json.loads(line)
+        for line in evidence_file.read_text().splitlines()
+    ]
+    assert records[-1]["source"] == "trusted_gold_goldenrod"
 
 
 def test_improvement_directive_is_run_bound_expiring_and_enum_only(tmp_path):
@@ -243,6 +451,10 @@ def test_gold_memory_reader_does_not_expose_red_wram_as_facts():
         "map_id": 0x10000,
         "coordinates": {"x": 14, "y": 15},
     }) is None
+    memory[0xD15F] = 1
+    noisy_reader = PokemonGoldMemoryReader(memory)
+    noisy_reader._decode_screen_text = lambda start, end: "99889899" * 8
+    assert noisy_reader._screen_text_gold() == ""
     assert "downstairs warp is (7,0)" in gold_route_guidance({
         **snapshot,
         "map_group": 0x18,
@@ -373,6 +585,58 @@ def test_gold_memory_reader_does_not_expose_red_wram_as_facts():
         "story_events": {},
         "party": [{"hp": 3, "max_hp": 35}],
     }) == "left"
+    bugsy_battle = {
+        **snapshot,
+        "map_group": 0x08,
+        "map_number": 0x05,
+        "in_battle": True,
+        "badges": ["Zephyr"],
+        "screen_text": "SCYTHER | FIGHT | PACK RUN",
+    }
+    assert trusted_gold_bugsy_battle_buttons(bugsy_battle) == [
+        "up",
+        "left",
+        "a",
+    ]
+    assert trusted_gold_bugsy_battle_buttons({
+        **bugsy_battle,
+        "screen_text": "SCRATCH | LEER | BITE | WATER GUN",
+        "menu_cursor_y": 3,
+    }) == ["down"]
+    assert trusted_gold_bugsy_battle_buttons({
+        **bugsy_battle,
+        "screen_text": "SCRATCH | LEER | BITE | WATER GUN",
+        "menu_cursor_y": 4,
+    }) == ["a"]
+    post_bugsy = {
+        **snapshot,
+        "map_group": 0x08,
+        "map_number": 0x05,
+        "screen_text": "",
+        "badges": ["Zephyr", "Hive"],
+        "story_events": {"beat_bug_catcher_benny": True},
+        "party": [{"hp": 1, "max_hp": 65}],
+    }
+    assert "do not approach Bugsy again" in gold_route_guidance({
+        **post_bugsy,
+        "coordinates": {"x": 6, "y": 7},
+    })
+    assert trusted_gold_route_action({
+        **post_bugsy,
+        "coordinates": {"x": 2, "y": 7},
+    }) == "up"
+    assert trusted_gold_route_action({
+        **post_bugsy,
+        "coordinates": {"x": 3, "y": 6},
+    }) == "up"
+    assert trusted_gold_route_action({
+        **post_bugsy,
+        "coordinates": {"x": 0, "y": 9},
+    }) == "down"
+    assert trusted_gold_route_action({
+        **post_bugsy,
+        "coordinates": {"x": 4, "y": 15},
+    }) == "down"
     assert trusted_gold_route_action({
         **snapshot,
         "map_group": 0x0A,
@@ -530,6 +794,1409 @@ def test_gold_memory_reader_does_not_expose_red_wram_as_facts():
             "gave_mystery_egg_to_elm": True,
         },
     }) == "up"
+
+
+def test_gold_reader_decodes_lower_tilemap_rows_for_bugsy_battle():
+    memory = bytearray(65536)
+    memory[0xDA00] = 0x08
+    memory[0xDA01] = 0x05
+    memory[0xDA02] = 7
+    memory[0xDA03] = 5
+    memory[0xD116] = 1
+    memory[0xD57C] = 1
+    cursor = 0xC580
+    for line in ("FIGHT", "PACK RUN"):
+        for character in line:
+            memory[cursor] = (
+                0x7F
+                if character == " "
+                else 0x80 + ord(character) - ord("A")
+            )
+            cursor += 1
+        memory[cursor] = 0x4E
+        cursor += 1
+
+    snapshot = PokemonGoldMemoryReader(memory).snapshot()
+
+    assert snapshot["screen_text"] == "FIGHT | PACK RUN"
+    assert trusted_gold_bugsy_battle_buttons(snapshot) == [
+        "up",
+        "left",
+        "a",
+    ]
+
+
+def test_gold_underground_route_reaches_and_unlocks_basement_door():
+    base = {
+        "game_id": "gold",
+        "map_id": 0x032E,
+        "map_group": 0x03,
+        "map_number": 0x2E,
+        "coordinates": {"x": 20, "y": 28},
+        "screen_text": "",
+        "story_events": {
+            "cleared_radio_tower": False,
+            "used_basement_key": False,
+            "beat_rival_underground": False,
+        },
+        "key_items": {
+            "basement_key": True,
+            "card_key": False,
+        },
+        "party": [{"hp": 154, "max_hp": 154}],
+    }
+
+    assert trusted_gold_route_action(base) == "up"
+    assert trusted_gold_route_action({
+        **base,
+        "coordinates": {"x": 20, "y": 25},
+    }) == "right"
+
+    regular = {
+        **base,
+        "map_number": 0x2D,
+        "coordinates": {"x": 3, "y": 2},
+    }
+    assert trusted_gold_route_action(regular) == "down"
+    assert trusted_gold_route_action({
+        **regular,
+        "coordinates": {"x": 3, "y": 10},
+    }) == "up"
+    assert trusted_gold_route_action({
+        **regular,
+        "coordinates": {"x": 6, "y": 7},
+    }) == "right"
+    assert trusted_gold_route_action({
+        **regular,
+        "coordinates": {"x": 18, "y": 7},
+        "facing_direction": 0,
+    }) == "up"
+    assert trusted_gold_route_action({
+        **regular,
+        "coordinates": {"x": 18, "y": 7},
+        "facing_direction": 4,
+    }) == "a"
+    assert "door at (18,6)" in gold_route_guidance(regular)
+
+    replaced = []
+    runner = PokemonRunner.__new__(PokemonRunner)
+    runner.status = {"phase": "overworld"}
+    runner.player = SimpleNamespace(replace=replaced.append)
+    runner.navigation_memory = SimpleNamespace(
+        finish=lambda *_args, **_kwargs: None,
+        begin=lambda *_args, **_kwargs: None,
+    )
+    runner.committed_route = None
+    runner.settle_candidate = None
+    runner.settle_samples = 0
+    runner.position_settled = True
+    runner.last_decision_finished = 0.0
+    runner._record_execution_evidence = lambda **_kwargs: None
+
+    assert runner._advance_trusted_story_route({
+        **regular,
+        "map_id": 0x032D,
+        "coordinates": {"x": 18, "y": 7},
+        "facing_direction": 4,
+        "in_battle": False,
+    })
+    assert replaced == [["a"]]
+
+    used_key = {
+        **base,
+        "map_number": 0x2D,
+        "coordinates": {"x": 22, "y": 31},
+        "story_events": {
+            **base["story_events"],
+            "used_basement_key": True,
+        },
+    }
+    assert trusted_gold_route_action(used_key) == "up"
+    assert trusted_gold_route_action({
+        **used_key,
+        "map_number": 0x2E,
+        "coordinates": {"x": 23, "y": 5},
+    }) == "left"
+
+
+def test_gold_memory_reader_tracks_cianwood_boulder_state():
+    memory = bytearray(65536)
+    memory[0xDA00] = 0x16
+    memory[0xDA01] = 0x05
+    memory[0xDA02] = 9
+    memory[0xDA03] = 4
+    memory[0xD5E2] = 0xFF
+    memory[0xD93F] = 0x01
+    for event_id in range(0x0709, 0x070D):
+        memory[0xD7B7 + event_id // 8] |= 1 << (event_id % 8)
+    for slot, (x, y) in enumerate(((3, 6), (4, 7), (5, 7)), start=4):
+        base = 0xD1FD + slot * 0x28
+        memory[base] = 90
+        memory[base + 0x06] = 0x40
+        memory[base + 0x10] = x + 4
+        memory[base + 0x11] = y + 4
+
+    snapshot = PokemonGoldMemoryReader(memory).snapshot()
+
+    assert snapshot["strength_active"] is True
+    assert snapshot["ice_path_boulders_dropped"] == {
+        "one": True,
+        "two": True,
+        "three": True,
+        "four": True,
+    }
+    assert snapshot["cianwood_gym_boulders"] == [
+        {"x": 3, "y": 6},
+        {"x": 4, "y": 7},
+        {"x": 5, "y": 7},
+    ]
+    memory[0xDA00] = 0x03
+    memory[0xDA01] = 0x2A
+    grunt = 0xD445 + 13 * 0x10
+    memory[grunt + 2] = 5
+    memory[grunt + 3] = 8
+
+    assert PokemonGoldMemoryReader(memory).snapshot()[
+        "rocket_grunt18_blocking"
+    ] is True
+
+
+def test_gold_farfetchd_position_and_verified_route():
+    memory = bytearray(65536)
+    memory[0xDA00] = 0x03
+    memory[0xDA01] = 0x2C
+    memory[0xDA02] = 23
+    memory[0xDA03] = 20
+    for event_id in range(0x06E9, 0x06F3):
+        memory[0xD7B7 + event_id // 8] |= 1 << (event_id % 8)
+    memory[0xD7B7 + 0x06EB // 8] &= ~(1 << (0x06EB % 8))
+
+    snapshot = PokemonGoldMemoryReader(memory).snapshot()
+
+    assert snapshot["story_events"]["farfetchd_position"] == 3
+    assert "face DOWN" in gold_route_guidance(snapshot)
+    assert trusted_gold_route_action({
+        **snapshot,
+        "coordinates": {"x": 15, "y": 24},
+        "screen_text": "",
+    }) == "up"
+    assert trusted_gold_route_action({
+        **snapshot,
+        "coordinates": {"x": 19, "y": 23},
+        "screen_text": "",
+    }) == "right"
+    assert trusted_gold_ilex_buttons({
+        **snapshot,
+        "coordinates": {"x": 20, "y": 23},
+        "screen_text": "",
+        "in_battle": False,
+    }) == ["down", "a"]
+    assert trusted_gold_ilex_buttons({
+        **snapshot,
+        "screen_text": "KWA!",
+        "in_battle": False,
+    }) == ["a"]
+    assert trusted_gold_ilex_buttons({
+        **snapshot,
+        "screen_text": "ODDISH | FIGHT | PACK RUN",
+        "in_battle": True,
+    }) is None
+
+
+def test_gold_farfetchd_handoff_routes_to_hm_cut():
+    state = {
+        "game_id": "gold",
+        "map_id": 0x032C,
+        "map_group": 0x03,
+        "map_number": 0x2C,
+        "coordinates": {"x": 11, "y": 35},
+        "screen_text": "",
+        "in_battle": False,
+        "party": [{"hp": 1, "max_hp": 68}],
+        "story_events": {
+            "farfetchd_position": 10,
+            "herded_farfetchd": True,
+            "got_hm_cut": False,
+        },
+    }
+
+    assert "keep pressing A" in gold_route_guidance(state)
+    assert trusted_gold_route_action(state) == "up"
+    assert trusted_gold_route_action({
+        **state,
+        "coordinates": {"x": 8, "y": 31},
+    }) == "up"
+    assert trusted_gold_route_action({
+        **state,
+        "coordinates": {"x": 6, "y": 29},
+    }) == "left"
+    assert trusted_gold_ilex_buttons({
+        **state,
+        "coordinates": {"x": 5, "y": 29},
+    }) == ["up", "a"]
+    assert trusted_gold_ilex_buttons({
+        **state,
+        "screen_text": "received HM01",
+    }) == ["a"]
+
+    cut_state = {
+        **state,
+        "coordinates": {"x": 5, "y": 29},
+        "story_events": {
+            **state["story_events"],
+            "farfetchd_position": None,
+            "got_hm_cut": True,
+        },
+    }
+    assert "tree at (8,25)" in gold_route_guidance(cut_state)
+    assert trusted_gold_route_action(cut_state) == "right"
+    assert trusted_gold_route_action({
+        **cut_state,
+        "coordinates": {"x": 8, "y": 28},
+    }) == "up"
+    assert trusted_gold_ilex_buttons({
+        **cut_state,
+        "coordinates": {"x": 8, "y": 26},
+    }) == ["up", "a"]
+    assert trusted_gold_ilex_buttons({
+        **cut_state,
+        "coordinates": {"x": 8, "y": 26},
+        "screen_text": "This tree can be CUT!",
+    }) == ["a"]
+    assert trusted_gold_route_action({
+        **cut_state,
+        "coordinates": {"x": 8, "y": 25},
+    }) == "up"
+    assert trusted_gold_route_action({
+        **cut_state,
+        "coordinates": {"x": 8, "y": 23},
+    }) == "down"
+    assert trusted_gold_route_action({
+        **cut_state,
+        "coordinates": {"x": 7, "y": 22},
+    }) == "down"
+    assert trusted_gold_route_action({
+        **cut_state,
+        "coordinates": {"x": 1, "y": 6},
+    }) == "up"
+
+
+def test_gold_goldenrod_required_route_and_whitney_handoff():
+    base = {
+        "game_id": "gold",
+        "map_id": 0x0B03,
+        "map_group": 0x0B,
+        "map_number": 0x03,
+        "coordinates": {"x": 0, "y": 5},
+        "screen_text": "",
+        "in_battle": False,
+        "badges": ["Zephyr", "Hive"],
+        "party": [{"hp": 61, "max_hp": 70}],
+        "story_events": {
+            "beat_beauty_victoria": True,
+            "beat_lass_carrie": False,
+            "beat_lass_bridget": False,
+            "beat_whitney": False,
+            "made_whitney_cry": False,
+        },
+    }
+
+    assert "Carrie's RIGHT-facing sight line" in gold_route_guidance(base)
+    assert trusted_gold_route_action(base) == "down"
+    assert trusted_gold_route_action({
+        **base,
+        "coordinates": {"x": 14, "y": 13},
+    }) == "left"
+    assert trusted_gold_route_action({
+        **base,
+        "coordinates": {"x": 6, "y": 2},
+    }) == "up"
+    carrie_cleared = {
+        **base,
+        "coordinates": {"x": 13, "y": 13},
+        "story_events": {
+            **base["story_events"],
+            "beat_lass_carrie": True,
+        },
+    }
+    assert trusted_gold_route_action(carrie_cleared) == "up"
+    assert trusted_gold_route_action({
+        **carrie_cleared,
+        "coordinates": {"x": 11, "y": 6},
+    }) == "left"
+    assert trusted_gold_goldenrod_buttons({
+        **carrie_cleared,
+        "coordinates": {"x": 10, "y": 6},
+    }) == ["left", "a"]
+    bridget_cleared = {
+        **carrie_cleared,
+        "coordinates": {"x": 10, "y": 6},
+        "story_events": {
+            **carrie_cleared["story_events"],
+            "beat_lass_bridget": True,
+        },
+    }
+    assert trusted_gold_route_action(bridget_cleared) == "right"
+    assert trusted_gold_route_action({
+        **bridget_cleared,
+        "coordinates": {"x": 8, "y": 5},
+    }) == "up"
+    assert trusted_gold_route_action({
+        **bridget_cleared,
+        "coordinates": {"x": 3, "y": 13},
+    }) == "up"
+    assert trusted_gold_route_action({
+        **bridget_cleared,
+        "coordinates": {"x": 13, "y": 9},
+    }) == "left"
+    assert trusted_gold_goldenrod_buttons({
+        **bridget_cleared,
+        "coordinates": {"x": 8, "y": 4},
+    }) == ["up", "a"]
+    assert trusted_gold_goldenrod_buttons({
+        **bridget_cleared,
+        "in_battle": True,
+        "screen_text": "MILTANK | FIGHT | PACK RUN",
+    }) == ["up", "left", "a"]
+    assert trusted_gold_goldenrod_buttons({
+        **bridget_cleared,
+        "in_battle": True,
+        "screen_text": "CUT | LEER | BITE | WATER GUN",
+        "menu_cursor_y": 2,
+    }) == ["down"]
+    assert trusted_gold_goldenrod_buttons({
+        **bridget_cleared,
+        "in_battle": True,
+        "screen_text": "Disabled! | CUT | LEER | BITE | WATER GUN",
+        "disabled_move_id": 55,
+        "menu_cursor_y": 4,
+    }) == ["up"]
+    assert trusted_gold_goldenrod_buttons({
+        **bridget_cleared,
+        "in_battle": True,
+        "screen_text": "Disabled! | CUT | LEER | BITE | WATER GUN",
+        "disabled_move_id": 44,
+        "menu_cursor_y": 3,
+    }) == ["down"]
+    crying = {
+        **bridget_cleared,
+        "coordinates": {"x": 8, "y": 4},
+        "story_events": {
+            **bridget_cleared["story_events"],
+            "beat_whitney": True,
+            "made_whitney_cry": True,
+        },
+    }
+    assert trusted_gold_route_action(crying) == "down"
+    ready_for_badge = {
+        **crying,
+        "coordinates": {"x": 8, "y": 5},
+        "story_events": {
+            **crying["story_events"],
+            "made_whitney_cry": False,
+        },
+    }
+    assert trusted_gold_route_action(ready_for_badge) == "up"
+    assert trusted_gold_goldenrod_buttons({
+        **ready_for_badge,
+        "coordinates": {"x": 8, "y": 4},
+    }) == ["up", "a"]
+    plain_badge = {
+        **ready_for_badge,
+        "coordinates": {"x": 14, "y": 11},
+        "badges": ["Zephyr", "Hive", "Plain"],
+    }
+    assert "south exit" in gold_route_guidance(plain_badge)
+    assert trusted_gold_route_action(plain_badge) == "left"
+    assert trusted_gold_route_action({
+        **plain_badge,
+        "coordinates": {"x": 4, "y": 17},
+    }) == "left"
+    assert trusted_gold_route_action({
+        **plain_badge,
+        "coordinates": {"x": 8, "y": 5},
+    }) == "down"
+    assert trusted_gold_route_action({
+        **plain_badge,
+        "coordinates": {"x": 4, "y": 9},
+    }) == "right"
+    wrong_house = {
+        **plain_badge,
+        "map_number": 0x0A,
+        "coordinates": {"x": 5, "y": 4},
+        "key_items": {"squirt_bottle": False},
+    }
+    assert "wrong PP tutorial house" in gold_route_guidance(wrong_house)
+    assert trusted_gold_route_action(wrong_house) == "down"
+    flower_shop = {
+        **wrong_house,
+        "map_number": 0x08,
+        "coordinates": {"x": 3, "y": 6},
+    }
+    assert "teacher at (2,4)" in gold_route_guidance(flower_shop)
+    assert trusted_gold_route_action(flower_shop) == "left"
+    assert trusted_gold_squirtbottle_buttons({
+        **flower_shop,
+        "coordinates": {"x": 2, "y": 5},
+    }) == ["up", "a"]
+    with_bottle = {
+        **flower_shop,
+        "coordinates": {"x": 2, "y": 5},
+        "key_items": {"squirt_bottle": True},
+    }
+    assert trusted_gold_route_action(with_bottle) == "down"
+    assert trusted_gold_squirtbottle_buttons(with_bottle) is None
+    city_to_flower = {
+        **flower_shop,
+        "map_number": 0x02,
+        "coordinates": {"x": 29, "y": 8},
+    }
+    assert trusted_gold_route_action(city_to_flower) == "up"
+    assert trusted_gold_route_action({
+        **city_to_flower,
+        "coordinates": {"x": 33, "y": 6},
+    }) == "up"
+    city_to_route35 = {
+        **with_bottle,
+        "map_number": 0x02,
+        "coordinates": {"x": 21, "y": 10},
+    }
+    assert trusted_gold_route_action(city_to_route35) == "up"
+    assert trusted_gold_route_action({
+        **city_to_route35,
+        "coordinates": {"x": 19, "y": 2},
+    }) == "up"
+    route35_gate = {
+        **city_to_route35,
+        "map_group": 0x0A,
+        "map_number": 0x0E,
+        "coordinates": {"x": 4, "y": 7},
+    }
+    assert trusted_gold_route_action(route35_gate) == "up"
+    route35 = {
+        **route35_gate,
+        "map_number": 0x02,
+        "coordinates": {"x": 9, "y": 19},
+    }
+    assert "Do not turn east" in gold_route_guidance(route35)
+    assert trusted_gold_route_action(route35) == "left"
+    assert trusted_gold_route_action({
+        **route35,
+        "coordinates": {"x": 3, "y": 6},
+    }) == "up"
+    assert trusted_gold_route_action({
+        **route35,
+        "coordinates": {"x": 5, "y": 12},
+    }) == "left"
+    sealed_route35 = {
+        **route35,
+        "coordinates": {"x": 7, "y": 19},
+        "route35_ivan_blocking": True,
+        "in_battle": False,
+        "screen_text": "",
+    }
+    assert trusted_gold_route35_recovery_buttons(sealed_route35) == [
+        "down",
+        "a",
+    ]
+    assert trusted_gold_route35_recovery_buttons({
+        **sealed_route35,
+        "in_battle": True,
+        "screen_text": "PIKACHU | FIGHT | PACK RUN",
+    }) == ["up", "left", "a"]
+    assert trusted_gold_route35_recovery_buttons({
+        **sealed_route35,
+        "in_battle": True,
+        "screen_text": "CUT | LEER | BITE | WATER GUN",
+        "menu_cursor_y": 3,
+    }) == ["up"]
+    national_park = {
+        **route35,
+        "map_group": 0x03,
+        "map_number": 0x0F,
+        "coordinates": {"x": 19, "y": 34},
+    }
+    assert "Route 36 gate" in gold_route_guidance(national_park)
+    assert trusted_gold_route_action(national_park) == "up"
+    assert trusted_gold_route_action({
+        **national_park,
+        "coordinates": {"x": 33, "y": 19},
+    }) == "right"
+    route36 = {
+        **route35,
+        "map_number": 0x03,
+        "coordinates": {"x": 22, "y": 13},
+        "story_events": {
+            **route35["story_events"],
+            "fought_sudowoodo": False,
+        },
+    }
+    assert trusted_gold_route_action(route36) == "down"
+    assert trusted_gold_route_action({
+        **route36,
+        "coordinates": {"x": 35, "y": 11},
+    }) == "up"
+    assert trusted_gold_sudowoodo_buttons({
+        **route36,
+        "coordinates": {"x": 35, "y": 10},
+    }) == ["up", "a"]
+    assert trusted_gold_sudowoodo_buttons({
+        **route36,
+        "coordinates": {"x": 35, "y": 10},
+        "in_battle": True,
+        "enemy_species_id": 185,
+        "screen_text": "SUDOWOODO | FIGHT | PACK RUN",
+    }) == ["up", "left", "a"]
+    dance_theater = {
+        **route36,
+        "map_group": 0x04,
+        "map_number": 0x05,
+        "coordinates": {"x": 6, "y": 5},
+        "story_events": {
+            **route36["story_events"],
+            "beat_kimono_miki": False,
+            "beat_kimono_kuni": False,
+            "beat_kimono_zuki": False,
+            "beat_kimono_sayo": False,
+            "beat_kimono_naoko": False,
+            "got_hm_surf": False,
+        },
+    }
+    assert trusted_gold_route_action(dance_theater) == "right"
+    assert trusted_gold_dance_theater_buttons({
+        **dance_theater,
+        "coordinates": {"x": 10, "y": 2},
+    }) == ["right", "a"]
+    assert trusted_gold_dance_theater_buttons({
+        **dance_theater,
+        "in_battle": True,
+        "enemy_species_id": 197,
+        "screen_text": "CUT | LEER | BITE | WATER GUN",
+        "menu_cursor_y": 3,
+    }) == ["down"]
+    all_kimono = {
+        **dance_theater,
+        "coordinates": {"x": 1, "y": 2},
+        "story_events": {
+            **dance_theater["story_events"],
+            "beat_kimono_miki": True,
+            "beat_kimono_kuni": True,
+            "beat_kimono_zuki": True,
+            "beat_kimono_sayo": True,
+            "beat_kimono_naoko": True,
+        },
+    }
+    assert trusted_gold_route_action(all_kimono) == "down"
+    assert trusted_gold_dance_theater_buttons({
+        **all_kimono,
+        "coordinates": {"x": 6, "y": 10},
+    }) == ["right", "a"]
+    surf_owned = {
+        **all_kimono,
+        "coordinates": {"x": 6, "y": 10},
+        "story_events": {
+            **all_kimono["story_events"],
+            "got_hm_surf": True,
+        },
+    }
+    assert trusted_gold_route_action(surf_owned) == "down"
+    ecruteak_low_hp = {
+        **surf_owned,
+        "map_number": 0x09,
+        "coordinates": {"x": 23, "y": 22},
+        "party": [{"hp": 19, "max_hp": 84}],
+    }
+    assert "below one-third HP" in gold_route_guidance(ecruteak_low_hp)
+    assert trusted_gold_route_action(ecruteak_low_hp) == "down"
+    assert trusted_gold_route_action({
+        **ecruteak_low_hp,
+        "coordinates": {"x": 24, "y": 29},
+    }) == "up"
+    assert trusted_gold_route_action({
+        **ecruteak_low_hp,
+        "coordinates": {"x": 23, "y": 23},
+    }) == "left"
+    ecruteak_tower = {
+        **ecruteak_low_hp,
+        "coordinates": {"x": 7, "y": 7},
+        "party": [{"hp": 84, "max_hp": 84}],
+        "lead_moves": [15, 249, 44, 55],
+        "story_events": {
+            **ecruteak_low_hp["story_events"],
+            "got_tm_rock_smash": True,
+        },
+    }
+    assert "release is optional" in gold_route_guidance(ecruteak_tower)
+    assert trusted_gold_route_action(ecruteak_tower) is None
+    rock_smash_unlearned = {
+        **ecruteak_tower,
+        "lead_moves": [15, 43, 44, 55],
+    }
+    assert "release is optional" in gold_route_guidance(rock_smash_unlearned)
+    assert trusted_gold_route_action(rock_smash_unlearned) is None
+    poisoned_tower = {
+        **ecruteak_tower,
+        "map_group": 0x03,
+        "map_number": 0x0D,
+        "coordinates": {"x": 9, "y": 15},
+        "lead_status": 8,
+        "script_mode": 1,
+        "script_running": 0,
+        "in_battle": False,
+    }
+    assert trusted_gold_poison_recovery_buttons(poisoned_tower) == ["a"]
+    assert trusted_gold_route_action({
+        **poisoned_tower,
+        "script_mode": 0,
+    }) == "down"
+    assert trusted_gold_route_action({
+        **poisoned_tower,
+        "map_group": 0x04,
+        "map_number": 0x09,
+        "coordinates": {"x": 6, "y": 13},
+        "script_mode": 0,
+    }) == "right"
+    assert trusted_gold_route_action({
+        **poisoned_tower,
+        "map_group": 0x04,
+        "map_number": 0x09,
+        "coordinates": {"x": 8, "y": 20},
+        "script_mode": 0,
+    }) == "down"
+    assert trusted_gold_route_action({
+        **poisoned_tower,
+        "map_group": 0x04,
+        "map_number": 0x09,
+        "coordinates": {"x": 8, "y": 23},
+        "script_mode": 0,
+    }) == "right"
+    assert trusted_gold_route_action({
+        **poisoned_tower,
+        "map_group": 0x04,
+        "map_number": 0x09,
+        "coordinates": {"x": 23, "y": 28},
+        "script_mode": 0,
+    }) == "up"
+    healed_tower = {
+        **poisoned_tower,
+        "coordinates": {"x": 13, "y": 12},
+        "lead_status": 0,
+        "script_mode": 0,
+    }
+    assert "beasts are optional" in gold_route_guidance(healed_tower)
+    assert trusted_gold_route_action({
+        **healed_tower,
+        "map_number": 0x0E,
+        "coordinates": {"x": 8, "y": 14},
+    }) == "left"
+    assert trusted_gold_route_action({
+        **healed_tower,
+        "coordinates": {"x": 9, "y": 15},
+        "story_events": {
+            **healed_tower["story_events"],
+            "got_tm_rock_smash": False,
+        },
+    }) == "down"
+    ecruteak_gym = {
+        **healed_tower,
+        "map_group": 0x04,
+        "map_number": 0x07,
+        "coordinates": {"x": 4, "y": 13},
+    }
+    assert "invisible-floor route" in gold_route_guidance(ecruteak_gym)
+    assert trusted_gold_route_action(ecruteak_gym) == "right"
+    assert trusted_gold_route_action({
+        **ecruteak_gym,
+        "coordinates": {"x": 6, "y": 2},
+    }) == "left"
+    assert trusted_gold_morty_buttons({
+        **ecruteak_gym,
+        "coordinates": {"x": 5, "y": 2},
+    }) == ["up", "a"]
+    assert trusted_gold_hidden_phone_buttons({
+        **ecruteak_gym,
+        "script_mode": 1,
+        "script_running": 0,
+    }) == ["a"]
+    lighthouse_1f = {
+        **ecruteak_gym,
+        "map_group": 0x03,
+        "map_number": 0x22,
+        "coordinates": {"x": 15, "y": 2},
+    }
+    assert trusted_gold_route_action(lighthouse_1f) == "down"
+    assert trusted_gold_route_action({
+        **lighthouse_1f,
+        "coordinates": {"x": 11, "y": 14},
+    }) == "right"
+    assert trusted_gold_route_action({
+        **lighthouse_1f,
+        "coordinates": {"x": 3, "y": 10},
+    }) == "down"
+    lighthouse_2f = {
+        **lighthouse_1f,
+        "map_number": 0x23,
+        "coordinates": {"x": 13, "y": 2},
+    }
+    assert trusted_gold_route_action({
+        **lighthouse_2f,
+        "coordinates": {"x": 3, "y": 11},
+    }) == "down"
+    assert trusted_gold_route_action(lighthouse_2f) == "left"
+    assert trusted_gold_route_action({
+        **lighthouse_2f,
+        "coordinates": {"x": 6, "y": 3},
+    }) == "left"
+    assert trusted_gold_route_action({
+        **lighthouse_2f,
+        "coordinates": {"x": 9, "y": 15},
+    }) == "up"
+    assert trusted_gold_route_action({
+        **lighthouse_2f,
+        "coordinates": {"x": 5, "y": 15},
+    }) == "up"
+    assert trusted_gold_route_action({
+        **lighthouse_2f,
+        "coordinates": {"x": 10, "y": 3},
+    }) == "up"
+    assert trusted_gold_lighthouse_buttons({
+        **lighthouse_2f,
+        "coordinates": {"x": 10, "y": 3},
+    }) == ["up", "up", "up"]
+    assert trusted_gold_route_action({
+        **lighthouse_2f,
+        "coordinates": {"x": 10, "y": 2},
+    }) == "left"
+    lighthouse_3f = {
+        **lighthouse_2f,
+        "map_number": 0x24,
+        "coordinates": {"x": 4, "y": 5},
+    }
+    assert trusted_gold_route_action({
+        **lighthouse_3f,
+        "coordinates": {"x": 5, "y": 3},
+    }) == "down"
+    assert trusted_gold_route_action(lighthouse_3f) == "left"
+    assert trusted_gold_route_action({
+        **lighthouse_3f,
+        "coordinates": {"x": 14, "y": 3},
+    }) == "left"
+    assert trusted_gold_route_action({
+        **lighthouse_3f,
+        "coordinates": {"x": 3, "y": 6},
+    }) == "left"
+    lighthouse_4f = {
+        **lighthouse_3f,
+        "map_number": 0x25,
+        "coordinates": {"x": 13, "y": 3},
+    }
+    assert trusted_gold_route_action(lighthouse_4f) == "left"
+    assert trusted_gold_route_action({
+        **lighthouse_4f,
+        "coordinates": {"x": 3, "y": 6},
+    }) is None
+    assert trusted_gold_route_action({
+        **lighthouse_4f,
+        "coordinates": {"x": 3, "y": 8},
+    }) == "down"
+    assert trusted_gold_lighthouse_buttons({
+        **lighthouse_4f,
+        "coordinates": {"x": 15, "y": 3},
+    }) == ["left"] * 6
+    lighthouse_5f = {
+        **lighthouse_4f,
+        "map_number": 0x26,
+        "coordinates": {"x": 3, "y": 5},
+    }
+    assert trusted_gold_route_action(lighthouse_5f) == "up"
+    assert trusted_gold_lighthouse_buttons({
+        **lighthouse_5f,
+        "coordinates": {"x": 3, "y": 4},
+    }) == ["down"] * 6
+    assert trusted_gold_route_action({
+        **lighthouse_5f,
+        "coordinates": {"x": 9, "y": 13},
+    }) == "down"
+    lighthouse_6f = {
+        **lighthouse_5f,
+        "map_number": 0x27,
+        "coordinates": {"x": 9, "y": 15},
+    }
+    assert trusted_gold_route_action(lighthouse_6f) == "up"
+    assert trusted_gold_lighthouse_buttons({
+        **lighthouse_6f,
+        "coordinates": {"x": 8, "y": 9},
+    }) == ["up", "a"]
+    explained_lighthouse = {
+        **lighthouse_6f,
+        "coordinates": {"x": 8, "y": 9},
+        "story_events": {
+            **lighthouse_6f["story_events"],
+            "jasmine_explained_sickness": True,
+        },
+    }
+    assert trusted_gold_route_action(explained_lighthouse) == "right"
+    assert trusted_gold_lighthouse_buttons(explained_lighthouse) == [
+        "right",
+    ] * 6
+    assert trusted_gold_route_action({
+        **explained_lighthouse,
+        "coordinates": {"x": 10, "y": 8},
+    }) == "down"
+    assert trusted_gold_route_action({
+        **explained_lighthouse,
+        "coordinates": {"x": 10, "y": 10},
+    }) == "up"
+    assert trusted_gold_route_action({
+        **explained_lighthouse,
+        "map_number": 0x24,
+        "coordinates": {"x": 14, "y": 10},
+    }) == "down"
+    assert trusted_gold_lighthouse_buttons({
+        **explained_lighthouse,
+        "map_number": 0x22,
+        "coordinates": {"x": 11, "y": 15},
+    }) == ["down"] * 6
+    assert trusted_gold_route_action({
+        **explained_lighthouse,
+        "map_group": 0x01,
+        "map_number": 0x0E,
+        "coordinates": {"x": 27, "y": 27},
+    }) == "up"
+    assert trusted_gold_route_action({
+        **explained_lighthouse,
+        "map_group": 0x01,
+        "map_number": 0x0E,
+        "coordinates": {"x": 17, "y": 23},
+    }) == "left"
+    cianwood = {
+        **explained_lighthouse,
+        "map_group": 0x16,
+        "map_number": 0x03,
+        "coordinates": {"x": 19, "y": 33},
+    }
+    assert trusted_gold_route_action(cianwood) == "down"
+    pharmacy = {
+        **cianwood,
+        "map_number": 0x07,
+        "coordinates": {"x": 2, "y": 4},
+    }
+    assert "pharmacist" in gold_route_guidance(pharmacy)
+    assert trusted_gold_route_action(pharmacy) == "up"
+    assert trusted_gold_cianwood_buttons(pharmacy) == ["up", "a"]
+    pharmacy_done = {
+        **pharmacy,
+        "story_events": {
+            **pharmacy["story_events"],
+            "got_secret_potion": True,
+        },
+    }
+    assert trusted_gold_route_action(pharmacy_done) == "down"
+    assert trusted_gold_cianwood_buttons(pharmacy_done) is None
+    cianwood_hurt = {
+        **pharmacy_done,
+        "map_number": 0x03,
+        "coordinates": {"x": 20, "y": 44},
+        "party": [{"hp": 59, "max_hp": 121}],
+    }
+    assert trusted_gold_route_action(cianwood_hurt) == "right"
+    cianwood_center = {
+        **cianwood_hurt,
+        "map_number": 0x06,
+        "coordinates": {"x": 3, "y": 3},
+    }
+    assert trusted_gold_route_action(cianwood_center) is None
+    assert trusted_gold_cianwood_buttons(cianwood_center) == ["up", "a"]
+    assert trusted_gold_route_action({
+        **cianwood_center,
+        "coordinates": {"x": 3, "y": 4},
+    }) == "up"
+    cianwood_healed = {
+        **cianwood_hurt,
+        "coordinates": {"x": 20, "y": 44},
+        "party": [{"hp": 121, "max_hp": 121}],
+    }
+    assert trusted_gold_route_action(cianwood_healed) == "left"
+    cianwood_gym = {
+        **pharmacy_done,
+        "map_number": 0x05,
+        "coordinates": {"x": 4, "y": 9},
+        "strength_active": True,
+        "facing_direction": 4,
+        "cianwood_gym_boulders": [
+            {"x": 3, "y": 7},
+            {"x": 4, "y": 7},
+            {"x": 5, "y": 7},
+        ],
+    }
+    assert trusted_gold_route_action(cianwood_gym) == "up"
+    assert trusted_gold_route_action({
+        **cianwood_gym,
+        "coordinates": {"x": 5, "y": 8},
+    }) == "left"
+    assert trusted_gold_route_action({
+        **cianwood_gym,
+        "coordinates": {"x": 5, "y": 7},
+        "cianwood_gym_boulders": [
+            {"x": 3, "y": 7},
+            {"x": 4, "y": 7},
+            {"x": 5, "y": 6},
+        ],
+    }) == "down"
+    assert trusted_gold_route_action({
+        **cianwood_gym,
+        "coordinates": {"x": 5, "y": 13},
+        "cianwood_gym_boulders": [],
+    }) == "left"
+    left_lifted = {
+        **cianwood_gym,
+        "coordinates": {"x": 3, "y": 8},
+        "cianwood_gym_boulders": [
+            {"x": 3, "y": 6},
+            {"x": 4, "y": 7},
+            {"x": 5, "y": 7},
+        ],
+    }
+    assert trusted_gold_route_action(left_lifted) == "up"
+    assert trusted_gold_route_action({
+        **left_lifted,
+        "facing_direction": 0,
+    }) == "right"
+    sides_lifted = {
+        **left_lifted,
+        "coordinates": {"x": 5, "y": 8},
+        "cianwood_gym_boulders": [
+            {"x": 3, "y": 6},
+            {"x": 5, "y": 6},
+            {"x": 4, "y": 7},
+        ],
+    }
+    assert trusted_gold_route_action(sides_lifted) == "up"
+    assert trusted_gold_route_action({
+        **sides_lifted,
+        "facing_direction": 0,
+    }) == "left"
+    center_open = {
+        **sides_lifted,
+        "coordinates": {"x": 4, "y": 6},
+        "cianwood_gym_boulders": [
+            {"x": 3, "y": 6},
+            {"x": 5, "y": 6},
+            {"x": 5, "y": 7},
+        ],
+    }
+    assert trusted_gold_route_action(center_open) == "up"
+    assert trusted_gold_route_action({
+        **center_open,
+        "coordinates": {"x": 4, "y": 4},
+    }) == "left"
+    assert trusted_gold_cianwood_buttons({
+        **center_open,
+        "coordinates": {"x": 4, "y": 2},
+    }) == ["up", "a"]
+    chuck_defeated = {
+        **center_open,
+        "coordinates": {"x": 4, "y": 2},
+        "badges": [*center_open["badges"], "Storm"],
+        "story_events": {
+            **center_open["story_events"],
+            "beat_chuck": True,
+        },
+    }
+    assert "HM02 Fly" in gold_route_guidance(chuck_defeated)
+    assert trusted_gold_route_action(chuck_defeated) == "left"
+    assert trusted_gold_route_action({
+        **chuck_defeated,
+        "coordinates": {"x": 3, "y": 2},
+    }) == "down"
+    chuck_wife_route = {
+        **chuck_defeated,
+        "map_number": 0x03,
+        "coordinates": {"x": 8, "y": 44},
+    }
+    assert "Chuck's wife" in gold_route_guidance(chuck_wife_route)
+    assert trusted_gold_route_action(chuck_wife_route) == "down"
+    assert trusted_gold_cianwood_buttons({
+        **chuck_wife_route,
+        "coordinates": {"x": 9, "y": 46},
+    }) == ["right", "a"]
+    assert "x=36" in gold_route_guidance({
+        **chuck_wife_route,
+        "map_number": 0x02,
+        "story_events": {
+            **chuck_wife_route["story_events"],
+            "got_hm_fly": True,
+        },
+    })
+    assert "NORTH through Route 40" in gold_route_guidance({
+        **chuck_wife_route,
+        "map_number": 0x01,
+    })
+    assert trusted_gold_route_action({
+        **chuck_wife_route,
+        "map_group": 0x01,
+        "map_number": 0x0E,
+        "coordinates": {"x": 23, "y": 11},
+        "key_items": {"secret_potion": True},
+    }) == "down"
+    olivine_gym_route = {
+        **chuck_wife_route,
+        "map_group": 0x01,
+        "map_number": 0x0E,
+        "coordinates": {"x": 29, "y": 28},
+        "story_events": {
+            **chuck_wife_route["story_events"],
+            "got_hm_strength": True,
+            "got_secret_potion": True,
+            "jasmine_returned_to_gym": True,
+        },
+    }
+    assert "Amphy is healed" in gold_route_guidance(olivine_gym_route)
+    assert trusted_gold_route_action(olivine_gym_route) == "left"
+    assert trusted_gold_route_action({
+        **olivine_gym_route,
+        "coordinates": {"x": 16, "y": 18},
+    }) == "right"
+    assert trusted_gold_route_action({
+        **olivine_gym_route,
+        "map_number": 0x0D,
+        "coordinates": {"x": 12, "y": 5},
+        "badges": [*olivine_gym_route["badges"], "Mineral"],
+    }) == "down"
+    assert trusted_gold_route_action({
+        **olivine_gym_route,
+        "map_group": 0x02,
+        "map_number": 0x05,
+        "coordinates": {"x": 18, "y": 14},
+        "badges": [*olivine_gym_route["badges"], "Mineral"],
+    }) == "up"
+    assert trusted_gold_route_action({
+        **olivine_gym_route,
+        "map_group": 0x02,
+        "map_number": 0x05,
+        "coordinates": {"x": 33, "y": 9},
+        "badges": [*olivine_gym_route["badges"], "Glacier"],
+    }) == "down"
+    assert trusted_gold_route_action({
+        **olivine_gym_route,
+        "map_group": 0x02,
+        "map_number": 0x07,
+        "coordinates": {"x": 16, "y": 8},
+        "badges": [*olivine_gym_route["badges"], "Mineral"],
+        "key_items": {"red_scale": False},
+    }) == "left"
+    assert trusted_gold_route_action({
+        **olivine_gym_route,
+        "map_group": 0x09,
+        "map_number": 0x06,
+        "coordinates": {"x": 21, "y": 26},
+        "key_items": {"red_scale": True},
+    }) == "right"
+    assert trusted_gold_lake_buttons({
+        **olivine_gym_route,
+        "map_group": 0x09,
+        "map_number": 0x06,
+        "coordinates": {"x": 22, "y": 28},
+        "key_items": {"red_scale": True},
+    }) == ["left", "a"]
+    assert trusted_gold_lake_buttons({
+        **olivine_gym_route,
+        "map_group": 0x09,
+        "map_number": 0x06,
+        "coordinates": {"x": 22, "y": 28},
+        "key_items": {"red_scale": True},
+        "screen_text": "LAKE OF RAGE",
+    }) == ["a"]
+    assert trusted_gold_lake_buttons({
+        **olivine_gym_route,
+        "map_group": 0x09,
+        "map_number": 0x06,
+        "coordinates": {"x": 21, "y": 26},
+        "key_items": {"red_scale": True},
+        "screen_text": "YES | NO | Will you help?",
+    }) == ["up", "a"]
+    assert trusted_gold_route_action({
+        **olivine_gym_route,
+        "map_group": 0x09,
+        "map_number": 0x05,
+        "coordinates": {"x": 3, "y": 17},
+        "story_events": {
+            **olivine_gym_route["story_events"],
+            "decided_to_help_lance": True,
+        },
+    }) == "right"
+    assert trusted_gold_route_action({
+        **olivine_gym_route,
+        "map_group": 0x03,
+        "map_number": 0x2A,
+        "coordinates": {"x": 14, "y": 11},
+        "story_events": {
+            **olivine_gym_route["story_events"],
+            "cleared_rocket_hideout": True,
+        },
+    }) == "down"
+    assert trusted_gold_route_action({
+        **olivine_gym_route,
+        "map_group": 0x03,
+        "map_number": 0x29,
+        "coordinates": {"x": 5, "y": 2},
+        "story_events": {
+            **olivine_gym_route["story_events"],
+            "cleared_rocket_hideout": True,
+        },
+    }) == "right"
+    assert trusted_gold_rocket_buttons({
+        **olivine_gym_route,
+        "map_group": 0x03,
+        "map_number": 0x2B,
+        "coordinates": {"x": 11, "y": 10},
+        "story_events": {
+            **olivine_gym_route["story_events"],
+            "met_rival_rocket_base": True,
+        },
+    }) == ["up", "a"]
+    assert trusted_gold_rocket_buttons({
+        **olivine_gym_route,
+        "map_group": 0x03,
+        "map_number": 0x2A,
+        "coordinates": {"x": 8, "y": 7},
+        "story_events": {
+            **olivine_gym_route["story_events"],
+            "opened_rocket_transmitter_door": True,
+            "rocket_electrode_3": True,
+        },
+    }) == ["left", "a"]
+    assert trusted_gold_route_action({
+        **olivine_gym_route,
+        "map_group": 0x03,
+        "map_number": 0x2A,
+        "coordinates": {"x": 8, "y": 9},
+        "story_events": {
+            **olivine_gym_route["story_events"],
+            "opened_rocket_transmitter_door": True,
+            "rocket_electrode_3": True,
+        },
+    }) == "right"
+    assert trusted_gold_rocket_buttons({
+        **olivine_gym_route,
+        "map_group": 0x03,
+        "map_number": 0x2B,
+        "coordinates": {"x": 3, "y": 3},
+        "story_events": {
+            **olivine_gym_route["story_events"],
+            "learned_hail_giovanni": True,
+        },
+    }) == ["up"] * 6
+    assert trusted_gold_rocket_buttons({
+        **olivine_gym_route,
+        "map_group": 0x03,
+        "map_number": 0x2A,
+        "coordinates": {"x": 15, "y": 13},
+        "story_events": {
+            **olivine_gym_route["story_events"],
+            "learned_hail_giovanni": True,
+        },
+    }) == ["up", "a"]
+    assert trusted_gold_route_action({
+        **olivine_gym_route,
+        "map_group": 0x03,
+        "map_number": 0x2B,
+        "coordinates": {"x": 3, "y": 2},
+        "story_events": {
+            **olivine_gym_route["story_events"],
+            "learned_hail_giovanni": True,
+        },
+    }) == "down"
+    assert trusted_gold_route_action({
+        **olivine_gym_route,
+        "map_group": 0x03,
+        "map_number": 0x2A,
+        "coordinates": {"x": 3, "y": 1},
+        "story_events": {
+            **olivine_gym_route["story_events"],
+            "learned_hail_giovanni": True,
+        },
+    }) == "right"
+    assert trusted_gold_route_action({
+        **olivine_gym_route,
+        "map_group": 0x03,
+        "map_number": 0x2B,
+        "coordinates": {"x": 10, "y": 10},
+        "story_events": {
+            **olivine_gym_route["story_events"],
+            "opened_giovanni_office": True,
+        },
+    }) == "up"
+    assert trusted_gold_rocket_buttons({
+        **olivine_gym_route,
+        "map_group": 0x03,
+        "map_number": 0x2B,
+        "coordinates": {"x": 7, "y": 3},
+        "story_events": {
+            **olivine_gym_route["story_events"],
+            "beat_rocket_commander": True,
+        },
+    }) == ["up", "a"]
+    assert trusted_gold_route_action({
+        **olivine_gym_route,
+        "map_group": 0x03,
+        "map_number": 0x2B,
+        "coordinates": {"x": 3, "y": 3},
+        "story_events": {
+            **olivine_gym_route["story_events"],
+            "learned_raticate_tail": True,
+            "learned_slowpoketail": True,
+        },
+    }) == "down"
+    assert trusted_gold_route_action({
+        **olivine_gym_route,
+        "map_group": 0x03,
+        "map_number": 0x2B,
+        "coordinates": {"x": 8, "y": 10},
+        "story_events": {
+            **olivine_gym_route["story_events"],
+            "learned_raticate_tail": True,
+            "learned_slowpoketail": True,
+            "met_rival_rocket_base": True,
+        },
+    }) == "right"
+    assert trusted_gold_route_action({
+        **olivine_gym_route,
+        "map_group": 0x03,
+        "map_number": 0x29,
+        "coordinates": {"x": 2, "y": 14},
+    }) == "right"
+    assert trusted_gold_route_action({
+        **olivine_gym_route,
+        "map_group": 0x03,
+        "map_number": 0x2A,
+        "coordinates": {"x": 10, "y": 13},
+    }) == "right"
+    assert trusted_gold_route_action({
+        **olivine_gym_route,
+        "map_group": 0x03,
+        "map_number": 0x2A,
+        "coordinates": {"x": 22, "y": 13},
+    }) == "left"
+    assert trusted_gold_route_action({
+        **olivine_gym_route,
+        "map_group": 0x03,
+        "map_number": 0x2B,
+        "coordinates": {"x": 28, "y": 4},
+        "story_events": {
+            **olivine_gym_route["story_events"],
+            "learned_raticate_tail": True,
+        },
+    }) == "up"
+    assert trusted_gold_route_action({
+        **olivine_gym_route,
+        "map_group": 0x03,
+        "map_number": 0x2A,
+        "coordinates": {"x": 27, "y": 3},
+        "story_events": {
+            **olivine_gym_route["story_events"],
+            "learned_raticate_tail": True,
+            "learned_slowpoketail": True,
+        },
+    }) == "right"
+    assert trusted_gold_route_action({
+        **olivine_gym_route,
+        "map_group": 0x03,
+        "map_number": 0x2A,
+        "coordinates": {"x": 5, "y": 1},
+        "rocket_grunt18_blocking": True,
+        "story_events": {
+            **olivine_gym_route["story_events"],
+            "learned_raticate_tail": True,
+            "learned_slowpoketail": True,
+        },
+    }) == "right"
+    assert trusted_gold_route_action({
+        **olivine_gym_route,
+        "map_group": 0x02,
+        "map_number": 0x07,
+        "coordinates": {"x": 13, "y": 8},
+        "story_events": {
+            **olivine_gym_route["story_events"],
+            "decided_to_help_lance": True,
+        },
+    }) == "left"
+    assert trusted_gold_route_action({
+        **olivine_gym_route,
+        "map_group": 0x02,
+        "map_number": 0x02,
+        "coordinates": {"x": 7, "y": 2},
+    }) == "left"
+    assert trusted_gold_route_action({
+        **olivine_gym_route,
+        "map_group": 0x02,
+        "map_number": 0x07,
+        "coordinates": {"x": 10, "y": 14},
+        "badges": [*olivine_gym_route["badges"], "Glacier"],
+    }) == "up"
+    assert trusted_gold_route_action({
+        **olivine_gym_route,
+        "map_group": 0x0B,
+        "map_number": 0x02,
+        "coordinates": {"x": 15, "y": 28},
+        "badges": [*olivine_gym_route["badges"], "Glacier"],
+    }) == "right"
+    assert trusted_gold_route_action({
+        **olivine_gym_route,
+        "map_group": 0x02,
+        "map_number": 0x07,
+        "coordinates": {"x": 3, "y": 12},
+        "story_events": {
+            **olivine_gym_route["story_events"],
+            "cleared_rocket_hideout": True,
+        },
+    }) == "left"
+    assert trusted_gold_route_action({
+        **olivine_gym_route,
+        "map_group": 0x03,
+        "map_number": 0x28,
+        "coordinates": {"x": 5, "y": 4},
+        "story_events": {
+            **olivine_gym_route["story_events"],
+            "decided_to_help_lance": True,
+        },
+    }) == "right"
+    assert trusted_gold_route_action({
+        **olivine_gym_route,
+        "map_number": 0x09,
+        "coordinates": {"x": 0, "y": 5},
+        "badges": [*olivine_gym_route["badges"], "Mineral"],
+    }) == "right"
+    assert trusted_gold_route_action({
+        **olivine_gym_route,
+        "map_group": 0x04,
+        "map_number": 0x09,
+        "coordinates": {"x": 32, "y": 21},
+        "badges": [*olivine_gym_route["badges"], "Mineral"],
+    }) == "down"
+    assert trusted_gold_route_action({
+        **chuck_wife_route,
+        "map_group": 0x01,
+        "map_number": 0x05,
+        "coordinates": {"x": 2, "y": 7},
+        "key_items": {"secret_potion": True},
+    }) == "down"
+    route36_rock_smash = {
+        **healed_tower,
+        "map_group": 0x0A,
+        "map_number": 0x03,
+        "coordinates": {"x": 32, "y": 9},
+        "story_events": {
+            **healed_tower["story_events"],
+            "fought_sudowoodo": True,
+            "got_tm_rock_smash": False,
+        },
+    }
+    assert trusted_gold_route_action(route36_rock_smash) == "right"
+    assert trusted_gold_rock_smash_gift_buttons({
+        **route36_rock_smash,
+        "coordinates": {"x": 43, "y": 9},
+    }) == ["right", "a"]
 
 
 def test_normalize_brain_decision_filters_buttons():
@@ -4469,6 +6136,27 @@ def test_operator_hold_is_never_auto_resumed(monkeypatch):
     assert runner.pause_owner is None
 
 
+def test_rewind_persistence_failure_does_not_report_loaded_state_rejected(
+    monkeypatch,
+):
+    runner = _control_runner(monkeypatch)
+    runner._rotate_clip = lambda reason: None
+    runner._hotload_git_checkpoint = lambda commit: "a" * 40
+
+    def fail_checkpoint(reason):
+        raise OSError("disk full")
+
+    runner._save_checkpoint = fail_checkpoint
+    runner.controls.put({"action": "rewind", "commit": "a" * 12})
+
+    runner._process_controls()
+
+    assert runner.status["last_rejected_control"] is None
+    assert runner.status["last_error"] == (
+        "Git rewind loaded, but checkpoint persistence failed: disk full"
+    )
+
+
 @pytest.mark.parametrize(
     ("query", "expected"),
     [
@@ -4506,6 +6194,35 @@ def test_agent_rejects_control_when_not_running(tmp_path):
 
     assert result["status"] == "error"
     assert "not running" in result["message"]
+
+
+def test_agent_validates_and_queues_git_rewind(tmp_path):
+    (tmp_path / "status.json").write_text(
+        json.dumps({"running": True, "pid": os.getpid(), "port": 9999})
+    )
+
+    invalid = json.loads(
+        PokemonAgent().perform(
+            action="rewind",
+            commit="not-a-commit",
+            runtime_dir=str(tmp_path),
+        )
+    )
+    valid = json.loads(
+        PokemonAgent().perform(
+            action="rewind",
+            commit="a" * 12,
+            runtime_dir=str(tmp_path),
+        )
+    )
+
+    assert invalid["status"] == "error"
+    assert valid["status"] == "success"
+    command = json.loads(
+        (tmp_path / "control.jsonl").read_text().splitlines()[-1]
+    )
+    assert command["action"] == "rewind"
+    assert command["commit"] == "a" * 12
 
 
 def test_agent_pause_defaults_to_bounded_automation_lease(tmp_path):
@@ -4636,6 +6353,86 @@ class FakeStateEmulator:
     def tick(self):
         self.ticks += 1
         return True
+
+
+def test_running_client_hotloads_verified_git_state(tmp_path):
+    class HotloadEmulator(FakeStateEmulator):
+        def __init__(self):
+            super().__init__()
+            self.screen = SimpleNamespace(
+                image=SimpleNamespace(copy=lambda: b"frame")
+            )
+            self.events = []
+
+        def send_input(self, event):
+            self.events.append(event)
+
+        def set_emulation_speed(self, speed):
+            self.speed = speed
+
+    class HotloadReader:
+        def __init__(self, memory):
+            del memory
+
+        def snapshot(self):
+            return {
+                "game_id": "gold",
+                "map_id": 0x0B03,
+                "map_group": 0x0B,
+                "map_number": 0x03,
+                "location": "Goldenrod Gym",
+                "coordinates": {"x": 8, "y": 4},
+                "badges": ["Zephyr", "Hive"],
+                "elite_four_completed": False,
+                "red_defeated": False,
+            }
+
+    class Archive:
+        def load(self, commitish):
+            assert commitish == "a" * 12
+            return (
+                "a" * 40,
+                {"checkpoint_id": "state-20260815-120000-000001"},
+                b"git-state",
+            )
+
+    rom = tmp_path / "Pokemon Gold.gbc"
+    rom.write_bytes(b"rom")
+    runner = PokemonRunner.__new__(PokemonRunner)
+    runner.git_checkpoint_archive = Archive()
+    runner.rom = rom
+    runner.rom_sha256 = file_sha256(rom)
+    runner.pyboy = HotloadEmulator()
+    runner.player = ActionPlayer()
+    runner.memory_reader_class = HotloadReader
+    runner.game_id = "gold"
+    runner.control_mode = "ai"
+    runner.resume_mode = "ai"
+    runner.control_generation = 0
+    runner.pause_kind = None
+    runner.pause_owner = None
+    runner.pause_expires_at = None
+    runner.emulator_pause_requested = False
+    runner.navigation_memory = SimpleNamespace(cancel_pending=lambda: None)
+    runner.decision_positions = deque()
+    runner.last_crowd_advisory_position = None
+    runner.decision_pending = False
+    runner.committed_route = None
+    runner.last_progress_marker = None
+    runner.status = {
+        "brain_status": "idle",
+        "game_state": {},
+        "completed": False,
+    }
+    runner._save_latest_frame = lambda image: None
+
+    resolved = runner._hotload_git_checkpoint("a" * 12)
+
+    assert resolved == "a" * 40
+    assert runner.pyboy.loaded[-1] == b"git-state"
+    assert runner.status["loaded_state"] == "git:" + "a" * 40
+    assert runner.status["game_state"]["location"] == "Goldenrod Gym"
+    assert runner.status["last_rewind"]["checkpoint_id"].endswith("000001")
 
 
 def test_checkpoint_is_atomic_and_manifested(tmp_path):
@@ -5041,6 +6838,59 @@ def test_stale_ai_decision_is_discarded_after_manual_takeover():
     assert runner.history == []
     assert runner.status["last_discarded_decision"]["decision_id"] == 1
     assert runner.status["brain_status"] == "manual"
+
+
+def test_stale_ai_decision_is_discarded_when_bugsy_helper_becomes_active(
+    tmp_path,
+):
+    runner = PokemonRunner.__new__(PokemonRunner)
+    runner.brain_results = queue.Queue()
+    runner.brain_results.put(
+        {
+            "decision_id": 2,
+            "generation": 0,
+            "decision": {
+                "phase": "overworld",
+                "observation": "walk toward Bugsy",
+                "objective": "challenge the gym leader",
+                "reason": "approach",
+                "buttons": ["up"],
+                "checkpoint": False,
+            },
+        }
+    )
+    runner.pending_decision_id = 2
+    runner.decision_pending = True
+    runner.control_generation = 0
+    runner.control_mode = "ai"
+    runner.emulator_pause_requested = False
+    runner.last_decision_requested = 10.0
+    runner.last_decision_finished = 5.0
+    runner.status = {
+        "game_state": {
+            "game_id": "gold",
+            "map_group": 0x08,
+            "map_number": 0x05,
+            "in_battle": True,
+            "badges": ["Zephyr"],
+            "screen_text": "FIGHT | PACK RUN",
+        }
+    }
+    runner.navigation_memory = NavigationMemory(
+        tmp_path / "navigation-memory.json"
+    )
+    runner.player = None
+
+    runner._apply_brain_result()
+
+    assert runner.decision_pending is False
+    assert runner.status["last_discarded_decision"] == {
+        "decision_id": 2,
+        "reason": "trusted route became applicable",
+        "timestamp": runner.status["last_discarded_decision"]["timestamp"],
+    }
+    assert runner.status["brain_status"] == "idle"
+    assert runner.last_decision_finished == 0
 
 
 def test_recording_clock_emits_wall_clock_frame_count(monkeypatch):
@@ -5500,6 +7350,8 @@ def test_runtime_parser_and_command_support_supervision(tmp_path):
             str(tmp_path / "Pokemon Red.gb"),
             "--runtime-dir",
             str(tmp_path),
+            "--state-repo",
+            str(tmp_path),
             "--port",
             "9999",
             "--youtube-chat-hints",
@@ -5516,6 +7368,7 @@ def test_runtime_parser_and_command_support_supervision(tmp_path):
     assert "--supervised" in command
     assert "--max-clips" in command
     assert "--max-storage-gb" in command
+    assert "--state-repo" in command
     assert "--youtube-chat-hints" in command
     assert "--stuck-web-research" in command
 
@@ -5829,6 +7682,65 @@ def test_retention_removes_only_old_generated_artifacts(tmp_path):
     assert unknown_state.read_bytes() == b"user state"
     assert runner.status["retained_clips"] == 2
     assert runner.status["retained_states"] == 2
+
+
+def test_oversized_player_log_is_truncated_in_place(tmp_path):
+    log_path = tmp_path / "player.log"
+    log_path.write_bytes(b"x" * 64)
+    descriptor = os.open(log_path, os.O_WRONLY | os.O_APPEND)
+    try:
+        assert pokemon_module.truncate_regular_file_if_oversized(
+            log_path,
+            16,
+        )
+        assert log_path.stat().st_size == 0
+        os.write(descriptor, b"next")
+    finally:
+        os.close(descriptor)
+
+    assert log_path.read_bytes() == b"next"
+
+
+def test_latest_frame_recovers_once_after_storage_exhaustion(tmp_path):
+    class Image:
+        saves = 0
+
+        def save(self, path, format):
+            assert format == "PNG"
+            self.saves += 1
+            if self.saves == 1:
+                raise OSError(errno.ENOSPC, "disk full")
+            Path(path).write_bytes(b"png")
+
+    runner = PokemonRunner.__new__(PokemonRunner)
+    runner.runtime_dir = tmp_path
+    runner.status = {}
+    cleanup_calls = []
+    runner._enforce_retention = lambda: cleanup_calls.append(True)
+
+    assert runner._save_latest_frame(Image()) is True
+    assert cleanup_calls == [True]
+    assert (tmp_path / "latest.png").read_bytes() == b"png"
+    assert runner.status["storage_write_error"] is None
+    assert runner.status["storage_recovered_at"]
+
+
+def test_decision_request_backs_off_when_screenshot_cannot_be_saved(
+    tmp_path,
+):
+    runner = PokemonRunner.__new__(PokemonRunner)
+    runner.screens_dir = tmp_path
+    runner.run_id = "storage"
+    runner.decision_sequence = 0
+    runner.status = {}
+    runner.brain_requests = queue.Queue(maxsize=1)
+    runner._save_png = lambda image, destination: False
+
+    runner._request_decision(object(), {}, None)
+
+    assert runner.brain_requests.empty()
+    assert runner.decision_sequence == 0
+    assert runner.status["brain_status"] == "storage-pressure"
 
 
 def test_supervisor_escalates_hung_child_on_stop():

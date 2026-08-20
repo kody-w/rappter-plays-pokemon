@@ -418,6 +418,30 @@ def test_launch_preflight_bypasses_controls_and_blocks_live_start(
     ) == ("start", True)
 
 
+def test_cli_supports_git_checkpoint_archive_and_rewind(tmp_path):
+    start = cli.build_parser().parse_args(
+        [
+            "start",
+            "--runtime-dir",
+            str(tmp_path / "runtime"),
+            "--state-repo",
+            str(tmp_path / "repo"),
+        ]
+    )
+    rewind = cli.build_parser().parse_args(
+        [
+            "rewind",
+            "--runtime-dir",
+            str(tmp_path / "runtime"),
+            "--commit",
+            "a" * 12,
+        ]
+    )
+
+    assert cli.agent_kwargs(start, {})["state_repo"] == tmp_path / "repo"
+    assert cli.agent_kwargs(rewind, {})["commit"] == "a" * 12
+
+
 @pytest.mark.parametrize(
     ("preflight", "action", "expected_install", "expected_code"),
     [

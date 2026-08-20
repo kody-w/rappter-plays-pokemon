@@ -275,9 +275,26 @@ function telemetry(sequence, locationValue) {
   assert(badges[0].classNames.has("earned"));
   assert(badges[0].textContent.includes("✓"));
 
+  const gold = telemetry(2, "Goldenrod City");
+  gold.snapshot.badges = {
+    earned: ["Zephyr", "Hive"],
+    count: 2,
+    total: 16,
+  };
+  gold.snapshot.pokedex = {caught: 12, seen: 20, total: 251};
+  gold.snapshot.play_time = {
+    hours: 600,
+    minutes: 4,
+    seconds: 3,
+    frames: 2,
+    maxed: false,
+  };
+  data.emit("data", gold);
+  assert.strictEqual(element("location").textContent, "Goldenrod City");
+
   data.emit("data", telemetry(0, "out-of-order"));
   assert.notStrictEqual(element("location").textContent, "out-of-order");
-  const malformed = telemetry(2, "malformed");
+  const malformed = telemetry(3, "malformed");
   malformed.snapshot.secret = "must reject";
   data.emit("data", malformed);
   assert.notStrictEqual(element("location").textContent, "malformed");
@@ -332,11 +349,11 @@ function telemetry(sequence, locationValue) {
   assert(element("details-banner").textContent.includes("Last known"));
   assert.strictEqual(
     element("location").textContent,
-    "<script>alert(1)</script>",
+    "Goldenrod City",
     "retained telemetry is visibly labeled last known rather than current"
   );
 
-  data.emit("data", telemetry(2, "Cerulean City"));
+  data.emit("data", telemetry(4, "Cerulean City"));
   assert.strictEqual(element("location").textContent, "Cerulean City");
   assert.strictEqual(element("details-health").textContent, "Live");
   assert.strictEqual(data.sent.length, 1, "the watch hello is the only outbound data");

@@ -501,12 +501,20 @@ function validSnapshot(value) {
     !boundedText(value.phase, 40) ||
     typeof value.completed !== 'boolean'
   ) return false;
-  const badgeNames = [
+  const redBadgeNames = [
     'Boulder', 'Cascade', 'Thunder', 'Rainbow',
     'Soul', 'Marsh', 'Volcano', 'Earth'
   ];
+  const goldBadgeNames = [
+    'Zephyr', 'Hive', 'Plain', 'Fog',
+    'Mineral', 'Storm', 'Glacier', 'Rising',
+    ...redBadgeNames
+  ];
+  const badgeNames =
+    value.badges.total === 16 ? goldBadgeNames : redBadgeNames;
   if (
     !hasExactKeys(value.badges, ['earned', 'count', 'total']) ||
+    ![8, 16].includes(value.badges.total) ||
     !Array.isArray(value.badges.earned) ||
     value.badges.earned.some(name => !badgeNames.includes(name)) ||
     new Set(value.badges.earned).size !== value.badges.earned.length ||
@@ -514,16 +522,17 @@ function validSnapshot(value) {
       value.badges.count === null ||
       value.badges.count === value.badges.earned.length
     ) ||
-    (value.badges.count === null && value.badges.earned.length !== 0) ||
-    value.badges.total !== 8
+    (value.badges.count === null && value.badges.earned.length !== 0)
   ) return false;
+  const pokedexTotal = value.pokedex.total;
   if (
     !hasExactKeys(value.pokedex, ['caught', 'seen', 'total']) ||
+    ![151, 251].includes(pokedexTotal) ||
+    (value.badges.total === 16) !== (pokedexTotal === 251) ||
     !(value.pokedex.caught === null ||
-      boundedInteger(value.pokedex.caught, 0, 151)) ||
+      boundedInteger(value.pokedex.caught, 0, pokedexTotal)) ||
     !(value.pokedex.seen === null ||
-      boundedInteger(value.pokedex.seen, 0, 151)) ||
-    value.pokedex.total !== 151
+      boundedInteger(value.pokedex.seen, 0, pokedexTotal))
   ) return false;
   if (!(value.party === null || (
     Array.isArray(value.party) && value.party.length <= 6
@@ -556,7 +565,11 @@ function validSnapshot(value) {
       ['hours', 'minutes', 'seconds', 'frames', 'maxed']
     )) return false;
     if (
-      !boundedInteger(value.play_time.hours, 0, 255) ||
+      !boundedInteger(
+        value.play_time.hours,
+        0,
+        pokedexTotal === 251 ? 999 : 255
+      ) ||
       !boundedInteger(value.play_time.minutes, 0, 59) ||
       !boundedInteger(value.play_time.seconds, 0, 59) ||
       !boundedInteger(value.play_time.frames, 0, 59) ||

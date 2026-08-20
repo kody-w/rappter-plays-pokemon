@@ -16,6 +16,7 @@ ACTIONS = (
     "pause",
     "resume",
     "checkpoint",
+    "rewind",
     "press",
     "view",
     "host",
@@ -52,6 +53,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("button", nargs="?", choices=BUTTONS)
     parser.add_argument("--config", type=Path)
     parser.add_argument("--rom", dest="rom_path")
+    parser.add_argument("--commit", help="Git checkpoint commit for rewind")
+    parser.add_argument(
+        "--state-repo",
+        type=Path,
+        help="Git repository root for isolated checkpoint commits",
+    )
     parser.add_argument(
         "--runtime-dir",
         type=Path,
@@ -186,6 +193,10 @@ def agent_kwargs(args: argparse.Namespace, config: dict[str, Any]) -> dict[str, 
         if not args.button:
             raise RuntimeError("press requires a button")
         kwargs["button"] = args.button
+    if args.action == "rewind":
+        if not args.commit:
+            raise RuntimeError("rewind requires --commit")
+        kwargs["commit"] = args.commit
     if args.action != "start":
         return kwargs
 
@@ -205,6 +216,7 @@ def agent_kwargs(args: argparse.Namespace, config: dict[str, Any]) -> dict[str, 
             "rom_path",
             os.environ.get("OPENRAPPTER_POKEMON_ROM"),
         ),
+        "state_repo": _configured(args, config, "state_repo"),
         "port": _configured(args, config, "port", 8765),
         "livestream": _configured(args, config, "livestream", False),
         "livestream_host": livestream_host,

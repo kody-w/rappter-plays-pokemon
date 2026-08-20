@@ -212,6 +212,7 @@ const server = createServer(async (request, response) => {
       );
       const host = {
         brain_status: 'idle',
+        game_id: null,
         actions_taken: null,
         clips_count: null,
         latest_clip_location: null,
@@ -262,6 +263,8 @@ const server = createServer(async (request, response) => {
           await readFile(path.join(runtimeDir, 'status.json'), 'utf-8')
         );
         host.emulation_speed = agentStatus.emulation_speed ?? null;
+        host.game_id =
+          agentStatus.game_id === 'gold' ? 'gold' : 'red';
         host.decision_latency_seconds =
           agentStatus.decision_latency_seconds ?? null;
         host.reasoning_effort = agentStatus.reasoning_effort ?? null;
@@ -309,6 +312,9 @@ const port = server.address().port;
 
 const width = Math.round(1280 * args.scale);
 const height = Math.round(720 * args.scale);
+const videoFilter =
+  `scale=${width}:${height}:flags=neighbor,` +
+  'setsar=1,setdar=16/9,format=yuv420p';
 const browser = await chromium.launch();
 const page = await browser.newPage({
   viewport: {width, height},
@@ -344,7 +350,7 @@ const ffmpeg = spawn('ffmpeg', [
   '-ar', '48000',
   '-ac', '2',
   '-i', 'pipe:3',
-  '-vf', 'format=yuv420p',
+  '-vf', videoFilter,
   // No aresample=async: with a shared clock there is no runaway gap to chase,
   // and continuously stretching audio to chase one was the background
   // artefact. adelay is now the only audio offset -- a fixed, deliberate
@@ -358,6 +364,7 @@ const ffmpeg = spawn('ffmpeg', [
   '-maxrate', height > 720 ? '4500k' : '2500k',
   '-bufsize', height > 720 ? '9000k' : '5000k',
   '-g', '60',
+  '-aspect', '16:9',
   '-c:a', 'aac',
   '-b:a', '128k',
   '-shortest',

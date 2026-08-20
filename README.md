@@ -142,6 +142,7 @@ All commands operate on the default private runtime directory,
 ./launch.sh press a                                        # a/b/start/select
 ./launch.sh autonomy                                       # return control to Copilot
 ./launch.sh checkpoint                                     # save + rotate clip
+./launch.sh rewind --commit COMMIT_SHA                     # hot-load Git checkpoint
 ./launch.sh host                                           # focus managed Pages host
 ./launch.sh go-live                                        # clear a latched host End
 ./launch.sh share                                          # private spectator link/state
@@ -221,6 +222,7 @@ Useful start options:
   --max-states 256 \
   --max-storage-gb 20 \
   --min-free-gb 2 \
+  --state-repo "$(git rev-parse --show-toplevel)" \
   --reasoning-effort medium \
   --youtube-chat-hints \
   --stuck-web-research \
@@ -231,6 +233,18 @@ Useful start options:
 without it. `--no-open-viewer` prevents automatic browser launch.
 `--no-resume` deliberately starts without loading a checkpoint; it does not
 delete existing saves.
+
+`--state-repo` additionally publishes every verified PyBoy checkpoint as a
+linear Git commit under
+`refs/rappter-pokemon/checkpoints/v1/<game>/<rom-hash>/<adventure>`. Git
+plumbing writes only objects and that isolated ref: it never checks out a
+branch, changes `HEAD`, touches the index, stages files, or modifies the dirty
+worktree. Each commit contains `checkpoint.state`, a minimal ROM-bound
+`manifest.json`, and the exact `pokemon_agent.py`; ROM bytes, local paths,
+screenshots, and model prose are excluded. The current ref and commit are
+reported in runtime status. Rewind with `./launch.sh rewind --commit SHA` or
+paste the SHA into the authenticated viewer; the running PyBoy process verifies
+the ref ancestry, ROM hash, blob size, and state hash before hot-loading it.
 
 ### Browser livestream
 
@@ -528,6 +542,7 @@ files containing local state are mode `0600`.
 | `clips/*.json` | Clip hashes, timing, and game-state manifests |
 | `states/*.state` | Atomic PyBoy checkpoints |
 | `states/*.json` | Checkpoint hash and matching-ROM manifest |
+| `git-checkpoint-archive.json` | Private adventure/ref binding for Git checkpoint history |
 | `pokemon-red.ram` | Atomic cartridge RAM |
 | `screens/` | Bounded decision screenshots |
 | `evidence/events-*.jsonl` | Append-only private execution receipts |

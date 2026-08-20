@@ -766,6 +766,28 @@ def test_authenticated_viewer_port_conflict_is_clear(tmp_path):
         blocker.close()
 
 
+def test_supervised_viewer_port_conflict_uses_available_loopback_port(
+    tmp_path,
+):
+    blocker = socket.socket()
+    blocker.bind(("127.0.0.1", 0))
+    blocker.listen()
+    port = blocker.getsockname()[1]
+    server = ViewerServer(
+        tmp_path,
+        port,
+        queue.Queue(),
+        allow_port_fallback=True,
+    )
+    try:
+        server.start()
+        assert server.port != port
+        assert server.port > 0
+    finally:
+        server.stop()
+        blocker.close()
+
+
 @pytest.mark.parametrize("server_type", ["viewer", "spectator"])
 def test_server_stop_closes_bound_only_server_without_shutdown(
     server_type,
