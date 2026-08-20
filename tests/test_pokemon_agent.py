@@ -90,6 +90,7 @@ from openrappter.agents.pokemon_agent import (
     trusted_mewtwo_finalize_buttons,
     trusted_mewtwo_surf_buttons,
     trusted_story_route_action,
+    trusted_yellow_caterpie_capture_buttons,
     wait_for_stopping_supervisor,
     wait_for_supervised_child,
     yellow_route_guidance,
@@ -842,6 +843,47 @@ def test_yellow_route_guidance_requires_brock_counter():
         **base,
         "map_id": 0x36,
     })
+    assert "No Poke Balls" in yellow_route_guidance({
+        **base,
+        "map_id": 0x0D,
+        "poke_ball_count": 0,
+    })
+
+
+def test_trusted_yellow_caterpie_capture_uses_poke_balls():
+    base = {
+        "game_id": "yellow",
+        "in_battle": True,
+        "enemy_species_id": 123,
+        "party": [{"species_id": 84}],
+        "poke_ball_count": 5,
+        "poke_ball_bag_index": 1,
+    }
+
+    assert trusted_yellow_caterpie_capture_buttons({
+        **base,
+        "screen_text": "FIGHT | PKMN | ITEM | RUN",
+        "menu_cursor_index": 0,
+    }) == ["down", "a"]
+    assert trusted_yellow_caterpie_capture_buttons({
+        **base,
+        "screen_text": "POTION | POKE BALL | CANCEL",
+        "menu_cursor_index": 0,
+    }) == ["down"]
+    assert trusted_yellow_caterpie_capture_buttons({
+        **base,
+        "screen_text": "POTION | POKE BALL | CANCEL",
+        "menu_cursor_index": 1,
+    }) == ["a"]
+    assert trusted_yellow_caterpie_capture_buttons({
+        **base,
+        "screen_text": "Give a nickname? YES NO",
+        "menu_cursor_index": 0,
+    }) == ["down", "a"]
+    assert trusted_yellow_caterpie_capture_buttons({
+        **base,
+        "enemy_species_id": 124,
+    }) is None
 
 
 def test_gold_reader_decodes_lower_tilemap_rows_for_bugsy_battle():

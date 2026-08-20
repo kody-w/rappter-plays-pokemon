@@ -470,10 +470,12 @@ def test_yellow_reader_uses_yellow_wram_layout():
     memory[0xD2B8] = 0x50
     set_dex_bit(memory, 0xD2F6, 25)
     set_dex_bit(memory, 0xD309, 25)
-    memory[0xD31C] = 1
+    memory[0xD31C] = 2
     memory[0xD31D] = 0x3F
     memory[0xD31E] = 1
-    memory[0xD31F] = 0xFF
+    memory[0xD31F] = 0x04
+    memory[0xD320] = 3
+    memory[0xD321] = 0xFF
     memory[0xD3AD] = 1
     memory[0xD3AE] = 7
     memory[0xD3AF] = 8
@@ -507,6 +509,8 @@ def test_yellow_reader_uses_yellow_wram_layout():
     }]
     assert snapshot["pokedex"] == {"caught": 1, "seen": 1, "total": 151}
     assert snapshot["key_items"]["ss_ticket"] is True
+    assert snapshot["poke_ball_bag_index"] == 1
+    assert snapshot["poke_ball_count"] == 3
     assert snapshot["warps"] == [{
         "x": 8,
         "y": 7,

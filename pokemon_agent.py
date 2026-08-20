@@ -1809,6 +1809,7 @@ POKE_FLUTE_ITEM_ID = 0x49
 LIFT_KEY_ITEM_ID = 0x4A
 CARD_KEY_ITEM_ID = 0x30
 MASTER_BALL_ITEM_ID = 0x01
+POKE_BALL_ITEM_ID = 0x04
 HALL_OF_FAME_COMPLETED_EVENT = 0x000
 MEWTWO_DEX_NUMBER = 150
 MEWTWO_EVENT = 0x8C1
@@ -13348,6 +13349,32 @@ class PokemonMemoryReader:
                 return index
         return None
 
+    def bag_item_quantity(self, wanted_item_id: int) -> Optional[int]:
+        count = self._read_optional(self.BAG_COUNT_ADDRESS)
+        if count is None or not 0 <= count <= BAG_ITEM_CAPACITY:
+            return None
+        found = 0
+        for index in range(count):
+            item_id = self._read_optional(
+                self.BAG_ITEMS_ADDRESS + index * 2
+            )
+            quantity = self._read_optional(
+                self.BAG_ITEMS_ADDRESS + index * 2 + 1
+            )
+            if (
+                item_id is None
+                or item_id in {0, 0xFF}
+                or quantity is None
+                or not 1 <= quantity <= 99
+            ):
+                return None
+            if item_id == wanted_item_id:
+                found += quantity
+        terminator = self._read_optional(
+            self.BAG_ITEMS_ADDRESS + count * 2
+        )
+        return found if terminator == 0xFF else None
+
     def _event_flag(self, event: int) -> Optional[bool]:
         byte = self._read_optional(self.EVENT_FLAGS_ADDRESS + event // 8)
         return None if byte is None else bool(byte & (1 << (event % 8)))
@@ -13643,6 +13670,8 @@ class PokemonMemoryReader:
             "enemy_species_id": self.enemy_species_id(),
             "menu_cursor_index": self._read(0xCC36) + self._read(0xCC26),
             "master_ball_bag_index": self.bag_item_index(MASTER_BALL_ITEM_ID),
+            "poke_ball_bag_index": self.bag_item_index(POKE_BALL_ITEM_ID),
+            "poke_ball_count": self.bag_item_quantity(POKE_BALL_ITEM_ID),
             "mewtwo_caught": self._bitfield_flag(
                 self.POKEDEX_CAUGHT_ADDRESS, MEWTWO_DEX_NUMBER
             ),
@@ -15913,6 +15942,22 @@ def yellow_route_guidance(game_state: dict[str, Any]) -> Optional[str]:
     if species & {57, 125}:
         return None
     map_id = game_state.get("map_id")
+    poke_ball_count = game_state.get("poke_ball_count")
+    if poke_ball_count == 0 and map_id in {
+        0x01, 0x02, 0x0D, 0x2A, 0x32, 0x33, 0x36
+    }:
+        if map_id == 0x2A:
+            return (
+                "Authoritative Pokemon Yellow Brock preparation. Buy at least "
+                "five Poke Balls in this Viridian Mart before leaving. Do not "
+                "return to Viridian Forest with zero Poke Balls."
+            )
+        return (
+            "Authoritative Pokemon Yellow Brock preparation. No Poke Balls "
+            "are available, so Caterpie cannot be caught. Return south to the "
+            "Viridian Mart at (29,19), buy at least five Poke Balls, then "
+            "return to Viridian Forest."
+        )
     if map_id == 0x33:
         if species & {123, 124}:
             return (
@@ -15934,6 +15979,13 @@ def yellow_route_guidance(game_state: dict[str, Any]) -> Optional[str]:
             "to Ground Pokemon. Return south to Viridian Forest, catch "
             "Caterpie, and train it to Butterfree level 10 before battling "
             "Brock."
+        )
+    if map_id in {0x0D, 0x32}:
+        return (
+            "Authoritative Pokemon Yellow Brock preparation. This party still "
+            "has no verified Brock counter. Return to Viridian Forest and "
+            "catch Caterpie, then train it to Butterfree level 10 before "
+            "continuing north."
         )
     return None
 
@@ -18430,6 +18482,66 @@ def trusted_gold_bugsy_battle_buttons(
         if cursor < 4:
             return ["down"]
         if cursor > 4:
+            return ["up"]
+        return ["a"]
+    return ["a"]
+
+
+def trusted_yellow_caterpie_capture_buttons(
+    game_state: dict[str, Any],
+) -> Optional[list[str]]:
+    """Throw available Poke Balls at Yellow's required Brock counter."""
+    party = game_state.get("party")
+    species = {
+        member.get("species_id")
+        for member in (party or [])
+        if isinstance(member, dict)
+    }
+    if (
+        game_state.get("game_id") != YELLOW_GAME_ID
+        or game_state.get("in_battle") is not True
+        or game_state.get("enemy_species_id") != 123
+        or species & {123, 124, 125}
+        or not isinstance(game_state.get("poke_ball_count"), int)
+        or game_state["poke_ball_count"] <= 0
+        or not isinstance(game_state.get("poke_ball_bag_index"), int)
+    ):
+        return None
+    screen_text = str(game_state.get("screen_text") or "")
+    upper_text = screen_text.upper()
+    cursor = game_state.get("menu_cursor_index")
+    if "NICKNAME" in upper_text and "YES" in upper_text and "NO" in upper_text:
+        return ["down", "a"]
+    if (
+        "CAUGHT" in upper_text
+        or "NEW DEX DATA" in upper_text
+        or "POKDEX DATA" in upper_text
+    ):
+        return ["a"]
+    if "FIGHT" in upper_text and "ITEM" in upper_text and "RUN" in upper_text:
+        if cursor == 0:
+            return ["down", "a"]
+        if cursor == 1:
+            return ["down", "left", "a"]
+        if cursor == 2:
+            return ["a"]
+        if cursor == 3:
+            return ["left", "a"]
+        return None
+    item_menu_tokens = (
+        "POKE BALL",
+        "POTION",
+        "ANTIDOTE",
+        "PARLYZ HEAL",
+        "CANCEL",
+    )
+    if any(token in upper_text for token in item_menu_tokens):
+        target = game_state["poke_ball_bag_index"]
+        if not isinstance(cursor, int):
+            return None
+        if cursor < target:
+            return ["down"]
+        if cursor > target:
             return ["up"]
         return ["a"]
     return ["a"]
@@ -23802,6 +23914,9 @@ class PokemonRunner:
                 or trusted_mewtwo_surf_buttons(current_game_state) is not None
                 or trusted_mewtwo_capture_buttons(current_game_state) is not None
                 or trusted_mewtwo_finalize_buttons(current_game_state) is not None
+                or trusted_yellow_caterpie_capture_buttons(
+                    current_game_state
+                ) is not None
                 or trusted_gold_ilex_buttons(current_game_state) is not None
                 or trusted_gold_goldenrod_buttons(current_game_state) is not None
                 or trusted_gold_squirtbottle_buttons(current_game_state)
@@ -24422,11 +24537,14 @@ class PokemonRunner:
         self, game_state: dict[str, Any]
     ) -> bool:
         """Keep the static encounter on the non-attacking Master Ball path."""
-        if game_state.get("game_id") == YELLOW_GAME_ID:
-            return False
         position = navigation_position(game_state)
-        buttons = trusted_mewtwo_finalize_buttons(game_state)
-        source = "trusted_mewtwo_finalize"
+        buttons = trusted_yellow_caterpie_capture_buttons(game_state)
+        source = "trusted_yellow_caterpie_capture"
+        if buttons is None and game_state.get("game_id") == YELLOW_GAME_ID:
+            return False
+        if buttons is None:
+            buttons = trusted_mewtwo_finalize_buttons(game_state)
+            source = "trusted_mewtwo_finalize"
         if buttons is None:
             buttons = trusted_mewtwo_capture_buttons(game_state)
             source = "trusted_mewtwo_capture"
