@@ -13683,6 +13683,9 @@ class PokemonYellowMemoryReader(PokemonMemoryReader):
     TRACKED_KEY_ITEMS = YELLOW_TRACKED_KEY_ITEMS
     HALL_OF_FAME_TEAMS_ADDRESS = 0xD5A1
     CHAMPION_DEFEATED_EVENT = 0x901
+    GOT_POKEDEX_EVENT = 0x25
+    OAK_GOT_PARCEL_EVENT = 0x38
+    GOT_OAKS_PARCEL_EVENT = 0x39
 
     def in_battle(self) -> bool:
         return self._read(self.BATTLE_STATE_ADDRESS) in {1, 2}
@@ -13705,6 +13708,15 @@ class PokemonYellowMemoryReader(PokemonMemoryReader):
         snapshot = super().snapshot()
         snapshot["champion_defeated"] = (
             self._event_flag(self.CHAMPION_DEFEATED_EVENT) is True
+        )
+        snapshot["pokedex_owned"] = (
+            self._event_flag(self.GOT_POKEDEX_EVENT) is True
+        )
+        snapshot["oaks_parcel_delivered"] = (
+            self._event_flag(self.OAK_GOT_PARCEL_EVENT) is True
+        )
+        snapshot["oaks_parcel_received"] = (
+            self._event_flag(self.GOT_OAKS_PARCEL_EVENT) is True
         )
         return snapshot
 

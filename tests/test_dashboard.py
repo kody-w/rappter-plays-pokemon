@@ -525,13 +525,21 @@ def test_yellow_reader_uses_yellow_wram_layout():
         "maxed": False,
     }
     assert snapshot["hall_of_fame_completed"] is False
+    assert snapshot["pokedex_owned"] is False
+    assert snapshot["oaks_parcel_delivered"] is False
+    assert snapshot["oaks_parcel_received"] is False
 
     memory[0xD056] = 0xFF
     memory[0xD5A1] = 1
+    for event in (0x25, 0x38, 0x39):
+        memory[0xD746 + event // 8] |= 1 << (event % 8)
     completed = PokemonYellowMemoryReader(memory).snapshot()
     assert completed["in_battle"] is False
     assert completed["enemy_species_id"] == 0
     assert completed["hall_of_fame_completed"] is True
+    assert completed["pokedex_owned"] is True
+    assert completed["oaks_parcel_delivered"] is True
+    assert completed["oaks_parcel_received"] is True
 
 
 def test_gold_reader_does_not_decode_overworld_tiles_as_text():
