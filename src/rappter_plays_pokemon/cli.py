@@ -187,7 +187,7 @@ def agent_kwargs(args: argparse.Namespace, config: dict[str, Any]) -> dict[str, 
     runtime = _configured(args, config, "runtime_dir", str(DEFAULT_RUNTIME_DIR))
     kwargs: dict[str, Any] = {
         "action": args.action,
-        "runtime_dir": str(Path(str(runtime)).expanduser()),
+        "runtime_dir": str(Path(str(runtime)).expanduser().resolve()),
     }
     if args.action == "press":
         if not args.button:

@@ -7081,6 +7081,39 @@ def test_copilot_close_force_stops_hung_client(monkeypatch, tmp_path):
     assert brain.loop is None
 
 
+def test_copilot_decision_retries_invalid_button_response(tmp_path):
+    class FakeSession:
+        def __init__(self):
+            self.prompts = []
+            self.responses = deque([
+                '{"phase":"dialogue","buttons":[]}',
+                '{"phase":"dialogue","buttons":["a"],"checkpoint":false}',
+            ])
+
+        async def send_and_wait(self, prompt, attachments, timeout):
+            self.prompts.append(prompt)
+            assert attachments[0]["mimeType"] == "image/png"
+            assert timeout == 5.0
+            return SimpleNamespace(
+                data=SimpleNamespace(content=self.responses.popleft())
+            )
+
+    screenshot = tmp_path / "frame.png"
+    screenshot.write_bytes(b"png")
+    brain = CopilotBrain.__new__(CopilotBrain)
+    brain.session = FakeSession()
+    brain.session_decisions = 0
+    brain.max_decisions_per_session = 10
+    brain.timeout_seconds = 5
+
+    decision = asyncio.run(brain._decide_sdk(screenshot, "base prompt"))
+
+    assert decision["buttons"] == ["a"]
+    assert brain.session_decisions == 2
+    assert brain.session.prompts[0] == "base prompt"
+    assert "CORRECTION:" in brain.session.prompts[1]
+
+
 def test_copilot_close_force_stops_after_disconnect_error(monkeypatch):
     class BrokenSession:
         async def disconnect(self):

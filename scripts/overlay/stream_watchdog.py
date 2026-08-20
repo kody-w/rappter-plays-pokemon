@@ -32,7 +32,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import obs_control  # noqa: E402
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-RUNTIME_DIR = Path.home() / ".openrappter/pokemon-red"
+RUNTIME_DIR = Path(
+    os.environ.get(
+        "RPP_RUNTIME_DIR",
+        Path.home() / ".openrappter/pokemon-red",
+    )
+).expanduser().resolve()
 ENCODER_LOG = RUNTIME_DIR / "encoder.log"
 WATCHDOG_LOG = RUNTIME_DIR / "watchdog.log"
 TWITCH_KEY_FILE = Path(

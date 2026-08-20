@@ -442,6 +442,26 @@ def test_cli_supports_git_checkpoint_archive_and_rewind(tmp_path):
     assert cli.agent_kwargs(rewind, {})["commit"] == "a" * 12
 
 
+def test_cli_resolves_relative_runtime_directory(monkeypatch, tmp_path):
+    monkeypatch.chdir(tmp_path)
+    start = cli.build_parser().parse_args(
+        ["start", "--runtime-dir", "runtime/yellow"]
+    )
+
+    assert cli.agent_kwargs(start, {})["runtime_dir"] == str(
+        (tmp_path / "runtime/yellow").resolve()
+    )
+
+
+def test_stream_watchdog_uses_configured_runtime_directory():
+    source = (
+        ROOT / "scripts" / "overlay" / "stream_watchdog.py"
+    ).read_text(encoding="utf-8")
+
+    assert '"RPP_RUNTIME_DIR"' in source
+    assert ".expanduser().resolve()" in source
+
+
 @pytest.mark.parametrize(
     ("preflight", "action", "expected_install", "expected_code"),
     [

@@ -13133,10 +13133,19 @@ class PokemonAgent(BasicAgent):
             lifecycle = child_status.get("lifecycle")
             if child_instance == instance_id and lifecycle == "ready":
                 viewer_url = authenticated_viewer_url(runtime_dir, child_status)
+                game_name = {
+                    "red": "Red",
+                    YELLOW_GAME_ID: "Yellow",
+                    "gold": "Gold",
+                }.get(child_status.get("game_id"))
                 return json.dumps(
                     {
                         "status": "success",
-                        "message": "Copilot Plays Pokemon Red is ready",
+                        "message": (
+                            f"Copilot Plays Pokemon {game_name} is ready"
+                            if game_name
+                            else "Copilot Plays Pokemon is ready"
+                        ),
                         "pid": child_status.get("pid"),
                         "supervisor_pid": process.pid,
                         "rom_title": rom_title(rom),
@@ -19455,24 +19464,36 @@ class CopilotBrain:
         )
 
     async def _decide_sdk(self, screenshot: Path, prompt: str) -> dict[str, Any]:
-        if self.session_decisions >= self.max_decisions_per_session:
-            await self.session.disconnect()
-            await self._create_sdk_session()
-
         attachment = {
             "type": "blob",
             "data": base64.b64encode(screenshot.read_bytes()).decode("ascii"),
             "mimeType": "image/png",
         }
-        response = await self.session.send_and_wait(
-            prompt,
-            attachments=[attachment],
-            timeout=float(self.timeout_seconds),
+        correction = (
+            "\n\nCORRECTION: The prior response was rejected. Return exactly "
+            "one JSON object in the requested schema. The buttons array must "
+            "be non-empty and contain only: "
+            + ", ".join(VALID_BUTTONS)
+            + ". Return no prose outside the JSON."
         )
-        if response is None or not hasattr(response.data, "content"):
-            raise RuntimeError("Copilot SDK returned no assistant message")
-        self.session_decisions += 1
-        return normalize_brain_decision(response.data.content)
+        for attempt in range(2):
+            if self.session_decisions >= self.max_decisions_per_session:
+                await self.session.disconnect()
+                await self._create_sdk_session()
+            response = await self.session.send_and_wait(
+                prompt if attempt == 0 else prompt + correction,
+                attachments=[attachment],
+                timeout=float(self.timeout_seconds),
+            )
+            if response is None or not hasattr(response.data, "content"):
+                raise RuntimeError("Copilot SDK returned no assistant message")
+            self.session_decisions += 1
+            try:
+                return normalize_brain_decision(response.data.content)
+            except ValueError:
+                if attempt:
+                    raise
+        raise RuntimeError("Copilot SDK decision retry was exhausted")
 
     def close(self) -> None:
         if not self.loop:
