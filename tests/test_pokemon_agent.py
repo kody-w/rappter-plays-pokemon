@@ -112,6 +112,7 @@ def test_agent_contract():
     assert agent.metadata["parameters"]["type"] == "object"
     assert "checkpoint" in agent.metadata["parameters"]["properties"]["action"]["enum"]
     assert "rewind" in agent.metadata["parameters"]["properties"]["action"]["enum"]
+    assert "chord" in agent.metadata["parameters"]["properties"]["action"]["enum"]
     assert "manual" in agent.metadata["parameters"]["properties"]["action"]["enum"]
     assert "autonomy" in agent.metadata["parameters"]["properties"]["action"]["enum"]
     assert "state_repo" in agent.metadata["parameters"]["properties"]
@@ -2317,6 +2318,31 @@ def test_normalize_brain_decision_filters_buttons():
     assert decision["checkpoint"] is True
     assert decision["objective"] == "Reach Viridian City"
     assert decision["action_mode"] == "precision"
+
+
+def test_action_player_holds_and_releases_chord_together():
+    class Emulator:
+        def __init__(self):
+            self.pressed = []
+            self.released = []
+
+        def button_press(self, button):
+            self.pressed.append(button)
+
+        def button_release(self, button):
+            self.released.append(button)
+
+    player = ActionPlayer()
+    emulator = Emulator()
+    player.append_chord("b", "left")
+
+    player.tick(emulator)
+    assert emulator.pressed == ["b", "left"]
+    for _ in range(8):
+        completed = player.tick(emulator)
+
+    assert completed == "b+left"
+    assert emulator.released == ["b", "left"]
 
 
 def test_normalize_brain_decision_requires_valid_button():

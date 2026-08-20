@@ -442,6 +442,23 @@ def test_cli_supports_git_checkpoint_archive_and_rewind(tmp_path):
     assert cli.agent_kwargs(rewind, {})["commit"] == "a" * 12
 
 
+def test_cli_supports_manual_b_direction_chord(tmp_path):
+    chord = cli.build_parser().parse_args(
+        [
+            "chord",
+            "left",
+            "--runtime-dir",
+            str(tmp_path / "runtime"),
+        ]
+    )
+
+    assert cli.agent_kwargs(chord, {}) == {
+        "action": "chord",
+        "runtime_dir": str((tmp_path / "runtime").resolve()),
+        "button": "left",
+    }
+
+
 def test_cli_resolves_relative_runtime_directory(monkeypatch, tmp_path):
     monkeypatch.chdir(tmp_path)
     start = cli.build_parser().parse_args(

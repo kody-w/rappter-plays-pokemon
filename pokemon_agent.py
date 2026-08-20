@@ -55,6 +55,7 @@ except (
 LOGGER = logging.getLogger("openrappter.pokemon")
 MODULE_NAME = "openrappter.agents.pokemon_agent"
 VALID_BUTTONS = ("a", "b", "start", "select", "up", "down", "left", "right")
+CHORD_DIRECTIONS = ("up", "down", "left", "right")
 BADGE_NAMES = (
     "Boulder",
     "Cascade",
@@ -12396,6 +12397,7 @@ class PokemonAgent(BasicAgent):
                             "checkpoint",
                             "rewind",
                             "press",
+                            "chord",
                             "view",
                             "host",
                             "go-live",
@@ -12415,7 +12417,7 @@ class PokemonAgent(BasicAgent):
                     "button": {
                         "type": "string",
                         "enum": list(VALID_BUTTONS),
-                        "description": "Button for the press action",
+                        "description": "Button or direction for press/chord",
                     },
                     "commit": {
                         "type": "string",
@@ -12736,6 +12738,7 @@ class PokemonAgent(BasicAgent):
             "rewind",
             "stop",
             "press",
+            "chord",
         }:
             status = runtime_status(runtime_dir)
             if action == "stop" and not status["running"]:
@@ -12761,6 +12764,16 @@ class PokemonAgent(BasicAgent):
                     {
                         "status": "error",
                         "message": f"button must be one of: {', '.join(VALID_BUTTONS)}",
+                    }
+                )
+            if action == "chord" and button not in CHORD_DIRECTIONS:
+                return json.dumps(
+                    {
+                        "status": "error",
+                        "message": (
+                            "chord direction must be one of: "
+                            + ", ".join(CHORD_DIRECTIONS)
+                        ),
                     }
                 )
             commit = str(kwargs.get("commit") or "").lower()
@@ -19777,8 +19790,8 @@ Return only one JSON object with exactly this shape:
 
 class ActionPlayer:
     def __init__(self):
-        self.pending: deque[str] = deque()
-        self.current: Optional[str] = None
+        self.pending: deque[tuple[str, ...]] = deque()
+        self.current: Optional[tuple[str, ...]] = None
         self.hold_frames = 0
         self.gap_frames = 0
 
@@ -19788,18 +19801,28 @@ class ActionPlayer:
 
     def replace(self, buttons: list[str]) -> None:
         self.pending.clear()
-        self.pending.extend(button for button in buttons if button in VALID_BUTTONS)
+        self.pending.extend(
+            (button,) for button in buttons if button in VALID_BUTTONS
+        )
 
     def append(self, button: str) -> None:
         if button in VALID_BUTTONS:
-            self.pending.append(button)
+            self.pending.append((button,))
+
+    def append_chord(self, *buttons: str) -> None:
+        chord = tuple(dict.fromkeys(
+            button for button in buttons if button in VALID_BUTTONS
+        ))
+        if len(chord) >= 2:
+            self.pending.append(chord)
 
     def tick(self, pyboy: Any) -> Optional[str]:
         if self.current:
             self.hold_frames -= 1
             if self.hold_frames <= 0:
-                pyboy.button_release(self.current)
-                completed = self.current
+                for button in self.current:
+                    pyboy.button_release(button)
+                completed = "+".join(self.current)
                 self.current = None
                 self.gap_frames = 18
                 return completed
@@ -19809,13 +19832,15 @@ class ActionPlayer:
             return None
         if self.pending:
             self.current = self.pending.popleft()
-            pyboy.button_press(self.current)
+            for button in self.current:
+                pyboy.button_press(button)
             self.hold_frames = 8
         return None
 
     def release(self, pyboy: Any) -> None:
         if self.current:
-            pyboy.button_release(self.current)
+            for button in self.current:
+                pyboy.button_release(button)
             self.current = None
         self.pending.clear()
         self.gap_frames = 0
@@ -21008,11 +21033,18 @@ class ViewerServer:
                     "rewind",
                     "stop",
                     "press",
+                    "chord",
                 }:
                     self._json(400, {"status": "error", "message": "Invalid action"})
                     return
                 if action == "press" and button not in VALID_BUTTONS:
                     self._json(400, {"status": "error", "message": "Invalid button"})
+                    return
+                if action == "chord" and button not in CHORD_DIRECTIONS:
+                    self._json(
+                        400,
+                        {"status": "error", "message": "Invalid chord direction"},
+                    )
                     return
                 commit = str(value.get("commit") or "").lower()
                 if action == "rewind" and not re.fullmatch(
@@ -23285,6 +23317,16 @@ class PokemonRunner:
                         game_state=self.status.get("game_state"),
                     )
                     self.player.append(button)
+            elif action == "chord":
+                direction = str(command.get("button", "")).lower()
+                if direction in CHORD_DIRECTIONS:
+                    self._set_control_mode("manual")
+                    self._record_execution_evidence(
+                        source="operator",
+                        buttons=["b", direction],
+                        game_state=self.status.get("game_state"),
+                    )
+                    self.player.append_chord("b", direction)
             elif action == "stop":
                 self.stop_event.set()
 

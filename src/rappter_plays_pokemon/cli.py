@@ -18,6 +18,7 @@ ACTIONS = (
     "checkpoint",
     "rewind",
     "press",
+    "chord",
     "view",
     "host",
     "go-live",
@@ -189,9 +190,13 @@ def agent_kwargs(args: argparse.Namespace, config: dict[str, Any]) -> dict[str, 
         "action": args.action,
         "runtime_dir": str(Path(str(runtime)).expanduser().resolve()),
     }
-    if args.action == "press":
+    if args.action in {"press", "chord"}:
         if not args.button:
-            raise RuntimeError("press requires a button")
+            raise RuntimeError(f"{args.action} requires a button")
+        if args.action == "chord" and args.button not in {
+            "up", "down", "left", "right"
+        }:
+            raise RuntimeError("chord requires a direction")
         kwargs["button"] = args.button
     if args.action == "rewind":
         if not args.commit:
