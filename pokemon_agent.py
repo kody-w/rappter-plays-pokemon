@@ -15884,6 +15884,8 @@ def trusted_exact_route_guidance(
     """Story/item routes outrank generic puzzle-route replay."""
     if game_state.get("game_id") == "gold":
         return gold_route_guidance(game_state)
+    if game_state.get("game_id") == YELLOW_GAME_ID:
+        return yellow_route_guidance(game_state)
     if game_state.get("game_id") not in {None, "red"}:
         return None
     return (
@@ -15894,6 +15896,46 @@ def trusted_exact_route_guidance(
         or pokemon_tower_route_guidance(game_state)
         or silph_co_route_guidance(game_state)
     )
+
+
+def yellow_route_guidance(game_state: dict[str, Any]) -> Optional[str]:
+    """Keep Yellow from reaching Brock with an Electric-only party."""
+    if game_state.get("game_id") != YELLOW_GAME_ID:
+        return None
+    if "Boulder" in (game_state.get("badges") or []):
+        return None
+    party = game_state.get("party")
+    species = {
+        member.get("species_id")
+        for member in (party or [])
+        if isinstance(member, dict)
+    }
+    if species & {57, 125}:
+        return None
+    map_id = game_state.get("map_id")
+    if map_id == 0x33:
+        if species & {123, 124}:
+            return (
+                "Authoritative Pokemon Yellow Brock preparation. Stay in "
+                "Viridian Forest and train Caterpie/Metapod until it evolves "
+                "into Butterfree at level 10 and learns Confusion. Do not "
+                "leave through the north exit or challenge Brock yet."
+            )
+        return (
+            "Authoritative Pokemon Yellow Brock preparation. Pikachu's "
+            "Electric moves cannot damage Brock's Ground Pokemon. Catch a "
+            "wild Caterpie in Viridian Forest with a Poke Ball, then train it "
+            "to Butterfree at level 10 before using the north exit."
+        )
+    if map_id in {0x02, 0x36}:
+        return (
+            "CRITICAL Pokemon Yellow Brock preparation. This party has no "
+            "verified Brock counter, and Pikachu's Electric moves do nothing "
+            "to Ground Pokemon. Return south to Viridian Forest, catch "
+            "Caterpie, and train it to Butterfree level 10 before battling "
+            "Brock."
+        )
+    return None
 
 
 def gold_route_guidance(game_state: dict[str, Any]) -> Optional[str]:

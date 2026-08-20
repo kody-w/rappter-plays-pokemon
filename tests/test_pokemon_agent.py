@@ -92,6 +92,7 @@ from openrappter.agents.pokemon_agent import (
     trusted_story_route_action,
     wait_for_stopping_supervisor,
     wait_for_supervised_child,
+    yellow_route_guidance,
 )
 
 
@@ -813,6 +814,34 @@ def test_gold_memory_reader_does_not_expose_red_wram_as_facts():
             "gave_mystery_egg_to_elm": True,
         },
     }) == "up"
+
+
+def test_yellow_route_guidance_requires_brock_counter():
+    base = {
+        "game_id": "yellow",
+        "map_id": 0x33,
+        "badges": [],
+        "party": [{
+            "species_id": 84,
+            "level": 9,
+            "hp": 26,
+            "max_hp": 26,
+        }],
+    }
+
+    assert "Catch a wild Caterpie" in yellow_route_guidance(base)
+    assert "train Caterpie/Metapod" in yellow_route_guidance({
+        **base,
+        "party": [*base["party"], {"species_id": 123, "level": 6}],
+    })
+    assert yellow_route_guidance({
+        **base,
+        "party": [*base["party"], {"species_id": 125, "level": 10}],
+    }) is None
+    assert "no verified Brock counter" in yellow_route_guidance({
+        **base,
+        "map_id": 0x36,
+    })
 
 
 def test_gold_reader_decodes_lower_tilemap_rows_for_bugsy_battle():
