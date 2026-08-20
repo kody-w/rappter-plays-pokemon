@@ -268,8 +268,8 @@ def test_overlay_exposes_screenshot_safe_tuning_metrics_and_qr():
     assert "let deficit = dueFrames - piped" in encoder
     assert "innerHTML" not in overlay
     assert "GOLD_BADGES" in overlay
-    assert "host.game_id === 'gold'" in overlay
-    assert "agentStatus.game_id === 'gold'" in encoder
+    assert "'yellow'" in overlay
+    assert "['red', 'yellow', 'gold']" in encoder
 
 
 def test_overlay_keeps_youtube_primary_and_mirrors_locally_for_obs():

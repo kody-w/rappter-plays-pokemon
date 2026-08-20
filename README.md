@@ -1,15 +1,17 @@
 # RAPPter Plays Pokémon
 
 Run a real, single-file OpenRappter agent that lets GitHub Copilot autonomously
-attempt a full playthrough of Pokémon Red in a local PyBoy emulator. It can
+attempt full playthroughs of Pokémon Red, Yellow, and Gold in a local PyBoy
+emulator. It can
 persist progress for long-running sessions, record segmented MP4 clips, expose
 an authenticated local viewer, optionally broadcast directly
 browser-to-browser, and hand control to you at any time.
 
 > [!IMPORTANT]
 > This repository is **ROM-free**. You must supply your own legally obtained
-> Pokémon Red Game Boy (`.gb`) ROM. The project never downloads, searches for,
-> copies, uploads, or distributes a ROM. Do not open an issue asking for one.
+> Pokémon Red, Yellow, or Gold Game Boy ROM. The project never downloads,
+> searches for, copies, uploads, or distributes a ROM. Do not open an issue
+> asking for one.
 
 This is an experimental autonomous player. It attempts to reach the Hall of
 Fame, but **it is not guaranteed to beat the game**.
@@ -91,7 +93,7 @@ The supported path is **macOS**. The launcher fails clearly on other platforms.
 3. [`ffmpeg`](https://ffmpeg.org/) (`brew install ffmpeg`)
 4. A GitHub account with an active Copilot entitlement
 5. GitHub Copilot CLI/SDK authentication already available to your user
-6. Your own legally obtained Pokémon Red `.gb` ROM stored locally
+6. Your own legally obtained Pokémon Red, Yellow, or Gold ROM stored locally
 7. For livestreaming only: Node.js 22+ and Google Chrome, Chrome for Testing,
    or Chromium
 

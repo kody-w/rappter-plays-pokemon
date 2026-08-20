@@ -20,6 +20,7 @@ import pytest
 from openrappter.agents.pokemon_agent import (
     GAME_SYSTEM_PROMPT,
     GOLD_SYSTEM_PROMPT,
+    YELLOW_SYSTEM_PROMPT,
     ActionPlayer,
     ClipRecorder,
     CopilotBrain,
@@ -28,6 +29,7 @@ from openrappter.agents.pokemon_agent import (
     PokemonAgent,
     PokemonGoldMemoryReader,
     PokemonRunner,
+    PokemonYellowMemoryReader,
     StartupConfigurationError,
     ViewerServer,
     acquire_runtime_lock,
@@ -43,6 +45,7 @@ from openrappter.agents.pokemon_agent import (
     is_cloud_placeholder,
     is_pokemon_gold_rom,
     is_pokemon_red_rom,
+    is_pokemon_yellow_rom,
     item_gate_guidance,
     list_clips,
     navigation_position,
@@ -428,6 +431,22 @@ def test_gold_rom_validation_uses_generation_two_header(tmp_path):
     assert discover_pokemon_rom(str(rom)) == rom.resolve()
     assert "sixteen badges" in GOLD_SYSTEM_PROMPT
     assert "defeat Red" in GOLD_SYSTEM_PROMPT
+
+
+def test_yellow_rom_validation_uses_cgb_truncated_header(tmp_path):
+    rom = make_rom(tmp_path / "Pokemon Yellow.gbc", b"POKEMON YELLOW")
+    data = bytearray(rom.read_bytes())
+    data[0x143] = 0x80
+    rom.write_bytes(data)
+
+    assert is_pokemon_yellow_rom(rom)
+    assert not is_pokemon_red_rom(rom)
+    assert not is_pokemon_gold_rom(rom)
+    assert pokemon_game_id(rom) == "yellow"
+    assert discover_pokemon_rom(str(rom)) == rom.resolve()
+    assert "starts with Pikachu" in YELLOW_SYSTEM_PROMPT
+    assert "Hall of Fame" in YELLOW_SYSTEM_PROMPT
+    assert PokemonYellowMemoryReader.GAME_ID == "yellow"
 
 
 def test_gold_memory_reader_does_not_expose_red_wram_as_facts():

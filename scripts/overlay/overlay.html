@@ -398,17 +398,23 @@ const GOLD_BADGES = [
 const badgeGrid = document.getElementById('badges');
 let activeGameId = null;
 function renderGameIdentity(gameId) {
-  const normalized = gameId === 'gold' ? 'gold' : 'red';
+  const normalized =
+    gameId === 'gold' ? 'gold' : (gameId === 'yellow' ? 'yellow' : 'red');
   if (normalized === activeGameId) return;
   activeGameId = normalized;
   const gold = normalized === 'gold';
-  const title = gold ? 'POKÉMON GOLD' : 'POKÉMON RED';
+  const title =
+    gold ? 'POKÉMON GOLD'
+      : (normalized === 'yellow' ? 'POKÉMON YELLOW' : 'POKÉMON RED');
   const badges = gold ? GOLD_BADGES : RED_BADGES;
   document.getElementById('game-title').textContent = title;
   document.getElementById('stream-brand').textContent =
     'RAPPTER PLAYS ' + title;
   document.getElementById('about-copy').textContent =
-    'An AI agent plays ' + (gold ? 'Pokémon Gold' : 'Pokémon Red') +
+    'An AI agent plays ' +
+    (gold
+      ? 'Pokémon Gold'
+      : (normalized === 'yellow' ? 'Pokémon Yellow' : 'Pokémon Red')) +
     ' autonomously, 24/7 — reading the screen, choosing goals, battling, ' +
     'and checkpointing its own progress.';
   document.getElementById('badge-total').textContent = badges.length;
@@ -464,7 +470,10 @@ function hpClassColor(ratio) {
 }
 
 function renderSnapshot(s, host) {
-  const gameId = host && host.game_id === 'gold' ? 'gold' : 'red';
+  const gameId =
+    host && ['red', 'yellow', 'gold'].includes(host.game_id)
+      ? host.game_id
+      : 'red';
   renderGameIdentity(gameId);
   // Rebuild party DOM only when its data changes, so animated sprite GIFs
   // aren't restarted from frame 0 on every refresh.

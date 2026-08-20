@@ -1,4 +1,4 @@
-"""A real OpenRappter agent that lets GitHub Copilot play Pokemon Red via PyBoy.
+"""A real OpenRappter agent that lets GitHub Copilot play Pokemon via PyBoy.
 
 Users must explicitly provide their own legally obtained ROM. The ROM is never
 copied, attached to Copilot, served by the viewer, or included in this project.
@@ -65,6 +65,7 @@ BADGE_NAMES = (
     "Volcano",
     "Earth",
 )
+YELLOW_GAME_ID = "yellow"
 GOLD_BADGE_NAMES = (
     "Zephyr",
     "Hive",
@@ -2293,6 +2294,14 @@ TRACKED_KEY_ITEMS: dict[str, int] = {
     "hm_fly": HM_FLY_ITEM_ID,
     "hm_surf": HM_SURF_ITEM_ID,
     "hm_strength": HM_STRENGTH_ITEM_ID,
+}
+YELLOW_TRACKED_KEY_ITEMS: dict[str, int] = {
+    **TRACKED_KEY_ITEMS,
+    "ss_ticket": 0x3F,
+    "gold_teeth": 0x40,
+    "oaks_parcel": 0x46,
+    "hm_cut": 0xC4,
+    "hm_flash": 0xC8,
 }
 YOUTUBE_VIDEO_ID_RE = re.compile(r"^[A-Za-z0-9_-]{11}$")
 CHAT_ADVISORY_STALE_SECONDS = 90
@@ -5868,6 +5877,11 @@ MAP_NAMES = {
     0xF5: "Lorelei",
     0xF6: "Bruno",
     0xF7: "Agatha",
+}
+YELLOW_MAP_NAMES = {
+    **MAP_NAMES,
+    0x3F: "Melanie's House",
+    0xF8: "Summer Beach House",
 }
 
 
@@ -11460,9 +11474,21 @@ def is_pokemon_gold_rom(path: Path) -> bool:
     return rom_title(path).upper().startswith("POKEMON_GLD")
 
 
+def is_pokemon_yellow_rom(path: Path) -> bool:
+    if (
+        not path.is_file()
+        or path.suffix.lower() not in {".gb", ".gbc"}
+        or is_cloud_placeholder(path)
+    ):
+        return False
+    return rom_title(path).upper().startswith("POKEMON YEL")
+
+
 def pokemon_game_id(path: Path) -> Optional[str]:
     if is_pokemon_red_rom(path):
         return "red"
+    if is_pokemon_yellow_rom(path):
+        return YELLOW_GAME_ID
     if is_pokemon_gold_rom(path):
         return "gold"
     return None
@@ -11511,8 +11537,8 @@ def discover_pokemon_rom(
         )
     raise FileNotFoundError(
         "No supported Pokemon ROM was configured. Pass rom_path or set "
-        "OPENRAPPTER_POKEMON_ROM to your own legally obtained Pokemon Red "
-        "or Pokemon Gold ROM."
+        "OPENRAPPTER_POKEMON_ROM to your own legally obtained Pokemon Red, "
+        "Pokemon Yellow, or Pokemon Gold ROM."
     )
 
 
@@ -12026,7 +12052,7 @@ def project_dashboard_snapshot(
     )
     game_id = (
         status.get("game_id")
-        if status.get("game_id") in {"red", "gold"}
+        if status.get("game_id") in {"red", YELLOW_GAME_ID, "gold"}
         else game_state.get("game_id")
     )
     badge_names = GOLD_BADGE_NAMES if game_id == "gold" else BADGE_NAMES
@@ -13172,6 +13198,32 @@ class PokemonAgent(BasicAgent):
 
 
 class PokemonMemoryReader:
+    GAME_ID = "red"
+    MAP_NAMES = MAP_NAMES
+    POKEDEX_CAUGHT_ADDRESS = 0xD2F7
+    POKEDEX_SEEN_ADDRESS = 0xD30A
+    BAG_COUNT_ADDRESS = W_NUM_BAG_ITEMS
+    BAG_ITEMS_ADDRESS = W_BAG_ITEMS
+    EVENT_FLAGS_ADDRESS = W_EVENT_FLAGS
+    PLAY_TIME_ADDRESSES = (0xDA41, 0xDA42, 0xDA43, 0xDA44, 0xDA45)
+    MAP_ID_ADDRESS = 0xD35E
+    X_ADDRESS = 0xD362
+    Y_ADDRESS = 0xD361
+    PLAYER_NAME_ADDRESS = 0xD158
+    RIVAL_NAME_ADDRESS = 0xD34A
+    BADGES_ADDRESS = 0xD356
+    PARTY_COUNT_ADDRESS = 0xD163
+    PARTY_BASES = (0xD16B, 0xD197, 0xD1C3, 0xD1EF, 0xD21B, 0xD247)
+    PARTY_NICKNAMES = (0xD2B5, 0xD2C0, 0xD2CB, 0xD2D6, 0xD2E1, 0xD2EC)
+    WARP_COUNT_ADDRESS = 0xD3AE
+    WARP_ENTRIES_ADDRESS = 0xD3AF
+    STRENGTH_ADDRESS = 0xD728
+    SURF_STATE_ADDRESS = W_WALK_BIKE_SURF_STATE
+    BATTLE_STATE_ADDRESS = 0xD057
+    ENEMY_SPECIES_ADDRESS = 0xD059
+    SCREEN_TEXT_END = 0xC507
+    TRACKED_KEY_ITEMS = TRACKED_KEY_ITEMS
+
     def __init__(self, memory: Any):
         self.memory = memory
 
@@ -13228,19 +13280,25 @@ class PokemonMemoryReader:
 
     def pokedex_counts(self) -> dict[str, Optional[int]]:
         return {
-            "caught": self._bitfield_count(0xD2F7),
-            "seen": self._bitfield_count(0xD30A),
+            "caught": self._bitfield_count(self.POKEDEX_CAUGHT_ADDRESS),
+            "seen": self._bitfield_count(self.POKEDEX_SEEN_ADDRESS),
         }
 
     def key_items(self) -> dict[str, Optional[bool]]:
-        unknown: dict[str, Optional[bool]] = dict.fromkeys(TRACKED_KEY_ITEMS)
-        count = self._read_optional(W_NUM_BAG_ITEMS)
+        unknown: dict[str, Optional[bool]] = dict.fromkeys(
+            self.TRACKED_KEY_ITEMS
+        )
+        count = self._read_optional(self.BAG_COUNT_ADDRESS)
         if count is None or not 0 <= count <= BAG_ITEM_CAPACITY:
             return unknown
         item_ids: list[int] = []
         for index in range(count):
-            item_id = self._read_optional(W_BAG_ITEMS + index * 2)
-            quantity = self._read_optional(W_BAG_ITEMS + index * 2 + 1)
+            item_id = self._read_optional(
+                self.BAG_ITEMS_ADDRESS + index * 2
+            )
+            quantity = self._read_optional(
+                self.BAG_ITEMS_ADDRESS + index * 2 + 1
+            )
             if (
                 item_id is None
                 or item_id in {0, 0xFF}
@@ -13249,21 +13307,27 @@ class PokemonMemoryReader:
             ):
                 return unknown
             item_ids.append(item_id)
-        terminator = self._read_optional(W_BAG_ITEMS + count * 2)
+        terminator = self._read_optional(
+            self.BAG_ITEMS_ADDRESS + count * 2
+        )
         if terminator != 0xFF:
             return unknown
         return {
             name: item_id in item_ids
-            for name, item_id in TRACKED_KEY_ITEMS.items()
+            for name, item_id in self.TRACKED_KEY_ITEMS.items()
         }
 
     def bag_item_index(self, wanted_item_id: int) -> Optional[int]:
-        count = self._read_optional(W_NUM_BAG_ITEMS)
+        count = self._read_optional(self.BAG_COUNT_ADDRESS)
         if count is None or not 0 <= count <= BAG_ITEM_CAPACITY:
             return None
         for index in range(count):
-            item_id = self._read_optional(W_BAG_ITEMS + index * 2)
-            quantity = self._read_optional(W_BAG_ITEMS + index * 2 + 1)
+            item_id = self._read_optional(
+                self.BAG_ITEMS_ADDRESS + index * 2
+            )
+            quantity = self._read_optional(
+                self.BAG_ITEMS_ADDRESS + index * 2 + 1
+            )
             if (
                 item_id is None
                 or item_id in {0, 0xFF}
@@ -13276,7 +13340,7 @@ class PokemonMemoryReader:
         return None
 
     def _event_flag(self, event: int) -> Optional[bool]:
-        byte = self._read_optional(W_EVENT_FLAGS + event // 8)
+        byte = self._read_optional(self.EVENT_FLAGS_ADDRESS + event // 8)
         return None if byte is None else bool(byte & (1 << (event % 8)))
 
     def seafoam_boulders(self) -> dict[str, Optional[bool]]:
@@ -13296,7 +13360,7 @@ class PokemonMemoryReader:
         }
 
     def victory_road_1_boulder(self) -> Optional[dict[str, int]]:
-        if self._read_optional(0xD35E) != 0x6C:
+        if self._read_optional(self.MAP_ID_ADDRESS) != 0x6C:
             return None
         raw_y = self._read_optional(0xC254)
         raw_x = self._read_optional(0xC255)
@@ -13310,7 +13374,7 @@ class PokemonMemoryReader:
         return {"x": raw_x - 4, "y": raw_y - 4}
 
     def victory_road_2_boulders(self) -> Optional[list[dict[str, int]]]:
-        if self._read_optional(0xD35E) != 0xC2:
+        if self._read_optional(self.MAP_ID_ADDRESS) != 0xC2:
             return None
         output = []
         for index in (11, 12, 13):
@@ -13327,7 +13391,7 @@ class PokemonMemoryReader:
         return output
 
     def victory_road_3_boulders(self) -> Optional[list[dict[str, int]]]:
-        if self._read_optional(0xD35E) != 0xC6:
+        if self._read_optional(self.MAP_ID_ADDRESS) != 0xC6:
             return None
         output = []
         for index in (7, 8, 9, 10):
@@ -13346,7 +13410,7 @@ class PokemonMemoryReader:
     def play_time(self) -> Optional[dict[str, Any]]:
         values = [
             self._read_optional(address)
-            for address in (0xDA41, 0xDA42, 0xDA43, 0xDA44, 0xDA45)
+            for address in self.PLAY_TIME_ADDRESSES
         ]
         if any(value is None for value in values):
             return None
@@ -13441,7 +13505,7 @@ class PokemonMemoryReader:
         return " | ".join(deduplicated[-8:])[:600]
 
     def _screen_text(self) -> str:
-        return self._decode_screen_text(0xC3A0, 0xC507)
+        return self._decode_screen_text(0xC3A0, self.SCREEN_TEXT_END)
 
     def warps(self) -> list[dict[str, Any]]:
         """The current map's warp table, straight from RAM.
@@ -13451,12 +13515,12 @@ class PokemonMemoryReader:
         the need to discover exits by stepping on them: a floor's real doors,
         stairs, and elevator mats are known the moment the map loads.
         """
-        count = self._read_optional(0xD3AE)
+        count = self._read_optional(self.WARP_COUNT_ADDRESS)
         if count is None or not 0 < count <= 32:
             return []
         entries = []
         for index in range(count):
-            base = 0xD3AF + index * 4
+            base = self.WARP_ENTRIES_ADDRESS + index * 4
             warp_y = self._read_optional(base)
             warp_x = self._read_optional(base + 1)
             destination_map = self._read_optional(base + 3)
@@ -13467,7 +13531,7 @@ class PokemonMemoryReader:
                     "x": warp_x,
                     "y": warp_y,
                     "destination_map": destination_map,
-                    "destination_name": MAP_NAMES.get(
+                    "destination_name": self.MAP_NAMES.get(
                         destination_map, f"Map 0x{destination_map:02X}"
                     ),
                 }
@@ -13476,30 +13540,40 @@ class PokemonMemoryReader:
 
     def position(self) -> Optional[tuple[int, int, int]]:
         """Cheap (map, x, y) read for the settled-position decision gate."""
-        map_id = self._read_optional(0xD35E)
-        x = self._read_optional(0xD362)
-        y = self._read_optional(0xD361)
+        map_id = self._read_optional(self.MAP_ID_ADDRESS)
+        x = self._read_optional(self.X_ADDRESS)
+        y = self._read_optional(self.Y_ADDRESS)
         if map_id is None or x is None or y is None:
             return None
         return (map_id, x, y)
 
+    def in_battle(self) -> bool:
+        return self._read(self.BATTLE_STATE_ADDRESS) != 0
+
+    def enemy_species_id(self) -> int:
+        return self._read(self.ENEMY_SPECIES_ADDRESS)
+
+    def hall_of_fame_completed(self, map_id: Optional[int]) -> bool:
+        return bool(
+            map_id == 0x76
+            or self._event_flag(HALL_OF_FAME_COMPLETED_EVENT) is True
+        )
+
     def snapshot(self) -> dict[str, Any]:
-        map_id = self._read_optional(0xD35E)
-        badge_byte = self._read_optional(0xD356)
-        raw_party_count = self._read_optional(0xD163)
+        map_id = self._read_optional(self.MAP_ID_ADDRESS)
+        badge_byte = self._read_optional(self.BADGES_ADDRESS)
+        raw_party_count = self._read_optional(self.PARTY_COUNT_ADDRESS)
         party_count = (
             raw_party_count
             if raw_party_count is not None and 0 <= raw_party_count <= 6
             else None
         )
         party = []
-        bases = (0xD16B, 0xD197, 0xD1C3, 0xD1EF, 0xD21B, 0xD247)
-        nicknames = (0xD2B5, 0xD2C0, 0xD2CB, 0xD2D6, 0xD2E1, 0xD2EC)
         for index in range(party_count or 0):
-            base = bases[index]
+            base = self.PARTY_BASES[index]
             party.append(
                 {
-                    "nickname": self._text(nicknames[index], 11),
+                    "nickname": self._text(self.PARTY_NICKNAMES[index], 11),
                     "species_id": self._read(base),
                     "level": self._read(base + 0x21),
                     "hp": (self._read(base + 1) << 8) + self._read(base + 2),
@@ -13507,18 +13581,19 @@ class PokemonMemoryReader:
                 }
             )
         return {
+            "game_id": self.GAME_ID,
             "map_id": map_id,
             "location": (
-                MAP_NAMES.get(map_id, f"Map 0x{map_id:02X}")
+                self.MAP_NAMES.get(map_id, f"Map 0x{map_id:02X}")
                 if map_id is not None
                 else None
             ),
             "coordinates": {
-                "x": self._read(0xD362),
-                "y": self._read(0xD361),
+                "x": self._read(self.X_ADDRESS),
+                "y": self._read(self.Y_ADDRESS),
             },
-            "player_name": self._text(0xD158, 11),
-            "rival_name": self._text(0xD34A, 8),
+            "player_name": self._text(self.PLAYER_NAME_ADDRESS, 11),
+            "rival_name": self._text(self.RIVAL_NAME_ADDRESS, 8),
             "badges": [
                 name
                 for bit, name in enumerate(BADGE_NAMES)
@@ -13553,23 +13628,76 @@ class PokemonMemoryReader:
                 ),
             },
             "victory_road_3_boulders": self.victory_road_3_boulders(),
-            "strength_active": bool(self._read(0xD728) & 0x01),
-            "surfing": self._read(W_WALK_BIKE_SURF_STATE) == 2,
-            "in_battle": self._read(0xD057) != 0,
-            "enemy_species_id": self._read(0xD059),
+            "strength_active": bool(self._read(self.STRENGTH_ADDRESS) & 0x01),
+            "surfing": self._read(self.SURF_STATE_ADDRESS) == 2,
+            "in_battle": self.in_battle(),
+            "enemy_species_id": self.enemy_species_id(),
             "menu_cursor_index": self._read(0xCC36) + self._read(0xCC26),
             "master_ball_bag_index": self.bag_item_index(MASTER_BALL_ITEM_ID),
             "mewtwo_caught": self._bitfield_flag(
-                0xD2F7, MEWTWO_DEX_NUMBER
+                self.POKEDEX_CAUGHT_ADDRESS, MEWTWO_DEX_NUMBER
             ),
             "mewtwo_encounter_resolved": self._event_flag(MEWTWO_EVENT),
             "screen_text": self._screen_text(),
             "hall_of_fame": map_id == 0x76 if map_id is not None else False,
-            "hall_of_fame_completed": bool(
-                map_id == 0x76
-                or self._event_flag(HALL_OF_FAME_COMPLETED_EVENT) is True
-            ),
+            "hall_of_fame_completed": self.hall_of_fame_completed(map_id),
         }
+
+
+class PokemonYellowMemoryReader(PokemonMemoryReader):
+    """Read guarded Pokemon Yellow WRAM facts."""
+
+    GAME_ID = YELLOW_GAME_ID
+    MAP_NAMES = YELLOW_MAP_NAMES
+    POKEDEX_CAUGHT_ADDRESS = 0xD2F6
+    POKEDEX_SEEN_ADDRESS = 0xD309
+    BAG_COUNT_ADDRESS = 0xD31C
+    BAG_ITEMS_ADDRESS = 0xD31D
+    EVENT_FLAGS_ADDRESS = 0xD746
+    PLAY_TIME_ADDRESSES = (0xDA40, 0xDA41, 0xDA42, 0xDA43, 0xDA44)
+    MAP_ID_ADDRESS = 0xD35D
+    X_ADDRESS = 0xD361
+    Y_ADDRESS = 0xD360
+    PLAYER_NAME_ADDRESS = 0xD157
+    RIVAL_NAME_ADDRESS = 0xD349
+    BADGES_ADDRESS = 0xD355
+    PARTY_COUNT_ADDRESS = 0xD162
+    PARTY_BASES = (0xD16A, 0xD196, 0xD1C2, 0xD1EE, 0xD21A, 0xD246)
+    PARTY_NICKNAMES = (0xD2B4, 0xD2BF, 0xD2CA, 0xD2D5, 0xD2E0, 0xD2EB)
+    WARP_COUNT_ADDRESS = 0xD3AD
+    WARP_ENTRIES_ADDRESS = 0xD3AE
+    STRENGTH_ADDRESS = 0xD727
+    SURF_STATE_ADDRESS = 0xD6FF
+    BATTLE_STATE_ADDRESS = 0xD056
+    ENEMY_SPECIES_ADDRESS = 0xCFE4
+    SCREEN_TEXT_END = 0xC508
+    TRACKED_KEY_ITEMS = YELLOW_TRACKED_KEY_ITEMS
+    HALL_OF_FAME_TEAMS_ADDRESS = 0xD5A1
+    CHAMPION_DEFEATED_EVENT = 0x901
+
+    def in_battle(self) -> bool:
+        return self._read(self.BATTLE_STATE_ADDRESS) in {1, 2}
+
+    def enemy_species_id(self) -> int:
+        return (
+            self._read(self.ENEMY_SPECIES_ADDRESS)
+            if self.in_battle()
+            else 0
+        )
+
+    def hall_of_fame_completed(self, map_id: Optional[int]) -> bool:
+        return bool(
+            map_id == 0x76
+            or self._read(self.HALL_OF_FAME_TEAMS_ADDRESS) != 0
+            or self._event_flag(self.CHAMPION_DEFEATED_EVENT) is True
+        )
+
+    def snapshot(self) -> dict[str, Any]:
+        snapshot = super().snapshot()
+        snapshot["champion_defeated"] = (
+            self._event_flag(self.CHAMPION_DEFEATED_EVENT) is True
+        )
+        return snapshot
 
 
 class PokemonGoldMemoryReader(PokemonMemoryReader):
@@ -19136,6 +19264,36 @@ Make progress deliberately:
 
 Valid buttons are: {", ".join(VALID_BUTTONS)}."""
 
+YELLOW_SYSTEM_PROMPT = f"""You are the autonomous player in Copilot Plays Pokemon Yellow.
+Your long-term goal is to defeat the Elite Four and Champion and enter the
+Hall of Fame. Each user message includes the current game state and a PNG
+screenshot. Never use tools. Return only the requested JSON object.
+
+Make progress deliberately:
+- Advance title screens and dialogue with A or Start. Choose CONTINUE after a
+  restart and never choose NEW GAME when a save exists.
+- Pokemon Yellow starts with Pikachu; keep the required Pikachu story events
+  moving and adapt the party to the campaign.
+- In battle, read the screen before choosing Fight, a move, an item, or Run.
+- Follow the Kanto story order: Oak's Parcel, Brock, Misty, S.S. Anne and Cut,
+  Surge, Rock Tunnel, Erika, Pokemon Tower, Fuchsia and Surf, Silph Co.,
+  Sabrina, Cinnabar, Giovanni, Victory Road, then the Pokemon League.
+- In the overworld, use the screenshot, coordinates, loaded warps, and local
+  collision grid to avoid loops. Do not apply Pokemon Red or Gold-specific
+  route assumptions unless current Yellow evidence independently confirms them.
+- Do not issue more than {MAX_BUTTONS_PER_DECISION} buttons. In corridors,
+  batch only 2-6 identical directions; use 1-3 inputs near turns, NPCs, doors,
+  menus, warps, ledges, puzzles, or unseen tiles.
+- Set action_mode to precision whenever uncertain or near an interaction.
+- A black or fade screen does not prove a transition. Reobserve before acting.
+- Interact only with NPCs or objects relevant to the current objective.
+- Never repeat an input that produced no visible change without first choosing
+  a materially different action.
+- Set checkpoint true after a badge, major story event, important new
+  location, or Hall of Fame completion.
+
+Valid buttons are: {", ".join(VALID_BUTTONS)}."""
+
 GOLD_SYSTEM_PROMPT = f"""You are the autonomous player in Copilot Plays Pokemon Gold.
 Your long-term goal is to complete both regions: defeat the Elite Four, earn
 all sixteen badges, unlock Mt. Silver, and defeat Red at the summit.
@@ -20794,16 +20952,16 @@ class PokemonRunner:
         self.run_id = uuid.uuid4().hex[:12]
         self.rom = Path(args.rom).expanduser().resolve()
         self.game_id = pokemon_game_id(self.rom) or "red"
-        self.memory_reader_class = (
-            PokemonMemoryReader
-            if self.game_id == "red"
-            else PokemonGoldMemoryReader
-        )
-        self.system_prompt = (
-            GAME_SYSTEM_PROMPT
-            if self.game_id == "red"
-            else GOLD_SYSTEM_PROMPT
-        )
+        self.memory_reader_class = {
+            "red": PokemonMemoryReader,
+            YELLOW_GAME_ID: PokemonYellowMemoryReader,
+            "gold": PokemonGoldMemoryReader,
+        }[self.game_id]
+        self.system_prompt = {
+            "red": GAME_SYSTEM_PROMPT,
+            YELLOW_GAME_ID: YELLOW_SYSTEM_PROMPT,
+            "gold": GOLD_SYSTEM_PROMPT,
+        }[self.game_id]
         self.runtime_dir = Path(args.runtime_dir).expanduser().resolve()
         self.runtime_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
         os.chmod(self.runtime_dir, 0o700)
@@ -20977,14 +21135,16 @@ class PokemonRunner:
             "observation": "",
             "phase": "other",
             "reason": "",
-            "objective": (
-                "Start Pokemon Red and work toward the Hall of Fame"
-                if self.game_id == "red"
-                else (
+            "objective": {
+                "red": "Start Pokemon Red and work toward the Hall of Fame",
+                YELLOW_GAME_ID: (
+                    "Start Pokemon Yellow and work toward the Hall of Fame"
+                ),
+                "gold": (
                     "Start Pokemon Gold, defeat the Elite Four, earn all "
                     "sixteen badges, and defeat Red"
-                )
-            ),
+                ),
+            }[self.game_id],
             "last_action": [],
             "last_error": None,
             "game_state": {},
@@ -23406,9 +23566,12 @@ class PokemonRunner:
         ):
             route_state["previous_map_id"] = floor_trail[-2]
         exact_route_guidance = trusted_exact_route_guidance(route_state)
-        route_guidance = exact_route_guidance or rocket_hideout_route_guidance(
-            route_state
-        )
+        route_guidance = exact_route_guidance
+        if (
+            route_guidance is None
+            and game_state.get("game_id") in {None, "red"}
+        ):
+            route_guidance = rocket_hideout_route_guidance(route_state)
         if route_guidance:
             decision_state["route_guidance"] = route_guidance
         decision_navigation_mode = self.navigation_mode
@@ -24148,6 +24311,8 @@ class PokemonRunner:
         self, game_state: dict[str, Any]
     ) -> bool:
         """Keep the static encounter on the non-attacking Master Ball path."""
+        if game_state.get("game_id") == YELLOW_GAME_ID:
+            return False
         position = navigation_position(game_state)
         buttons = trusted_mewtwo_finalize_buttons(game_state)
         source = "trusted_mewtwo_finalize"
@@ -24410,7 +24575,12 @@ class PokemonRunner:
             return
         if game_state.get("hall_of_fame") and not self.status["completed"]:
             self.status["completed"] = True
-            self._rotate_clip("Pokemon Red completed: Hall of Fame")
+            game_name = (
+                "Pokemon Yellow"
+                if getattr(self, "game_id", "red") == YELLOW_GAME_ID
+                else "Pokemon Red"
+            )
+            self._rotate_clip(f"{game_name} completed: Hall of Fame")
             self._set_control_mode("paused")
         if (
             game_state.get("mewtwo_caught") is True

@@ -263,8 +263,9 @@ const server = createServer(async (request, response) => {
           await readFile(path.join(runtimeDir, 'status.json'), 'utf-8')
         );
         host.emulation_speed = agentStatus.emulation_speed ?? null;
-        host.game_id =
-          agentStatus.game_id === 'gold' ? 'gold' : 'red';
+        host.game_id = ['red', 'yellow', 'gold'].includes(agentStatus.game_id)
+          ? agentStatus.game_id
+          : 'red';
         host.decision_latency_seconds =
           agentStatus.decision_latency_seconds ?? null;
         host.reasoning_effort = agentStatus.reasoning_effort ?? null;

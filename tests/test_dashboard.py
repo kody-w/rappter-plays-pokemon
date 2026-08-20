@@ -28,6 +28,7 @@ from openrappter.agents.pokemon_agent import (
     PokemonGoldMemoryReader,
     PokemonMemoryReader,
     PokemonRunner,
+    PokemonYellowMemoryReader,
     ViewerServer,
     file_sha256,
     project_dashboard_snapshot,
@@ -449,6 +450,90 @@ def test_gold_reader_exposes_verified_generation_two_progress():
     }
 
 
+def test_yellow_reader_uses_yellow_wram_layout():
+    memory = bytearray(65536)
+    memory[0xD35D] = 0x00
+    memory[0xD360] = 6
+    memory[0xD361] = 5
+    memory[0xD355] = 0b00000001
+    memory[0xD162] = 1
+    memory[0xD16A] = 84
+    memory[0xD16B] = 0
+    memory[0xD16C] = 20
+    memory[0xD16A + 0x21] = 5
+    memory[0xD16A + 0x22] = 0
+    memory[0xD16A + 0x23] = 20
+    memory[0xD2B4] = 0x8F
+    memory[0xD2B5] = 0x88
+    memory[0xD2B6] = 0x8A
+    memory[0xD2B7] = 0x80
+    memory[0xD2B8] = 0x50
+    set_dex_bit(memory, 0xD2F6, 25)
+    set_dex_bit(memory, 0xD309, 25)
+    memory[0xD31C] = 1
+    memory[0xD31D] = 0x3F
+    memory[0xD31E] = 1
+    memory[0xD31F] = 0xFF
+    memory[0xD3AD] = 1
+    memory[0xD3AE] = 7
+    memory[0xD3AF] = 8
+    memory[0xD3B0] = 1
+    memory[0xD3B1] = 0x00
+    memory[0xD727] = 1
+    memory[0xD6FF] = 2
+    memory[0xD056] = 2
+    memory[0xCFE4] = 84
+    memory[0xDA40] = 23
+    memory[0xDA41] = 0
+    memory[0xDA42] = 58
+    memory[0xDA43] = 59
+    memory[0xDA44] = 30
+    memory[0xD163] = 6
+    memory[0xD356] = 0xFF
+    memory[0xD057] = 0
+    memory[0xD059] = 99
+
+    snapshot = PokemonYellowMemoryReader(memory).snapshot()
+
+    assert snapshot["game_id"] == "yellow"
+    assert snapshot["coordinates"] == {"x": 5, "y": 6}
+    assert snapshot["badges"] == ["Boulder"]
+    assert snapshot["party"] == [{
+        "nickname": "PIKA",
+        "species_id": 84,
+        "level": 5,
+        "hp": 20,
+        "max_hp": 20,
+    }]
+    assert snapshot["pokedex"] == {"caught": 1, "seen": 1, "total": 151}
+    assert snapshot["key_items"]["ss_ticket"] is True
+    assert snapshot["warps"] == [{
+        "x": 8,
+        "y": 7,
+        "destination_map": 0x00,
+        "destination_name": "Pallet Town",
+    }]
+    assert snapshot["strength_active"] is True
+    assert snapshot["surfing"] is True
+    assert snapshot["in_battle"] is True
+    assert snapshot["enemy_species_id"] == 84
+    assert snapshot["play_time"] == {
+        "hours": 23,
+        "minutes": 58,
+        "seconds": 59,
+        "frames": 30,
+        "maxed": False,
+    }
+    assert snapshot["hall_of_fame_completed"] is False
+
+    memory[0xD056] = 0xFF
+    memory[0xD5A1] = 1
+    completed = PokemonYellowMemoryReader(memory).snapshot()
+    assert completed["in_battle"] is False
+    assert completed["enemy_species_id"] == 0
+    assert completed["hall_of_fame_completed"] is True
+
+
 def test_gold_reader_does_not_decode_overworld_tiles_as_text():
     memory = bytearray(65536)
     memory[0xDA00] = 0x18
@@ -502,6 +587,43 @@ def test_project_dashboard_projects_gold_badges_and_party():
     assert snapshot["pokedex"]["total"] == 251
     assert snapshot["play_time"]["hours"] == 600
     assert snapshot["party"][0]["nickname"] == "CROCONAW"
+
+
+def test_project_dashboard_projects_yellow_as_generation_one():
+    snapshot = project_dashboard_snapshot({
+        "game_id": "yellow",
+        "game_state": {
+            "game_id": "yellow",
+            "location": "Pallet Town",
+            "badges": ["Boulder"],
+            "badge_bits": 1,
+            "party_count": 1,
+            "party": [{
+                "nickname": "PIKA",
+                "species_id": 84,
+                "level": 5,
+                "hp": 20,
+                "max_hp": 20,
+            }],
+            "pokedex": {"caught": 1, "seen": 1, "total": 151},
+            "play_time": {
+                "hours": 1,
+                "minutes": 2,
+                "seconds": 3,
+                "frames": 4,
+                "maxed": False,
+            },
+        },
+    })
+
+    assert snapshot["badges"] == {
+        "earned": ["Boulder"],
+        "count": 1,
+        "total": 8,
+    }
+    assert snapshot["pokedex"]["total"] == 151
+    assert snapshot["play_time"]["hours"] == 1
+    assert snapshot["party"][0]["nickname"] == "PIKA"
 
 
 def test_hall_of_fame_completion_event_persists_postgame():
