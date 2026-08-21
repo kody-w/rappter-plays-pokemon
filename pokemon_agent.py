@@ -23802,7 +23802,7 @@ class PokemonRunner:
         route_guidance = exact_route_guidance
         if (
             route_guidance is None
-            and game_state.get("game_id") in {None, "red"}
+            and game_state.get("game_id") in {None, "red", YELLOW_GAME_ID}
         ):
             route_guidance = rocket_hideout_route_guidance(route_state)
         if route_guidance:

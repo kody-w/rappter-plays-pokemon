@@ -5927,12 +5927,18 @@ def test_puzzle_decision_state_carries_neighborhood_directive_and_counters(
     collision = "\n".join(
         "....P....." if index == 4 else ".........." for index in range(9)
     )
-    game_state = {"map_id": 0xC9, "coordinates": {"x": b[1], "y": b[2]}}
+    game_state = {
+        "game_id": "yellow",
+        "map_id": 0xC9,
+        "coordinates": {"x": b[1], "y": b[2]},
+        "badges": ["Boulder"],
+    }
 
     runner._request_decision(image, game_state, collision)
 
     request = runner.brain_requests.get_nowait()
     state = request["game_state"]
+    assert "Rocket Hideout route" in state["route_guidance"]
     assert state["navigation_mode"] == "puzzle"
     counters = state["step_counters"]
     assert counters["global_actions"] == 7
