@@ -1,6 +1,6 @@
 {
   "builder": {
-    "commit": "8cf47995c749caa582034a3e5e5977931fba59ab",
+    "commit": "42184c3064653fab7680a91e08b9b8c55becfe67",
     "module_sha256": "475c3d74533d73890a06f7e58fb24e5d8c673ca2f1746cb55e5d63cd11ea075c",
     "python": "3.13.15",
     "sqlite": "3.45.1"
@@ -36,7 +36,7 @@
       "source_commits": 466
     },
     "database_bytes": 60796928,
-    "database_sha256": "fe276108585b3c97b0fdb6cdda86c0705c3cf63854cc84b1cefee04d027409db",
+    "database_sha256": "1f01ed9a389476dff96a03adba52a2e4e4e3be16473b76b46bbaa5990f35e237",
     "execution_receipts_bytes": 4429461,
     "execution_receipts_sha256": "73955c26915419cca14508ad792cab47092285771cbc0c930be0e94bd379f55c",
     "schema_version": 1
