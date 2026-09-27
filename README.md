@@ -1,5 +1,9 @@
 # RAPPter Plays Pokémon
 
+<!-- rapp1:network-header:start -->
+[![RAPP/1](https://kody-w.github.io/rapp-hive-public/portfolio/badges/rappter-plays-pokemon.svg)](https://github.com/kody-w/rapp-hive-public/blob/main/portfolio/repos/rappter-plays-pokemon.md) · **New to RAPP?** [Start here: get your Brainstem →](https://github.com/kody-w/rapp-installer#start-here)
+<!-- rapp1:network-header:end -->
+
 Run a real, single-file OpenRappter agent that lets GitHub Copilot autonomously
 attempt a full playthrough of Pokémon Red in a local PyBoy emulator. It can
 persist progress for long-running sessions, record segmented MP4 clips, expose
